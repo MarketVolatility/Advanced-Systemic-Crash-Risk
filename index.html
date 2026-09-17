@@ -1,0 +1,1693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Systemic Crash Risk Dashboard</title>
+
+
+<style>
+/* =========================================================
+   AUTHENTICATION
+   Front-end login/verification gate.
+   NOTE: Real multi-device authentication requires a backend
+   authentication service; this UI does not store passwords.
+   ========================================================= */
+.auth-overlay{
+    position:fixed;
+    inset:0;
+    z-index:9999;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding:20px;
+    background:rgba(15,23,42,.98);
+}
+.auth-card{
+    width:min(430px,100%);
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:28px;
+    box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.auth-card h2{margin:0 0 8px;font-size:22px;}
+.auth-card p{color:var(--text-muted);font-size:13px;line-height:1.5;margin:0 0 20px;}
+.auth-form{display:flex;flex-direction:column;gap:12px;}
+.auth-form label{font-size:12px;color:var(--text-muted);font-weight:600;}
+.auth-form input{
+    width:100%;
+    background:var(--bg-color);
+    border:1px solid var(--border);
+    border-radius:7px;
+    padding:11px 12px;
+    color:var(--text-main);
+    font-size:14px;
+}
+.auth-form input:focus{border-color:var(--blue);outline:none;}
+.auth-message{font-size:12px;line-height:1.45;min-height:18px;}
+.auth-message.error{color:var(--red);}
+.auth-message.success{color:var(--green);}
+.auth-links{display:flex;justify-content:space-between;gap:10px;margin-top:14px;}
+.auth-links button{
+    background:none;
+    border:0;
+    color:#93c5fd;
+    padding:4px;
+    font-size:12px;
+}
+.auth-step{display:none;}
+.auth-step.active{display:block;}
+.auth-brand{
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--blue);
+    font-weight:800;
+    margin-bottom:8px;
+}
+#appShell{display:none;}
+.user-menu{display:flex;align-items:center;gap:8px;}
+.user-email{font-size:12px;color:var(--text-muted);}
+.logout-btn{padding:7px 11px;font-size:12px;}
+</style>
+
+<style>
+:root {
+    --bg-color:#0f172a;
+    --card-bg:#1e293b;
+    --card-bg2:#162032;
+    --text-main:#f8fafc;
+    --text-muted:#94a3b8;
+    --border:#334155;
+    --green:#10b981;
+    --amber:#f59e0b;
+    --red:#ef4444;
+    --purple:#9333ea;
+    --blue:#3b82f6;
+}
+
+* { box-sizing:border-box; }
+
+body {
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    background:var(--bg-color);
+    color:var(--text-main);
+    margin:0;
+    padding:20px;
+}
+
+.container {
+    max-width:1100px;
+    margin:0 auto;
+}
+
+header {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    border-bottom:1px solid var(--border);
+    padding-bottom:20px;
+    margin-bottom:25px;
+}
+
+h1 {
+    margin:0;
+    font-size:24px;
+}
+
+.last-checked {
+    color:var(--text-muted);
+    font-size:14px;
+    margin-top:4px;
+}
+
+/* SUMMARY */
+
+.summary-grid {
+    display:grid;
+    grid-template-columns:1fr 2fr;
+    gap:20px;
+    margin-bottom:20px;
+}
+
+.score-card,
+.scale-card,
+.control-panel,
+.signal-card {
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:20px;
+}
+
+.score-card {
+    text-align:center;
+    display:flex;
+    flex-direction:column;
+    justify-content:center;
+}
+
+.score-num {
+    font-size:48px;
+    font-weight:800;
+    margin:10px 0;
+}
+
+.score-status {
+    font-weight:600;
+    padding:5px 12px;
+    border-radius:20px;
+    display:inline-block;
+}
+
+.scale-title {
+    font-weight:600;
+    margin-bottom:15px;
+    color:var(--text-muted);
+    font-size:14px;
+}
+
+.scale-bars {
+    display:flex;
+    flex-direction:column;
+    gap:9px;
+}
+
+.scale-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:14px;
+    padding:5px;
+    border-radius:6px;
+}
+
+.scale-label {
+    display:flex;
+    align-items:center;
+    gap:8px;
+}
+
+.scale-dot {
+    width:10px;
+    height:10px;
+    border-radius:50%;
+    flex-shrink:0;
+}
+
+/* SIGNAL CARDS */
+
+.signal-grid {
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:15px;
+    margin-bottom:25px;
+}
+
+.signal-title {
+    font-size:12px;
+    color:var(--text-muted);
+    text-transform:uppercase;
+    font-weight:700;
+}
+
+.signal-value {
+    font-size:24px;
+    font-weight:800;
+    margin:7px 0;
+}
+
+.signal-description {
+    font-size:12px;
+    color:var(--text-muted);
+}
+
+/* TABLE */
+
+table {
+    width:100%;
+    border-collapse:collapse;
+    background:var(--card-bg);
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    margin-bottom:25px;
+}
+
+th,td {
+    padding:13px 16px;
+    text-align:left;
+}
+
+th {
+    background:var(--card-bg2);
+    font-size:12px;
+    text-transform:uppercase;
+    color:var(--text-muted);
+    letter-spacing:.5px;
+}
+
+tr {
+    border-bottom:1px solid var(--border);
+}
+
+tr:last-child {
+    border-bottom:none;
+}
+
+.metric-cat {
+    font-size:10px;
+    text-transform:uppercase;
+    color:var(--blue);
+    font-weight:700;
+    display:block;
+    margin-bottom:2px;
+}
+
+.metric-name {
+    font-weight:600;
+}
+
+.metric-note {
+    font-size:11px;
+    color:var(--text-muted);
+    margin-top:3px;
+}
+
+.badge {
+    font-weight:600;
+    padding:4px 8px;
+    border-radius:6px;
+    font-size:12px;
+    display:inline-block;
+}
+
+.status-green {
+    background:rgba(16,185,129,.15);
+    color:var(--green);
+}
+
+.status-amber {
+    background:rgba(245,158,11,.15);
+    color:var(--amber);
+}
+
+.status-red {
+    background:rgba(239,68,68,.15);
+    color:var(--red);
+}
+
+.status-purple {
+    background:rgba(147,51,234,.15);
+    color:#c084fc;
+}
+
+/* CONTROLS */
+
+.control-panel {
+    margin-bottom:25px;
+}
+
+.panel-title {
+    font-weight:700;
+    margin-bottom:15px;
+    font-size:16px;
+}
+
+.input-grid {
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(190px,1fr));
+    gap:15px;
+    margin-bottom:20px;
+}
+
+.input-group {
+    display:flex;
+    flex-direction:column;
+    gap:5px;
+}
+
+.input-group label {
+    font-size:12px;
+    color:var(--text-muted);
+    font-weight:600;
+}
+
+.input-group input {
+    background:var(--bg-color);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:8px 10px;
+    color:var(--text-main);
+    font-size:14px;
+}
+
+.input-group input:focus {
+    border-color:var(--blue);
+    outline:none;
+}
+
+.btn-container {
+    display:flex;
+    gap:10px;
+    justify-content:flex-end;
+}
+
+button {
+    background:var(--blue);
+    color:white;
+    border:none;
+    border-radius:6px;
+    padding:10px 20px;
+    font-weight:600;
+    cursor:pointer;
+}
+
+button.secondary {
+    background:transparent;
+    border:1px solid var(--border);
+}
+
+.paste-box {
+    width:100%;
+    background:var(--bg-color);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:10px;
+    color:var(--text-main);
+    font-family:monospace;
+    font-size:13px;
+    margin-bottom:15px;
+    resize:vertical;
+}
+
+.info-box {
+    background:rgba(59,130,246,.08);
+    border:1px solid rgba(59,130,246,.25);
+    border-radius:8px;
+    padding:13px;
+    color:#bfdbfe;
+    font-size:12px;
+    line-height:1.5;
+    margin-bottom:20px;
+}
+
+/* GRANULAR REGIME MATRIX */
+.matrix-wrap {
+    overflow-x:auto;
+}
+
+.regime-matrix {
+    width:100%;
+    border-collapse:collapse;
+    min-width:820px;
+    font-size:12px;
+    margin:0;
+}
+
+.regime-matrix th,
+.regime-matrix td {
+    border:1px solid var(--border);
+    padding:11px 10px;
+    vertical-align:top;
+    line-height:1.45;
+}
+
+.regime-matrix th {
+    background:var(--card-bg2);
+    color:var(--text-muted);
+    font-size:10px;
+    letter-spacing:.06em;
+    text-align:left;
+}
+
+.regime-matrix td:nth-child(1) { width:8%; white-space:nowrap; }
+.regime-matrix td:nth-child(2) { width:15%; }
+.regime-matrix td:nth-child(3) { width:22%; }
+.regime-matrix td:nth-child(4) { width:55%; }
+
+.matrix-row {
+    transition:background .2s ease, box-shadow .2s ease;
+}
+
+.matrix-row.active {
+    background:rgba(59,130,246,.12) !important;
+    box-shadow:inset 4px 0 0 var(--blue);
+}
+
+.matrix-row:hover {
+    background:rgba(59,130,246,.06);
+}
+
+/* RESPONSIVE */
+
+@media(max-width:800px) {
+    .summary-grid,
+    .signal-grid {
+        grid-template-columns:1fr;
+    }
+
+    table {
+        font-size:12px;
+    }
+
+    th,td {
+        padding:10px 8px;
+    }
+
+    header {
+        flex-direction:column;
+        align-items:flex-start;
+        gap:10px;
+    }
+}
+</style>
+
+<style>
+
+<style>
+.regime-points {
+    display:inline-block;
+    margin-left:8px;
+    font-size:.78em;
+    font-weight:700;
+    opacity:.9;
+    color:var(--text-muted);
+}
+</style>
+</head>
+
+<body>
+
+<!-- =========================================================
+     LOGIN / EMAIL VERIFICATION
+     ========================================================= -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-card">
+    <div class="auth-brand">Advanced Systemic Crash Risk Dashboard</div>
+
+    <div class="auth-step active" id="loginStep">
+      <h2>Sign in</h2>
+      <p>Use your verified email address and password to access the dashboard.</p>
+      <form class="auth-form" onsubmit="return handleLogin(event)">
+        <div>
+          <label for="loginEmail">Email address</label>
+          <input id="loginEmail" type="email" autocomplete="email" required>
+        </div>
+        <div>
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="auth-message" id="loginMessage"></div>
+        <button type="submit">Sign in</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" onclick="showAuthStep('registerStep')">Create account</button>
+        <button type="button" onclick="showAuthStep('resetStep')">Forgot password?</button>
+      </div>
+    </div>
+
+    <div class="auth-step" id="registerStep">
+      <h2>Create account</h2>
+      <p>Register with an email address. A verification code is required before the account can be used.</p>
+      <form class="auth-form" onsubmit="return handleRegister(event)">
+        <div>
+          <label for="registerEmail">Email address</label>
+          <input id="registerEmail" type="email" autocomplete="email" required>
+        </div>
+        <div>
+          <label for="registerPassword">Password</label>
+          <input id="registerPassword" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <div>
+          <label for="registerPassword2">Confirm password</label>
+          <input id="registerPassword2" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <div class="auth-message" id="registerMessage"></div>
+        <button type="submit">Register &amp; send verification</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
+      </div>
+    </div>
+
+    <div class="auth-step" id="verifyStep">
+      <h2>Verify your email</h2>
+      <p>Enter the verification code sent to <strong id="verifyEmail"></strong>.</p>
+      <form class="auth-form" onsubmit="return handleVerify(event)">
+        <div>
+          <label for="verificationCode">Verification code</label>
+          <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code"
+                 maxlength="6" pattern="[0-9]{6}" required>
+        </div>
+        <div class="auth-message" id="verifyMessage"></div>
+        <button type="submit">Verify email</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
+        <button type="button" onclick="resendVerification()">Resend code</button>
+      </div>
+    </div>
+
+    <div class="auth-step" id="resetStep">
+      <h2>Reset password</h2>
+      <p>Enter your verified email address. A password-reset link/code would be sent by the authentication server.</p>
+      <form class="auth-form" onsubmit="return handleReset(event)">
+        <div>
+          <label for="resetEmail">Email address</label>
+          <input id="resetEmail" type="email" autocomplete="email" required>
+        </div>
+        <div class="auth-message" id="resetMessage"></div>
+        <button type="submit">Request password reset</button>
+      </form>
+      <div class="auth-links">
+        <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="appShell">
+<div class="container">
+
+<header>
+    <div>
+        <h1>Advanced Systemic Crash Risk Dashboard</h1>
+        <div class="last-checked" id="lastCheckDate"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);text-align:right;">
+        Build v5.0<br>
+        Risk-Weighted + Momentum + Cross-Asset
+        <div class="user-menu">
+            <span class="user-email" id="loggedInEmail"></span>
+            <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
+        </div>
+    </div>
+</header>
+
+<div class="summary-grid">
+
+    <div class="score-card">
+        <div style="font-size:14px;color:var(--text-muted);font-weight:600;">
+            Composite Crash Risk Score
+        </div>
+
+        <div class="score-num" id="totalScoreDisp">0 / 40</div>
+
+        <div>
+            <span class="score-status status-green" id="statusTermDisp">
+                Normal Risk
+            </span>
+        </div>
+
+        <div id="scoreSubtext"
+             style="font-size:12px;color:var(--text-muted);margin-top:12px;">
+        </div>
+    </div>
+
+    <div class="scale-card">
+        <div class="scale-title">
+            📊 Systemic Risk Regime Matrix — Maximum 40 Points
+        </div>
+
+        <div class="matrix-wrap">
+            <table class="regime-matrix">
+                <thead>
+                    <tr>
+                        <th>SCORE BAND</th>
+                        <th>REGIME LABEL</th>
+                        <th>TARGET PORTFOLIO ACTION</th>
+                        <th>MARKET ENVIRONMENT CHARACTERISTICS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="matrix-row" id="scale-normal">
+                        <td><strong>0–3</strong></td>
+                        <td><strong>Normal Risk</strong></td>
+                        <td><strong>Fully Invested / Risk-On</strong></td>
+                        <td>Volatility is suppressed, credit spreads are tight, and market breadth is healthy. Asset allocation should favor maximum growth equity and high-beta exposure.</td>
+                    </tr>
+                    <tr class="matrix-row" id="scale-watch">
+                        <td><strong>4–7</strong></td>
+                        <td><strong>Correction Risk</strong></td>
+                        <td><strong>Tactical Neutral / Watch</strong></td>
+                        <td>Early macro or technical cracks appearing (e.g., energy spikes or minor technical breakdown). Portfolio should pause new capital deployments and evaluate hedge triggers.</td>
+                    </tr>
+                    <tr class="matrix-row" id="scale-systemic-stress">
+                        <td><strong>8–11</strong></td>
+                        <td><strong>Systemic Stress</strong></td>
+                        <td><strong>Defensive Pivot / Hedges On</strong></td>
+                        <td>Broader technical breakdown. Multiple asset classes are flashing warning signs (e.g., yields spiking or currency unwinding). Start moving capital into cash alternatives or defensive moats like <strong>AVGO</strong> and <strong>PLTR</strong>.</td>
+                    </tr>
+                    <tr class="matrix-row" id="scale-high-stress">
+                        <td><strong>12–15</strong></td>
+                        <td><strong>High Stress</strong></td>
+                        <td><strong>De-risking / Stress Plan</strong></td>
+                        <td>Volatility enters a persistent high regime. High-yield credit markets begin to tighten significantly. Implement strict portfolio de-risking by trimming high-beta and leveraged assets.</td>
+                    </tr>
+                    <tr class="matrix-row" id="scale-high-risk">
+                        <td><strong>16–25</strong></td>
+                        <td><strong>High Risk</strong></td>
+                        <td><strong>De-risking / Stress Plan</strong></td>
+                        <td>Broad-based market panic. Market breadth collapses completely, and correlation approaches 1. Portfolio focuses heavily on capital preservation and downside protection.</td>
+                    </tr>
+                    <tr class="matrix-row" id="scale-systemic">
+                        <td><strong>26–40</strong></td>
+                        <td><strong>Systemic Risk</strong></td>
+                        <td><strong>Liquidity / Capitulation</strong></td>
+                        <td>Full-scale institutional credit freeze, currency dislocation, or market crash. Liquidate remaining vulnerable exposures and prepare to deploy capital into deeply discounted structural moats as capitulation peaks.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- REGIME SIGNALS -->
+
+<div class="signal-grid">
+
+    <div class="signal-card">
+        <div class="signal-title">Volatility Regime</div>
+        <div class="signal-value" id="volRegime">—</div>
+        <div class="signal-description" id="volDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Credit Regime</div>
+        <div class="signal-value" id="creditRegime">—</div>
+        <div class="signal-description" id="creditDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Macro Shock</div>
+        <div class="signal-value" id="macroRegime">—</div>
+        <div class="signal-description" id="macroDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Equity Structure</div>
+        <div class="signal-value" id="equityRegime">—</div>
+        <div class="signal-description" id="equityDesc"></div>
+    </div>
+
+</div>
+
+<table>
+
+<thead>
+<tr>
+    <th>Risk Factor</th>
+    <th>Current Reading</th>
+    <th>Status</th>
+    <th>Points</th>
+</tr>
+</thead>
+
+<tbody id="metricTableBody"></tbody>
+
+</table>
+
+<!-- QUICK PASTE -->
+
+<div class="control-panel">
+
+<div class="panel-title">
+    ⚡ Quick Paste Update
+</div>
+
+<div class="info-box">
+    Paste values in the following order:
+    <br><br>
+    <strong>
+    VIX,
+    VIX 1D %,
+    VIX 5D %,
+    HY OAS,
+    HY OAS 5D bp change,
+    HY OAS 20D bp change,
+    BBB OAS,
+    10Y Yield,
+    10Y 20D bp change,
+    S&P vs 50DMA,
+    S&P vs 200DMA,
+    WTI,
+    WTI 20D %,
+    MOVE,
+    USDJPY,
+    Breadth % &gt;50DMA,
+    Breadth 20D change,
+    VIX 3M-1M spread
+    </strong>
+</div>
+
+<textarea
+class="paste-box"
+id="quickPasteInput"
+rows="3"
+placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5, 105.4, 142.1, 62.5, -4.2, 1.8">
+</textarea>
+
+<div class="btn-container">
+    <button onclick="parseQuickPaste()">Parse & Update</button>
+</div>
+
+</div>
+
+<!-- MANUAL -->
+
+<div class="control-panel">
+
+<div class="panel-title">
+    🔧 Manual Structural Overrides
+</div>
+
+<div class="input-grid">
+
+<div class="input-group">
+<label>VIX Level</label>
+<input type="number" step=".01" id="in_vix" value="15.72">
+</div>
+
+<div class="input-group">
+<label>VIX 1-Day Change (%)</label>
+<input type="number" step=".01" id="in_vix_chg" value="8.19">
+</div>
+
+<div class="input-group">
+<label>VIX 5-Day Change (%)</label>
+<input type="number" step=".01" id="in_vix_5d" value="12.4">
+</div>
+
+<div class="input-group">
+<label>HY OAS (bp)</label>
+<input type="number" id="in_hy" value="268">
+</div>
+
+<div class="input-group">
+<label>HY OAS 5-Day Δ (bp)</label>
+<input type="number" step=".1" id="in_hy_5d" value="8">
+</div>
+
+<div class="input-group">
+<label>HY OAS 20-Day Δ (bp)</label>
+<input type="number" step=".1" id="in_hy_20d" value="22">
+</div>
+
+<div class="input-group">
+<label>BBB OAS (bp)</label>
+<input type="number" id="in_bbb" value="102">
+</div>
+
+<div class="input-group">
+<label>10Y Yield (%)</label>
+<input type="number" step=".01" id="in_yield" value="4.80">
+</div>
+
+<div class="input-group">
+<label>10Y 20-Day Δ (bp)</label>
+<input type="number" step=".1" id="in_yield_20d" value="18">
+</div>
+
+<div class="input-group">
+<label>S&P vs 50DMA (%)</label>
+<input type="number" step=".01" id="in_dma50" value="1.2">
+</div>
+
+<div class="input-group">
+<label>S&P vs 200DMA (%)</label>
+<input type="number" step=".01" id="in_dma200" value="7.6">
+</div>
+
+<div class="input-group">
+<label>WTI ($)</label>
+<input type="number" step=".01" id="in_wti" value="94.73">
+</div>
+
+<div class="input-group">
+<label>WTI 20-Day Change (%)</label>
+<input type="number" step=".01" id="in_wti_20d" value="12.5">
+</div>
+
+<div class="input-group">
+<label>MOVE Index</label>
+<input type="number" step=".1" id="in_move" value="105.4">
+</div>
+
+<div class="input-group">
+<label>USD/JPY</label>
+<input type="number" step=".1" id="in_jpy" value="142.1">
+</div>
+
+<div class="input-group">
+<label>Breadth (% > 50DMA)</label>
+<input type="number" step=".1" id="in_breadth" value="62.5">
+</div>
+
+<div class="input-group">
+<label>Breadth 20-Day Δ (percentage points)</label>
+<input type="number" step=".1" id="in_breadth_20d" value="-4.2">
+</div>
+
+<div class="input-group">
+<label>VIX 3M − 1M (points)</label>
+<input type="number" step=".1" id="in_vix_term" value="1.8">
+</div>
+
+</div>
+
+<div class="btn-container">
+    <button class="secondary" onclick="resetForm()">
+        Reset Defaults
+    </button>
+
+    <button onclick="updateFromManual()">
+        Save Manual Changes
+    </button>
+</div>
+
+</div>
+
+</div>
+</div>
+
+<script>
+
+/* =========================================================
+   AUTHENTICATION GATE
+   =========================================================
+   This is a front-end authentication interface. A browser-only
+   HTML file cannot securely provide real password authentication,
+   email delivery, or multi-device sessions. The functions below
+   therefore expose the required UI/API integration points and
+   deliberately do NOT store passwords in localStorage.
+*/
+let pendingVerificationEmail = "";
+
+function showAuthStep(id){
+    document.querySelectorAll(".auth-step").forEach(el => el.classList.remove("active"));
+    const step = document.getElementById(id);
+    if(step) step.classList.add("active");
+    document.querySelectorAll(".auth-message").forEach(el => {
+        el.textContent = "";
+        el.className = "auth-message";
+    });
+}
+
+function setAuthMessage(id, message, type=""){
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.textContent = message;
+    el.className = "auth-message " + type;
+}
+
+/*
+ * Replace these three functions with calls to your chosen
+ * authentication backend (e.g. Supabase/Firebase/Auth0/custom API).
+ * The backend should:
+ *   1. create accounts using email + password,
+ *   2. send a verification email/code,
+ *   3. verify the email,
+ *   4. issue a secure session/token that works across devices.
+ */
+async function authApi(path, payload){
+    const AUTH_API_BASE = ""; // Example: "https://your-domain.example/api"
+    if(!AUTH_API_BASE){
+        throw new Error("Authentication backend is not configured. Set AUTH_API_BASE in authApi().");
+    }
+    const response = await fetch(AUTH_API_BASE + path, {
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        credentials:"include",
+        body:JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => ({}));
+    if(!response.ok) throw new Error(data.message || "Authentication request failed.");
+    return data;
+}
+
+async function handleRegister(event){
+    event.preventDefault();
+    const email = document.getElementById("registerEmail").value.trim().toLowerCase();
+    const password = document.getElementById("registerPassword").value;
+    const password2 = document.getElementById("registerPassword2").value;
+
+    if(password !== password2){
+        setAuthMessage("registerMessage","Passwords do not match.","error");
+        return false;
+    }
+    if(password.length < 8){
+        setAuthMessage("registerMessage","Password must contain at least 8 characters.","error");
+        return false;
+    }
+
+    try{
+        await authApi("/register",{email,password});
+        pendingVerificationEmail = email;
+        document.getElementById("verifyEmail").textContent = email;
+        showAuthStep("verifyStep");
+        setAuthMessage("verifyMessage","Verification code sent. Check your email.","success");
+    }catch(err){
+        setAuthMessage("registerMessage",err.message,"error");
+    }
+    return false;
+}
+
+async function handleVerify(event){
+    event.preventDefault();
+    const code = document.getElementById("verificationCode").value.trim();
+
+    try{
+        await authApi("/verify-email",{
+            email:pendingVerificationEmail,
+            code
+        });
+        showAuthStep("loginStep");
+        document.getElementById("loginEmail").value = pendingVerificationEmail;
+        setAuthMessage("loginMessage","Email verified. You can now sign in.","success");
+    }catch(err){
+        setAuthMessage("verifyMessage",err.message,"error");
+    }
+    return false;
+}
+
+async function resendVerification(){
+    if(!pendingVerificationEmail){
+        showAuthStep("loginStep");
+        return;
+    }
+    try{
+        await authApi("/resend-verification",{email:pendingVerificationEmail});
+        setAuthMessage("verifyMessage","A new verification code has been sent.","success");
+    }catch(err){
+        setAuthMessage("verifyMessage",err.message,"error");
+    }
+}
+
+async function handleLogin(event){
+    event.preventDefault();
+    const email = document.getElementById("loginEmail").value.trim().toLowerCase();
+    const password = document.getElementById("loginPassword").value;
+
+    try{
+        const result = await authApi("/login",{email,password});
+        if(result && result.emailVerified === false){
+            pendingVerificationEmail = email;
+            document.getElementById("verifyEmail").textContent = email;
+            showAuthStep("verifyStep");
+            setAuthMessage("verifyMessage","Please verify your email before signing in.","error");
+            return false;
+        }
+
+        /*
+         * The server should establish a secure, HttpOnly session cookie.
+         * Do not store passwords or long-lived authentication tokens in
+         * localStorage.
+         */
+        document.getElementById("loggedInEmail").textContent = email;
+        document.getElementById("authOverlay").style.display = "none";
+        document.getElementById("appShell").style.display = "block";
+        renderDashboard();
+    }catch(err){
+        setAuthMessage("loginMessage",err.message,"error");
+    }
+    return false;
+}
+
+async function handleReset(event){
+    event.preventDefault();
+    const email = document.getElementById("resetEmail").value.trim().toLowerCase();
+    try{
+        await authApi("/request-password-reset",{email});
+        setAuthMessage("resetMessage","If an account exists for this email, password-reset instructions have been sent.","success");
+    }catch(err){
+        setAuthMessage("resetMessage",err.message,"error");
+    }
+    return false;
+}
+
+async function logoutUser(){
+    try{
+        await authApi("/logout",{});
+    }catch(err){
+        console.warn("Logout request failed:",err.message);
+    }
+    document.getElementById("appShell").style.display = "none";
+    document.getElementById("authOverlay").style.display = "flex";
+    document.getElementById("loggedInEmail").textContent = "";
+    document.getElementById("loginPassword").value = "";
+    showAuthStep("loginStep");
+}
+
+async function checkExistingSession(){
+    /*
+     * With a configured backend, call a /session endpoint here.
+     * The backend's secure session cookie allows the same account to
+     * be used from different devices after normal sign-in.
+     */
+    try{
+        const result = await authApi("/session",{});
+        if(result && result.authenticated){
+            document.getElementById("loggedInEmail").textContent = result.email || "";
+            document.getElementById("authOverlay").style.display = "none";
+            document.getElementById("appShell").style.display = "block";
+        }
+    }catch(err){
+        // Expected while AUTH_API_BASE is not configured.
+    }
+}
+
+
+/* =========================================================
+   RISK ENGINE
+   =========================================================
+
+   Maximum = 40 points
+
+   The model deliberately gives more importance to:
+   1. Credit deterioration
+   2. Volatility acceleration
+   3. Rates shock
+   4. Oil shock
+   5. Equity breadth
+   6. Cross-asset confirmation
+
+   A high score requires multiple markets to confirm stress.
+*/
+
+const metricConfig = {
+
+vix: {
+    name:"VIX Level",
+    cat:"Equities / Volatility",
+    maxPoints:2,
+    calc:v => v >= 30 ? 2 : (v >= 25 ? 1 : 0),
+    format:v => v.toFixed(2)
+},
+
+    vix_chg:{
+        name:"VIX 1-Day Velocity",
+        cat:"Equities / Volatility",
+        maxPoints:2,
+        calc:v => v >= 30 ? 2 : (v >= 15 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+    },
+
+    vix_5d:{
+        name:"VIX 5-Day Momentum",
+        cat:"Equities / Volatility",
+        maxPoints:2,
+        calc:v => v >= 50 ? 2 : (v >= 25 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+    },
+
+    hy:{
+        name:"High Yield OAS",
+        cat:"Credit",
+        maxPoints:4,
+        calc:v => v >= 500 ? 4 : (v >= 400 ? 3 : (v >= 325 ? 1 : 0)),
+        format:v => v.toFixed(0) + " bp"
+    },
+
+    hy_5d:{
+        name:"HY OAS 5-Day Widening",
+        cat:"Credit Momentum",
+        maxPoints:2,
+        calc:v => v >= 25 ? 2 : (v >= 15 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(0) + " bp"
+    },
+
+    hy_20d:{
+        name:"HY OAS 20-Day Widening",
+        cat:"Credit Momentum",
+        maxPoints:2,
+        calc:v => v >= 50 ? 2 : (v >= 30 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(0) + " bp"
+    },
+
+    bbb:{
+        name:"BBB OAS",
+        cat:"Credit",
+        maxPoints:3,
+        calc:v => v >= 200 ? 3 : (v >= 160 ? 2 : (v >= 130 ? 1 : 0)),
+        format:v => v.toFixed(0) + " bp"
+    },
+
+    yield:{
+        name:"10-Year Treasury Yield",
+        cat:"Rates",
+        maxPoints:2,
+        calc:v => v >= 5.25 ? 2 : (v >= 4.75 ? 1 : 0),
+        format:v => v.toFixed(2) + "%"
+    },
+
+    yield_20d:{
+        name:"10Y 20-Day Yield Change",
+        cat:"Rates Momentum",
+        maxPoints:2,
+        calc:v => v >= 35 ? 2 : (v >= 20 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(0) + " bp"
+    },
+
+    dma50:{
+        name:"S&P 500 vs 50-DMA",
+        cat:"Equities / Technicals",
+        maxPoints:2,
+        calc:v => v <= -5 ? 2 : (v <= 0 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+    },
+
+    dma200:{
+        name:"S&P 500 vs 200-DMA",
+        cat:"Equities / Technicals",
+        maxPoints:2,
+        calc:v => v <= -10 ? 2 : (v <= 0 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+    },
+
+    wti:{
+        name:"WTI Crude",
+        cat:"Commodities / Macro",
+        maxPoints:2,
+        calc:v => v >= 105 ? 2 : (v >= 90 ? 1 : 0),
+        format:v => "$" + v.toFixed(2)
+    },
+
+    wti_20d:{
+        name:"WTI 20-Day Momentum",
+        cat:"Commodities / Macro",
+        maxPoints:2,
+        calc:v => v >= 20 ? 2 : (v >= 10 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%"
+    },
+
+
+move:{
+    name:"MOVE Bond Volatility",
+    cat:"Rates / Volatility",
+    maxPoints:2,
+    calc:v => v >= 140 ? 2 : (v >= 120 ? 1 : 0),
+    format:v => v.toFixed(1)
+},
+    
+    jpy:{
+        name:"USD/JPY Carry Signal",
+        cat:"FX / Liquidity",
+        maxPoints:2,
+        calc:v => v <= 130 ? 2 : (v <= 135 ? 1 : 0),
+        format:v => v.toFixed(1)
+    },
+
+    breadth:{
+        name:"S&P 500 Breadth > 50-DMA",
+        cat:"Equities / Breadth",
+        maxPoints:3,
+        calc:v => v <= 30 ? 3 : (v <= 50 ? 2 : (v <= 60 ? 1 : 0)),
+        format:v => v.toFixed(1) + "%"
+    },
+
+    breadth_20d:{
+        name:"Breadth 20-Day Deterioration",
+        cat:"Equities / Breadth Momentum",
+        maxPoints:2,
+        calc:v => v <= -15 ? 2 : (v <= -8 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1) + " pp"
+    },
+
+    vix_term:{
+        name:"VIX 3M − 1M Term Structure",
+        cat:"Volatility Structure",
+        maxPoints:2,
+        calc:v => v <= -2 ? 2 : (v <= 0 ? 1 : 0),
+        format:v => (v >= 0 ? "+" : "") + v.toFixed(1)
+    }
+};
+
+
+/* =========================================================
+   CURRENT DATA
+   ========================================================= */
+
+let currentData = {
+
+    vix:15.72,
+    vix_chg:8.19,
+    vix_5d:12.4,
+
+    hy:268,
+    hy_5d:8,
+    hy_20d:22,
+
+    bbb:102,
+
+    yield:4.80,
+    yield_20d:18,
+
+    dma50:1.2,
+    dma200:7.6,
+
+    wti:94.73,
+    wti_20d:12.5,
+
+    move:105.4,
+    jpy:142.1,
+
+    breadth:62.5,
+    breadth_20d:-4.2,
+
+    vix_term:1.8
+};
+
+
+/* =========================================================
+   STATUS
+   ========================================================= */
+
+function getStatus(points,maxPoints){
+
+    if(points === 0)
+        return ["Green","status-green"];
+
+    if(points >= maxPoints)
+        return ["Red","status-red"];
+
+    return ["Amber","status-amber"];
+}
+
+
+/* =========================================================
+   RENDER TABLE
+   ========================================================= */
+
+function renderDashboard(){
+
+    const tbody =
+        document.getElementById("metricTableBody");
+
+    tbody.innerHTML="";
+
+    let totalScore=0;
+    let totalMax=0;
+
+    for(const key in metricConfig){
+
+        const config=metricConfig[key];
+        const val=currentData[key];
+
+        if(!Number.isFinite(val))
+            continue;
+
+        const points=config.calc(val);
+
+        totalScore+=points;
+        totalMax+=config.maxPoints;
+
+        const [statusText,statusClass]=
+            getStatus(points,config.maxPoints);
+
+        const row=document.createElement("tr");
+
+        row.innerHTML=`
+
+        <td>
+            <span class="metric-cat">
+                ${config.cat}
+            </span>
+
+            <span class="metric-name">
+                ${config.name}
+            </span>
+        </td>
+
+        <td style="font-family:monospace;font-weight:bold;">
+            ${config.format(val)}
+        </td>
+
+        <td>
+            <span class="badge ${statusClass}">
+                ${statusText}
+            </span>
+        </td>
+
+        <td style="font-weight:700;">
+            ${points} / ${config.maxPoints}
+        </td>
+        `;
+
+        tbody.appendChild(row);
+    }
+
+    updateSummary(totalScore,totalMax);
+    updateRegimes();
+
+    document.getElementById("lastCheckDate").innerText =
+        "Last check: " +
+        new Date().toLocaleDateString(
+            "en-CA",
+            {
+                year:"numeric",
+                month:"2-digit",
+                day:"2-digit"
+            }
+        );
+}
+
+
+/* =========================================================
+   SUMMARY
+   ========================================================= */
+
+function updateSummary(score,max){
+
+    document.getElementById("totalScoreDisp")
+        .innerText=`${score} / ${max}`;
+
+    let text="Normal Risk";
+    let cls="status-green";
+    let scale="scale-normal";
+    let sub="Normal risk regime; portfolio can remain fully invested / risk-on.";
+
+    if(score>=26){
+        text="Systemic Risk";
+        cls="status-purple";
+        scale="scale-systemic";
+        sub="Systemic risk regime; liquidity / capitulation plan applies.";
+
+    }else if(score>=16){
+        text="High Risk";
+        cls="status-red";
+        scale="scale-high-risk";
+        sub="Broad-based market panic; focus heavily on capital preservation and downside protection.";
+
+    }else if(score>=12){
+        text="High Stress";
+        cls="status-red";
+        scale="scale-high-stress";
+        sub="Persistent high volatility and tightening high-yield credit; implement strict de-risking.";
+
+    }else if(score>=8){
+        text="Systemic Stress";
+        cls="status-amber";
+        scale="scale-systemic-stress";
+        sub="Broader technical breakdown; defensive pivot and hedges on.";
+
+    }else if(score>=4){
+        text="Correction Risk";
+        cls="status-amber";
+        scale="scale-watch";
+        sub="Early macro or technical cracks; tactical neutral / watch and evaluate hedge triggers.";
+    }
+
+    document
+        .querySelectorAll(".matrix-row")
+        .forEach(x=>x.classList.remove("active"));
+
+    document.getElementById(scale)
+        .classList.add("active");
+
+    const status=
+        document.getElementById("statusTermDisp");
+
+    status.innerText=text;
+    status.className=
+        `score-status ${cls}`;
+
+    document.getElementById("scoreSubtext")
+        .innerText=sub;
+}
+
+/* =========================================================
+   REGIME CLASSIFICATION
+   ========================================================= */
+
+function updateRegimes(){
+
+    /* VOLATILITY */
+
+    let volScore =
+        metricConfig.vix.calc(currentData.vix) +
+        metricConfig.vix_chg.calc(currentData.vix_chg) +
+        metricConfig.vix_5d.calc(currentData.vix_5d) +
+        metricConfig.move.calc(currentData.move) +
+        metricConfig.vix_term.calc(currentData.vix_term);
+
+    setRegime(
+        "volRegime",
+        "volDesc",
+        volScore,
+        10,
+        "Volatility contained.",
+        "Volatility rising.",
+        "Volatility stress."
+    );
+
+
+    /* CREDIT */
+
+    let creditScore =
+        metricConfig.hy.calc(currentData.hy) +
+        metricConfig.hy_5d.calc(currentData.hy_5d) +
+        metricConfig.hy_20d.calc(currentData.hy_20d) +
+        metricConfig.bbb.calc(currentData.bbb);
+
+    setRegime(
+        "creditRegime",
+        "creditDesc",
+        creditScore,
+        11,
+        "Credit markets calm.",
+        "Credit spreads widening.",
+        "Credit stress / systemic warning."
+    );
+
+
+    /* MACRO */
+
+    let macroScore =
+        metricConfig.yield.calc(currentData.yield) +
+        metricConfig.yield_20d.calc(currentData.yield_20d) +
+        metricConfig.wti.calc(currentData.wti) +
+        metricConfig.wti_20d.calc(currentData.wti_20d);
+
+    setRegime(
+        "macroRegime",
+        "macroDesc",
+        macroScore,
+        8,
+        "Macro shock limited.",
+        "Rates/oil becoming restrictive.",
+        "Major macro shock."
+    );
+
+
+    /* EQUITIES */
+
+    let equityScore =
+        metricConfig.dma50.calc(currentData.dma50) +
+        metricConfig.dma200.calc(currentData.dma200) +
+        metricConfig.breadth.calc(currentData.breadth) +
+        metricConfig.breadth_20d.calc(currentData.breadth_20d);
+
+    setRegime(
+        "equityRegime",
+        "equityDesc",
+        equityScore,
+        9,
+        "Equity structure healthy.",
+        "Equity breadth deteriorating.",
+        "Major equity technical stress."
+    );
+}
+
+
+function setRegime(
+    valueId,
+    descId,
+    score,
+    max,
+    greenText,
+    amberText,
+    redText
+){
+
+    const value=document.getElementById(valueId);
+    const desc=document.getElementById(descId);
+
+    value.className="signal-value";
+
+    let label;
+    let color;
+
+    if(score >= max*0.67){
+        label="STRESSED";
+        color="var(--red)";
+        desc.innerText=redText;
+
+    }else if(score >= max*0.34){
+        label="WATCH";
+        color="var(--amber)";
+        desc.innerText=amberText;
+
+    }else{
+        label="CALM";
+        color="var(--green)";
+        desc.innerText=greenText;
+    }
+
+    // Show the actual component score and its own maximum in the existing
+    // regime cell. The four components have different maximum point weights.
+    value.innerHTML = `${label} <span class="regime-points">${score} / ${max}</span>`;
+    value.style.color=color;
+}
+
+
+/* =========================================================
+   MANUAL UPDATE
+   ========================================================= */
+
+function updateFromManual(){
+
+    Object.keys(currentData).forEach(key=>{
+
+        const input=
+            document.getElementById("in_"+key);
+
+        if(input){
+
+            const val=parseFloat(input.value);
+
+            if(Number.isFinite(val))
+                currentData[key]=val;
+        }
+    });
+
+    renderDashboard();
+}
+
+
+/* =========================================================
+   QUICK PASTE
+   ========================================================= */
+
+function parseQuickPaste(){
+
+    const text=
+        document.getElementById("quickPasteInput").value;
+
+    const cleaned=text
+        .replace(/[\[\]\s]/g,"");
+
+    const items=cleaned.split(",");
+
+    if(items.length < 18){
+
+        alert(
+            "Please provide all 18 values in the specified order."
+        );
+
+        return;
+    }
+
+    const keys=[
+        "vix",
+        "vix_chg",
+        "vix_5d",
+        "hy",
+        "hy_5d",
+        "hy_20d",
+        "bbb",
+        "yield",
+        "yield_20d",
+        "dma50",
+        "dma200",
+        "wti",
+        "wti_20d",
+        "move",
+        "jpy",
+        "breadth",
+        "breadth_20d",
+        "vix_term"
+    ];
+
+    keys.forEach((key,i)=>{
+
+        const value=parseFloat(items[i]);
+
+        if(Number.isFinite(value))
+            currentData[key]=value;
+
+        const input=
+            document.getElementById("in_"+key);
+
+        if(input)
+            input.value=currentData[key];
+    });
+
+    renderDashboard();
+}
+
+
+/* =========================================================
+   RESET
+   ========================================================= */
+
+function resetForm(){
+
+    currentData={
+
+        vix:15.72,
+        vix_chg:8.19,
+        vix_5d:12.4,
+
+        hy:268,
+        hy_5d:8,
+        hy_20d:22,
+
+        bbb:102,
+
+        yield:4.80,
+        yield_20d:18,
+
+        dma50:1.2,
+        dma200:7.6,
+
+        wti:94.73,
+        wti_20d:12.5,
+
+        move:105.4,
+        jpy:142.1,
+
+        breadth:62.5,
+        breadth_20d:-4.2,
+
+        vix_term:1.8
+    };
+
+    Object.keys(currentData).forEach(key=>{
+
+        const input=
+            document.getElementById("in_"+key);
+
+        if(input)
+            input.value=currentData[key];
+
+    });
+
+    renderDashboard();
+}
+
+
+/* =========================================================
+   INITIALIZE
+   ========================================================= */
+
+window.onload=function(){
+    checkExistingSession();
+};
+
+</script>
+
+</body>
+</html>
