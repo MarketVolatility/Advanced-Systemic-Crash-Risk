@@ -532,7 +532,7 @@ button.secondary {
 
     <div class="auth-step" id="verifyStep">
       <h2>Verify your email</h2>
-      <p>Check the email sent to <strong id="verifyEmail"></strong>. Click its confirmation link, then return here to sign in. If the email contains a code, enter it below.</p>
+      <p>Check the email sent to <strong id="verifyEmail"></strong>. Click its confirmation link to open the online dashboard. If you stay on this page, return to sign in after confirming. If the email contains a code, enter it below.</p>
       <form class="auth-form" onsubmit="return handleVerify(event)">
         <div>
           <label for="verificationCode">Verification code</label>
@@ -887,6 +887,9 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 // Supabase manages API routes, API-key headers, and refreshing the session.
 // Passwords are never stored; the session is kept only in this browser tab.
+// Supabase Auth > URL Configuration: set Site URL and an allowed Redirect URL
+// to this exact address, including the trailing slash.
+const AUTH_REDIRECT_URL = "https://marketvolatility.github.io/advance-login/";
 const SUPABASE_URL = "https://qmiplvdkrwksokiuehrd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JsrzOaKxp0RJo2Se4MDctg_tGiG_GaD";
 let authClient;
@@ -940,8 +943,8 @@ async function authAction(event, messageId, action){
     return false;
 }
 function redirectOptions(){
-    // Add this exact HTTP(S) page URL to Supabase Auth > URL Configuration.
-    return /^https?:$/.test(location.protocol) ? { redirectTo: location.origin + location.pathname } : {};
+    // Always return to the hosted dashboard, including when opened locally.
+    return { redirectTo: AUTH_REDIRECT_URL };
 }
 function lockDashboard(){
     document.getElementById('appShell').style.display = 'none';
@@ -1012,7 +1015,6 @@ function handleLogin(event){
 }
 function handleReset(event){
     return authAction(event, 'resetMessage', async auth => {
-        if(location.protocol === 'file:') throw new Error('Password-reset links need a web address. Serve this page over HTTP(S) and add its URL to Supabase Auth > URL Configuration before requesting a reset.');
         const {error} = await auth.resetPasswordForEmail(document.getElementById('resetEmail').value.trim().toLowerCase(), redirectOptions());
         if(error) throw error;
         setAuthMessage('resetMessage', 'If an account exists for this email, password-reset instructions have been sent.', 'success');
@@ -1039,6 +1041,17 @@ async function logoutUser(){
     } catch(error){ setAuthMessage('loginMessage', 'Sign-out could not complete. ' + authError(error), 'error'); }
 }
 async function checkExistingSession(){
+    // Capture link errors before the SDK processes the URL fragment.
+    const callbackParams = new URLSearchParams(location.hash.slice(1));
+    if(callbackParams.has('error') || callbackParams.has('error_code')){
+        lockDashboard();
+        showAuthStep('loginStep');
+        const expired = callbackParams.get('error_code') === 'otp_expired';
+        setAuthMessage('loginMessage', expired
+            ? 'This email link has expired or has already been used. Try signing in. If your email is still unconfirmed, request a new confirmation email.'
+            : 'The email link could not be verified. Try signing in or request a new confirmation or password-reset email.', 'error');
+        return;
+    }
     try {
         const auth = getAuthClient().auth;
         const {data: {session}, error} = await auth.getSession();
