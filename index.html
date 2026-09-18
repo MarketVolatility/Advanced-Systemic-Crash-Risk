@@ -474,6 +474,26 @@ button.secondary {
     color:var(--text-muted);
 }
 </style>
+<style>
+.data-table-scroll {overflow:auto; border:1px solid var(--border); border-radius:8px;}
+.data-table-scroll table {margin:0; border:0; border-radius:0;}
+.table-note {font-size:12px; line-height:1.6; color:var(--text-muted);}
+.table-note a {color:#93c5fd;}
+.glossary-table {min-width:650px;}
+.glossary-table th[scope="row"] {text-transform:none; letter-spacing:0; color:var(--text-main); width:190px;}
+.glossary-table td {font-size:13px; line-height:1.55;}
+.history-scroll {max-height:520px;}
+.history-table {width:max-content; min-width:100%; font-variant-numeric:tabular-nums; font-size:13px;}
+.history-table th {position:sticky; top:0; z-index:2; max-width:140px; font-size:11px;}
+.history-table td {text-align:right; white-space:nowrap;}
+.history-table td:first-child {text-align:left;}
+.history-table th:first-child,.history-table td:first-child {position:sticky; left:0; background:var(--card-bg2); z-index:1;}
+.history-table th:first-child {z-index:3;}
+.history-normal {color:#fff;}
+.history-amber {color:var(--amber);}
+.history-red {color:var(--red);}
+.history-current {background:rgba(59,130,246,.08);}
+</style>
 </head>
 
 <body>
@@ -834,6 +854,43 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 </div>
 
+
+<section class="control-panel" aria-labelledby="glossaryHeading">
+<h2 class="panel-title" id="glossaryHeading">Indicator explanations</h2>
+<p class="table-note">D means trading days; DMA means daily moving average; bp means basis points (100 bp = 1 percentage point); pp means percentage points.</p>
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="Indicator explanations">
+<table class="glossary-table"><thead><tr><th>Indicator</th><th>Unit</th><th>Explanation</th></tr></thead><tbody><tr><th scope="row">VIX</th><td>Index</td><td>Expected annualized S&amp;P 500 volatility over the next 30 days, derived from options prices. Higher readings indicate greater expected movement, not its direction.</td></tr>
+<tr><th scope="row">VIX 1D %</th><td>%</td><td>Percentage change in VIX from the previous trading day: (current / previous − 1) × 100. This is not the separate VIX1D index.</td></tr>
+<tr><th scope="row">VIX 5D %</th><td>%</td><td>Percentage change in VIX over five trading days. A positive value means expected volatility has risen.</td></tr>
+<tr><th scope="row">HY OAS</th><td>bp</td><td>High-yield corporate bond option-adjusted spread over a Treasury benchmark, adjusted for embedded options. Wider spreads indicate greater credit stress.</td></tr>
+<tr><th scope="row">HY OAS 5D bp change</th><td>bp</td><td>Current high-yield OAS minus its value five trading days ago. Positive values mean spreads widened.</td></tr>
+<tr><th scope="row">HY OAS 20D bp change</th><td>bp</td><td>Current high-yield OAS minus its value twenty trading days ago. Positive values mean spreads widened.</td></tr>
+<tr><th scope="row">BBB OAS</th><td>bp</td><td>Option-adjusted spread for BBB-rated investment-grade corporate bonds. Higher readings indicate more credit risk priced into these bonds.</td></tr>
+<tr><th scope="row">10Y Yield</th><td>%</td><td>Yield on the 10-year US Treasury. Enter 4.80 for 4.80%. This dashboard assigns more risk points to higher yields.</td></tr>
+<tr><th scope="row">10Y 20D bp change</th><td>bp</td><td>Change in 10-year Treasury yield over twenty trading days. A move from 4.50% to 4.80% is 30 basis points.</td></tr>
+<tr><th scope="row">S&amp;P vs 50DMA</th><td>%</td><td>S&amp;P 500 distance from its 50-day moving average: (index / average − 1) × 100. Negative values mean the index is below its average.</td></tr>
+<tr><th scope="row">S&amp;P vs 200DMA</th><td>%</td><td>S&amp;P 500 distance from its 200-day moving average, using the same formula. Negative values indicate weakness versus the longer-term trend.</td></tr>
+<tr><th scope="row">WTI</th><td>USD/barrel</td><td>West Texas Intermediate crude oil price. Use the same spot or futures series for all entries and its 20-day change. This dashboard flags high oil prices as a macro stress signal.</td></tr>
+<tr><th scope="row">WTI 20D %</th><td>%</td><td>Percentage change in the chosen WTI price series over twenty trading days. Positive values mean oil prices rose.</td></tr>
+<tr><th scope="row">MOVE</th><td>Index</td><td>ICE BofA bond-market implied-volatility index based on US Treasury options. Higher values indicate greater expected interest-rate volatility.</td></tr>
+<tr><th scope="row">USDJPY</th><td>JPY/USD</td><td>Japanese yen per US dollar. A lower value means a stronger yen; this dashboard uses low levels as a carry-trade stress signal.</td></tr>
+<tr><th scope="row">Breadth % &gt;50DMA</th><td>%</td><td>Percentage of S&amp;P 500 constituents above their own 50-day moving averages. Lower values indicate fewer stocks participating in the uptrend.</td></tr>
+<tr><th scope="row">Breadth 20D change</th><td>pp</td><td>Current breadth percentage minus its value twenty trading days ago. A fall from 65% to 50% is −15 percentage points, not −15%.</td></tr>
+<tr><th scope="row">VIX 3M-1M spread</th><td>Index points</td><td>VIX3M minus VIX (approximately one month). A negative result means near-term implied volatility exceeds three-month implied volatility.</td></tr></tbody></table>
+</div>
+<p class="table-note">Reference definitions: <a href="https://www.cboe.com/tradable_products/vix/term_structure">Cboe volatility indices</a> · <a href="https://developer.ice.com/fixed-income-data-services/catalog/ice-data-indices-move-index">ICE MOVE</a> · <a href="https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf">ICE bond methodology</a>. Risk colors follow this dashboard’s existing scoring rules.</p>
+</section>
+<section class="control-panel" aria-labelledby="historyHeading">
+<h2 class="panel-title" id="historyHeading">Current and past entries</h2>
+<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
+<p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Hover over a value for its score.</p>
+<p class="table-note" id="historyNotice" role="status"></p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
+<table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
+</div>
+<p class="table-note">History is stored for this account in this browser only. It does not sync between devices and is removed if browser data is cleared. Default sample values are not saved automatically.</p>
+</section>
+
 </div>
 </div>
 
@@ -895,6 +952,7 @@ function openDashboard(user){
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('appShell').style.display = 'block';
     document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
+    loadEntryHistory(user.id);
     renderDashboard();
 }
 function handleRegister(event){
@@ -1145,6 +1203,72 @@ let currentData = {
    STATUS
    ========================================================= */
 
+
+// History is keyed by authenticated user ID and stored only on this browser.
+const historyColumns = [["vix", "VIX", "Index"], ["vix_chg", "VIX 1D %", "%"], ["vix_5d", "VIX 5D %", "%"], ["hy", "HY OAS", "bp"], ["hy_5d", "HY OAS 5D bp change", "bp"], ["hy_20d", "HY OAS 20D bp change", "bp"], ["bbb", "BBB OAS", "bp"], ["yield", "10Y Yield", "%"], ["yield_20d", "10Y 20D bp change", "bp"], ["dma50", "S&P vs 50DMA", "%"], ["dma200", "S&P vs 200DMA", "%"], ["wti", "WTI", "USD/barrel"], ["wti_20d", "WTI 20D %", "%"], ["move", "MOVE", "Index"], ["jpy", "USDJPY", "JPY/USD"], ["breadth", "Breadth % >50DMA", "%"], ["breadth_20d", "Breadth 20D change", "pp"], ["vix_term", "VIX 3M-1M spread", "Index points"]];
+const defaultData = {...currentData};
+let entryHistory = [];
+let historyOwner = null;
+let currentEntryTime = null;
+let historyStorageError = '';
+function historyKey(){ return 'crash-risk-history-v1:' + historyOwner; }
+function validSnapshot(values){
+    return values && historyColumns.every(([key]) => Number.isFinite(values[key]));
+}
+function syncManualInputs(){
+    historyColumns.forEach(([key]) => { document.getElementById('in_'+key).value = currentData[key]; });
+}
+function loadEntryHistory(userId){
+    historyOwner = userId;
+    entryHistory = [];
+    currentEntryTime = null;
+    historyStorageError = '';
+    currentData = {...defaultData};
+    try {
+        const raw = localStorage.getItem(historyKey());
+        const saved = raw ? JSON.parse(raw) : [];
+        if(!Array.isArray(saved) || saved.some(row => !row || !Number.isFinite(Date.parse(row.savedAt)) || !validSnapshot(row.values)))
+            throw new Error('Invalid stored history');
+        entryHistory = saved.sort((a,b) => Date.parse(b.savedAt)-Date.parse(a.savedAt));
+        if(entryHistory.length){ currentData = {...entryHistory[0].values}; currentEntryTime = entryHistory[0].savedAt; }
+    } catch(error){ historyStorageError = 'Saved history could not be loaded. New entries will remain in memory until browser storage is available.'; }
+    syncManualInputs();
+}
+function saveEntry(){
+    if(!historyOwner || !validSnapshot(currentData)) return;
+    currentEntryTime = new Date().toISOString();
+    entryHistory.unshift({savedAt:currentEntryTime, values:{...currentData}});
+    try { localStorage.setItem(historyKey(),JSON.stringify(entryHistory)); historyStorageError = ''; }
+    catch(error){ historyStorageError = 'This update is visible but could not be saved to browser storage. Keep this page open to retain it.'; }
+}
+function historyRisk(key,value){
+    const config = metricConfig[key], points = config.calc(value);
+    return {className:points === 0 ? 'history-normal' : points >= config.maxPoints ? 'history-red' : 'history-amber', points, max:config.maxPoints};
+}
+function renderEntryHistory(){
+    document.getElementById('historyTimezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
+    document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : 'No saved entries yet. Current values are unsaved samples.');
+    const head = document.getElementById('historyHead'); head.replaceChildren();
+    const heading = document.createElement('tr');
+    ['Entry','Date','Time',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
+        const th=document.createElement('th'); th.scope='col'; th.textContent=label; heading.appendChild(th);
+    }); head.appendChild(heading);
+    const body = document.getElementById('historyBody'); body.replaceChildren();
+    const entries = currentEntryTime ? entryHistory : [{savedAt:null,values:currentData},...entryHistory];
+    entries.forEach((entry,index)=>{
+        const tr=document.createElement('tr'); if(index===0) tr.className='history-current';
+        const date=entry.savedAt ? new Date(entry.savedAt) : null;
+        const dateText=date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
+        const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
+        [index===0 ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
+        historyColumns.forEach(([key])=>{
+            const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
+            td.textContent=String(value); td.className=risk.className;
+            td.title=risk.points+' / '+risk.max+' risk points'; tr.appendChild(td);
+        }); body.appendChild(tr);
+    });
+}
+
 function getStatus(points,maxPoints){
 
     if(points === 0)
@@ -1162,6 +1286,7 @@ function getStatus(points,maxPoints){
    ========================================================= */
 
 function renderDashboard(){
+    renderEntryHistory();
 
     const tbody =
         document.getElementById("metricTableBody");
@@ -1427,93 +1552,36 @@ function setRegime(
    MANUAL UPDATE
    ========================================================= */
 
+function commitEntry(values){
+    if(!historyOwner){ alert('Please sign in before saving an entry.'); return; }
+    currentData = values;
+    syncManualInputs();
+    saveEntry();
+    renderDashboard();
+}
 function updateFromManual(){
-
-    Object.keys(currentData).forEach(key=>{
-
-        const input=
-            document.getElementById("in_"+key);
-
-        if(input){
-
-            const val=parseFloat(input.value);
-
-            if(Number.isFinite(val))
-                currentData[key]=val;
-        }
-    });
-
-    renderDashboard();
-}
-
-
-/* =========================================================
-   QUICK PASTE
-   ========================================================= */
-
-function parseQuickPaste(){
-
-    const text=
-        document.getElementById("quickPasteInput").value;
-
-    const cleaned=text
-        .replace(/[\[\]\s]/g,"");
-
-    const items=cleaned.split(",");
-
-    if(items.length < 18){
-
-        alert(
-            "Please provide all 18 values in the specified order."
-        );
-
-        return;
+    const values = {};
+    for(const [key] of historyColumns){
+        const text = document.getElementById('in_'+key).value.trim();
+        if(!text || !Number.isFinite(Number(text))){ alert('Enter a valid number for every indicator. No entry was saved.'); return; }
+        values[key] = Number(text);
     }
-
-    const keys=[
-        "vix",
-        "vix_chg",
-        "vix_5d",
-        "hy",
-        "hy_5d",
-        "hy_20d",
-        "bbb",
-        "yield",
-        "yield_20d",
-        "dma50",
-        "dma200",
-        "wti",
-        "wti_20d",
-        "move",
-        "jpy",
-        "breadth",
-        "breadth_20d",
-        "vix_term"
-    ];
-
-    keys.forEach((key,i)=>{
-
-        const value=parseFloat(items[i]);
-
-        if(Number.isFinite(value))
-            currentData[key]=value;
-
-        const input=
-            document.getElementById("in_"+key);
-
-        if(input)
-            input.value=currentData[key];
-    });
-
-    renderDashboard();
+    commitEntry(values);
 }
-
+function parseQuickPaste(){
+    const items = document.getElementById('quickPasteInput').value.trim().replace(/^\[|\]$/g,'').split(',').map(v=>v.trim());
+    if(items.length !== historyColumns.length || items.some(v=>!v || !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:e[+-]?\d+)?$/i.test(v) || !Number.isFinite(Number(v)))){
+        alert('Provide exactly 18 comma-separated numbers in the listed order. No entry was saved.'); return;
+    }
+    commitEntry(Object.fromEntries(historyColumns.map(([key],i)=>[key,Number(items[i])])));
+}
 
 /* =========================================================
    RESET
    ========================================================= */
 
 function resetForm(){
+    currentEntryTime = null;
 
     currentData={
 
