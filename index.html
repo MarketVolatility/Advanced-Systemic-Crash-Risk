@@ -913,9 +913,11 @@ function setAuthMessage(id, message, type=""){
  *   4. issue a secure session/token that works across devices.
  */
 async function authApi(path, payload){
-    const AUTH_API_BASE = ""; // Example: "https://your-domain.example/api"
+    const SUPABASE_URL = "https://qmiplvdkrwksokiuehrd.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JsrzOaKxp0RJo2Se4MDctg_tGiG_GaD";
+const AUTH_API_BASE = SUPABASE_URL;
     if(!AUTH_API_BASE){
-        throw new Error("Authentication backend is not configured. Set AUTH_API_BASE in authApi().");
+        throw new Error("Authentication service is not available. Please check your Supabase configuration and try again.");
     }
     const response = await fetch(AUTH_API_BASE + path, {
         method:"POST",
