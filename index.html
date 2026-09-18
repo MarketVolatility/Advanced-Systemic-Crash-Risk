@@ -489,6 +489,8 @@ button.secondary {
 .history-table td:first-child {text-align:left;}
 .history-table th:first-child,.history-table td:first-child {position:sticky; left:0; background:var(--card-bg2); z-index:1;}
 .history-table th:first-child {z-index:3;}
+.history-delete {color:var(--red); background:transparent; border:1px solid transparent; padding:2px 10px; min-width:36px; min-height:36px; font-size:25px; line-height:1;}
+.history-delete:hover,.history-delete:focus-visible {background:rgba(239,68,68,.12); border-color:var(--red);}
 .history-normal {color:#fff;}
 .history-amber {color:var(--amber);}
 .history-red {color:var(--red);}
@@ -882,7 +884,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
-<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
+<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
 <p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Hover over a value for its score.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
@@ -1210,6 +1212,7 @@ const defaultData = {...currentData};
 let entryHistory = [];
 let historyOwner = null;
 let currentEntryTime = null;
+let historyPreviewHidden = false;
 let historyStorageError = '';
 function historyKey(){ return 'crash-risk-history-v1:' + historyOwner; }
 function validSnapshot(values){
@@ -1219,6 +1222,7 @@ function syncManualInputs(){
     historyColumns.forEach(([key]) => { document.getElementById('in_'+key).value = currentData[key]; });
 }
 function loadEntryHistory(userId){
+    historyPreviewHidden = false;
     historyOwner = userId;
     entryHistory = [];
     currentEntryTime = null;
@@ -1235,11 +1239,40 @@ function loadEntryHistory(userId){
     syncManualInputs();
 }
 function saveEntry(){
+    historyPreviewHidden = false;
     if(!historyOwner || !validSnapshot(currentData)) return;
     currentEntryTime = new Date().toISOString();
     entryHistory.unshift({savedAt:currentEntryTime, values:{...currentData}});
     try { localStorage.setItem(historyKey(),JSON.stringify(entryHistory)); historyStorageError = ''; }
     catch(error){ historyStorageError = 'This update is visible but could not be saved to browser storage. Keep this page open to retain it.'; }
+}
+function deleteHistoryEntry(entry){
+    const savedIndex = entry.savedAt ? entryHistory.indexOf(entry) : -1;
+    if(entry.savedAt && savedIndex < 0) return;
+    const label = entry.savedAt ? new Date(entry.savedAt).toLocaleString() : 'the unsaved current row';
+    if(!window.confirm('Delete '+label+' from history? This cannot be undone.')) return;
+    if(!entry.savedAt){
+        historyPreviewHidden = true;
+        renderEntryHistory();
+        return;
+    }
+    const remaining = entryHistory.filter((row,index)=>index !== savedIndex);
+    try { localStorage.setItem(historyKey(),JSON.stringify(remaining)); }
+    catch(error){
+        historyStorageError = 'The row could not be deleted from browser storage. It has been kept. Please try again.';
+        renderEntryHistory();
+        return;
+    }
+    const wasCurrent = currentEntryTime !== null && savedIndex === 0;
+    entryHistory = remaining;
+    historyStorageError = '';
+    if(wasCurrent){
+        currentEntryTime = remaining[0]?.savedAt || null;
+        currentData = remaining.length ? {...remaining[0].values} : {...defaultData};
+        historyPreviewHidden = !remaining.length;
+        syncManualInputs();
+    }
+    renderDashboard();
 }
 function historyRisk(key,value){
     const config = metricConfig[key], points = config.calc(value);
@@ -1247,20 +1280,28 @@ function historyRisk(key,value){
 }
 function renderEntryHistory(){
     document.getElementById('historyTimezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
-    document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : 'No saved entries yet. Current values are unsaved samples.');
+    document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
     const head = document.getElementById('historyHead'); head.replaceChildren();
     const heading = document.createElement('tr');
-    ['Entry','Date','Time',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
+    ['Delete','Entry','Date','Time',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
         const th=document.createElement('th'); th.scope='col'; th.textContent=label; heading.appendChild(th);
     }); head.appendChild(heading);
     const body = document.getElementById('historyBody'); body.replaceChildren();
-    const entries = currentEntryTime ? entryHistory : [{savedAt:null,values:currentData},...entryHistory];
+    const entries = currentEntryTime || historyPreviewHidden ? entryHistory : [{savedAt:null,values:currentData},...entryHistory];
     entries.forEach((entry,index)=>{
-        const tr=document.createElement('tr'); if(index===0) tr.className='history-current';
+        const isCurrent = index===0 && !historyPreviewHidden;
+        const tr=document.createElement('tr'); if(isCurrent) tr.className='history-current';
+        const deleteCell=document.createElement('td');
+        const deleteButton=document.createElement('button');
+        deleteButton.type='button'; deleteButton.className='history-delete'; deleteButton.textContent='×';
+        const deleteLabel='Delete '+(entry.savedAt ? new Date(entry.savedAt).toLocaleString() : 'unsaved current row');
+        deleteButton.title=deleteLabel; deleteButton.setAttribute('aria-label',deleteLabel);
+        deleteButton.onclick=()=>deleteHistoryEntry(entry);
+        deleteCell.appendChild(deleteButton); tr.appendChild(deleteCell);
         const date=entry.savedAt ? new Date(entry.savedAt) : null;
         const dateText=date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
-        [index===0 ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
+        [isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
         historyColumns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
             td.textContent=String(value); td.className=risk.className;
@@ -1581,6 +1622,7 @@ function parseQuickPaste(){
    ========================================================= */
 
 function resetForm(){
+    historyPreviewHidden = false;
     currentEntryTime = null;
 
     currentData={
