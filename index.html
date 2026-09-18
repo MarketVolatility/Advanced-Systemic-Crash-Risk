@@ -465,8 +465,6 @@ button.secondary {
 </style>
 
 <style>
-
-<style>
 .regime-points {
     display:inline-block;
     margin-left:8px;
@@ -510,7 +508,7 @@ button.secondary {
 
     <div class="auth-step" id="registerStep">
       <h2>Create account</h2>
-      <p>Register with an email address. A verification code is required before the account can be used.</p>
+      <p>Register with an email address, then follow the confirmation instructions in your email.</p>
       <form class="auth-form" onsubmit="return handleRegister(event)">
         <div>
           <label for="registerEmail">Email address</label>
@@ -534,25 +532,25 @@ button.secondary {
 
     <div class="auth-step" id="verifyStep">
       <h2>Verify your email</h2>
-      <p>Enter the verification code sent to <strong id="verifyEmail"></strong>.</p>
+      <p>Check the email sent to <strong id="verifyEmail"></strong>. Click its confirmation link, then return here to sign in. If the email contains a code, enter it below.</p>
       <form class="auth-form" onsubmit="return handleVerify(event)">
         <div>
           <label for="verificationCode">Verification code</label>
           <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code"
-                 maxlength="6" pattern="[0-9]{6}" required>
+                 maxlength="10" pattern="[0-9]{6,10}" required>
         </div>
         <div class="auth-message" id="verifyMessage"></div>
         <button type="submit">Verify email</button>
       </form>
       <div class="auth-links">
         <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
-        <button type="button" onclick="resendVerification()">Resend code</button>
+        <button type="button" onclick="resendVerification()">Resend email</button>
       </div>
     </div>
 
     <div class="auth-step" id="resetStep">
       <h2>Reset password</h2>
-      <p>Enter your verified email address. A password-reset link/code would be sent by the authentication server.</p>
+      <p>Enter your email address to request a password-reset link.</p>
       <form class="auth-form" onsubmit="return handleReset(event)">
         <div>
           <label for="resetEmail">Email address</label>
@@ -564,6 +562,17 @@ button.secondary {
       <div class="auth-links">
         <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
       </div>
+    </div>
+    <div class="auth-step" id="newPasswordStep">
+      <h2>Choose a new password</h2>
+      <form class="auth-form" onsubmit="return handleNewPassword(event)">
+        <label for="newPassword">New password</label>
+        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
+        <label for="newPassword2">Confirm new password</label>
+        <input id="newPassword2" type="password" autocomplete="new-password" minlength="8" required>
+        <div class="auth-message" id="newPasswordMessage"></div>
+        <button type="submit">Save new password</button>
+      </form>
     </div>
   </div>
 </div>
@@ -873,192 +882,173 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 <script>
 
-/* =========================================================
-   AUTHENTICATION GATE
-   =========================================================
-   This is a front-end authentication interface. A browser-only
-   HTML file cannot securely provide real password authentication,
-   email delivery, or multi-device sessions. The functions below
-   therefore expose the required UI/API integration points and
-   deliberately do NOT store passwords in localStorage.
-*/
-let pendingVerificationEmail = "";
-
-function showAuthStep(id){
-    document.querySelectorAll(".auth-step").forEach(el => el.classList.remove("active"));
-    const step = document.getElementById(id);
-    if(step) step.classList.add("active");
-    document.querySelectorAll(".auth-message").forEach(el => {
-        el.textContent = "";
-        el.className = "auth-message";
-    });
-}
-
-function setAuthMessage(id, message, type=""){
-    const el = document.getElementById(id);
-    if(!el) return;
-    el.textContent = message;
-    el.className = "auth-message " + type;
-}
-
-/*
- * Replace these three functions with calls to your chosen
- * authentication backend (e.g. Supabase/Firebase/Auth0/custom API).
- * The backend should:
- *   1. create accounts using email + password,
- *   2. send a verification email/code,
- *   3. verify the email,
- *   4. issue a secure session/token that works across devices.
- */
-async function authApi(path, payload){
-    const SUPABASE_URL = "https://qmiplvdkrwksokiuehrd.supabase.co";
+// Supabase manages API routes, API-key headers, and refreshing the session.
+// Passwords are never stored; the session is kept only in this browser tab.
+const SUPABASE_URL = "https://qmiplvdkrwksokiuehrd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JsrzOaKxp0RJo2Se4MDctg_tGiG_GaD";
-const AUTH_API_BASE = SUPABASE_URL;
-    if(!AUTH_API_BASE){
-        throw new Error("Authentication service is not available. Please check your Supabase configuration and try again.");
-    }
-    const response = await fetch(AUTH_API_BASE + path, {
-        method:"POST",
-        headers:{"Content-Type":"application/json"},
-        credentials:"include",
-        body:JSON.stringify(payload)
+let authClient;
+let pendingVerificationEmail = "";
+let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
+
+function getAuthClient(){
+    if(authClient) return authClient;
+    if(!window.supabase) throw new Error('The sign-in library could not load. Check your internet connection and reload this page.');
+    let storage;
+    try { storage = window.sessionStorage; } catch (_) { /* Private browser storage may be unavailable. */ }
+    authClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+        auth: { storage, persistSession: !!storage, autoRefreshToken: true, detectSessionInUrl: true }
     });
-    const data = await response.json().catch(() => ({}));
-    if(!response.ok) throw new Error(data.message || "Authentication request failed.");
-    return data;
-}
-
-async function handleRegister(event){
-    event.preventDefault();
-    const email = document.getElementById("registerEmail").value.trim().toLowerCase();
-    const password = document.getElementById("registerPassword").value;
-    const password2 = document.getElementById("registerPassword2").value;
-
-    if(password !== password2){
-        setAuthMessage("registerMessage","Passwords do not match.","error");
-        return false;
-    }
-    if(password.length < 8){
-        setAuthMessage("registerMessage","Password must contain at least 8 characters.","error");
-        return false;
-    }
-
-    try{
-        await authApi("/register",{email,password});
-        pendingVerificationEmail = email;
-        document.getElementById("verifyEmail").textContent = email;
-        showAuthStep("verifyStep");
-        setAuthMessage("verifyMessage","Verification code sent. Check your email.","success");
-    }catch(err){
-        setAuthMessage("registerMessage",err.message,"error");
-    }
-    return false;
-}
-
-async function handleVerify(event){
-    event.preventDefault();
-    const code = document.getElementById("verificationCode").value.trim();
-
-    try{
-        await authApi("/verify-email",{
-            email:pendingVerificationEmail,
-            code
-        });
-        showAuthStep("loginStep");
-        document.getElementById("loginEmail").value = pendingVerificationEmail;
-        setAuthMessage("loginMessage","Email verified. You can now sign in.","success");
-    }catch(err){
-        setAuthMessage("verifyMessage",err.message,"error");
-    }
-    return false;
-}
-
-async function resendVerification(){
-    if(!pendingVerificationEmail){
-        showAuthStep("loginStep");
-        return;
-    }
-    try{
-        await authApi("/resend-verification",{email:pendingVerificationEmail});
-        setAuthMessage("verifyMessage","A new verification code has been sent.","success");
-    }catch(err){
-        setAuthMessage("verifyMessage",err.message,"error");
-    }
-}
-
-async function handleLogin(event){
-    event.preventDefault();
-    const email = document.getElementById("loginEmail").value.trim().toLowerCase();
-    const password = document.getElementById("loginPassword").value;
-
-    try{
-        const result = await authApi("/login",{email,password});
-        if(result && result.emailVerified === false){
-            pendingVerificationEmail = email;
-            document.getElementById("verifyEmail").textContent = email;
-            showAuthStep("verifyStep");
-            setAuthMessage("verifyMessage","Please verify your email before signing in.","error");
-            return false;
+    authClient.auth.onAuthStateChange((event, session) => {
+        if(event === 'PASSWORD_RECOVERY'){
+            recoveringPassword = true;
+            lockDashboard();
+            showAuthStep('newPasswordStep');
+        } else if(event === 'SIGNED_OUT'){
+            recoveringPassword = false;
+            lockDashboard();
+            showAuthStep('loginStep');
         }
-
-        /*
-         * The server should establish a secure, HttpOnly session cookie.
-         * Do not store passwords or long-lived authentication tokens in
-         * localStorage.
-         */
-        document.getElementById("loggedInEmail").textContent = email;
-        document.getElementById("authOverlay").style.display = "none";
-        document.getElementById("appShell").style.display = "block";
-        renderDashboard();
-    }catch(err){
-        setAuthMessage("loginMessage",err.message,"error");
-    }
+    });
+    return authClient;
+}
+function showAuthStep(id){
+    document.querySelectorAll('.auth-step').forEach(el => el.classList.remove('active'));
+    document.getElementById(id)?.classList.add('active');
+    document.querySelectorAll('.auth-message').forEach(el => { el.textContent = ''; el.className = 'auth-message'; });
+}
+function setAuthMessage(id, message, type=''){
+    const el = document.getElementById(id);
+    if(el){ el.textContent = message; el.className = 'auth-message ' + type; }
+}
+function authError(error){
+    if(/load failed|failed to fetch|network|fetch failed/i.test(error.message || ''))
+        return 'Cannot reach the authentication service. Check your internet connection and try again. If this continues, check that the Supabase project is active and its URL is correct.';
+    return error.message || 'Authentication failed. Please try again.';
+}
+async function authAction(event, messageId, action){
+    event?.preventDefault();
+    const button = event?.currentTarget?.querySelector('button[type="submit"]');
+    if(button?.disabled) return false;
+    if(button) button.disabled = true;
+    setAuthMessage(messageId, 'Please wait…');
+    try { await action(getAuthClient().auth); }
+    catch(error){ setAuthMessage(messageId, authError(error), 'error'); }
+    finally { if(button) button.disabled = false; }
     return false;
 }
-
-async function handleReset(event){
-    event.preventDefault();
-    const email = document.getElementById("resetEmail").value.trim().toLowerCase();
-    try{
-        await authApi("/request-password-reset",{email});
-        setAuthMessage("resetMessage","If an account exists for this email, password-reset instructions have been sent.","success");
-    }catch(err){
-        setAuthMessage("resetMessage",err.message,"error");
-    }
-    return false;
+function redirectOptions(){
+    // Add this exact HTTP(S) page URL to Supabase Auth > URL Configuration.
+    return /^https?:$/.test(location.protocol) ? { redirectTo: location.origin + location.pathname } : {};
 }
-
+function lockDashboard(){
+    document.getElementById('appShell').style.display = 'none';
+    document.getElementById('authOverlay').style.display = 'flex';
+    document.getElementById('loggedInEmail').textContent = '';
+}
+function openDashboard(user){
+    if(!user?.email_confirmed_at) throw new Error('Please confirm your email before signing in.');
+    document.getElementById('loggedInEmail').textContent = user.email || '';
+    document.getElementById('authOverlay').style.display = 'none';
+    document.getElementById('appShell').style.display = 'block';
+    document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
+    renderDashboard();
+}
+function showVerification(email){
+    pendingVerificationEmail = email;
+    document.getElementById('verifyEmail').textContent = email;
+    showAuthStep('verifyStep');
+}
+function handleRegister(event){
+    return authAction(event, 'registerMessage', async auth => {
+        const email = document.getElementById('registerEmail').value.trim().toLowerCase();
+        const password = document.getElementById('registerPassword').value;
+        if(password !== document.getElementById('registerPassword2').value) throw new Error('Passwords do not match.');
+        if(password.length < 8) throw new Error('Password must contain at least 8 characters.');
+        const redirect = redirectOptions().redirectTo;
+        const {data, error} = await auth.signUp({email, password, options: redirect ? {emailRedirectTo: redirect} : {}});
+        if(error) throw error;
+        document.getElementById('registerPassword').value = '';
+        document.getElementById('registerPassword2').value = '';
+        if(data.session){ openDashboard(data.user); return; }
+        showVerification(email);
+        setAuthMessage('verifyMessage', 'Check your email for a confirmation link or code. If you already have an account, sign in or reset your password.', 'success');
+    });
+}
+function handleVerify(event){
+    return authAction(event, 'verifyMessage', async auth => {
+        if(!pendingVerificationEmail) throw new Error('Please register or sign in first.');
+        const {data, error} = await auth.verifyOtp({email: pendingVerificationEmail, token: document.getElementById('verificationCode').value.trim(), type: 'email'});
+        if(error) throw error;
+        openDashboard(data.user);
+    });
+}
+function resendVerification(){
+    return authAction(null, 'verifyMessage', async auth => {
+        if(!pendingVerificationEmail) throw new Error('Please register or sign in first.');
+        const redirect = redirectOptions().redirectTo;
+        const {error} = await auth.resend({type: 'signup', email: pendingVerificationEmail, options: redirect ? {emailRedirectTo: redirect} : {}});
+        if(error) throw error;
+        setAuthMessage('verifyMessage', 'Confirmation email requested. Check your inbox and spam folder.', 'success');
+    });
+}
+function handleLogin(event){
+    return authAction(event, 'loginMessage', async auth => {
+        const email = document.getElementById('loginEmail').value.trim().toLowerCase();
+        const {data, error} = await auth.signInWithPassword({email, password: document.getElementById('loginPassword').value});
+        if(error){
+            if(error.code === 'email_not_confirmed'){
+                showVerification(email);
+                setAuthMessage('verifyMessage', 'Confirm your email before signing in. You can request another confirmation email below.', 'error');
+                return;
+            }
+            throw error;
+        }
+        recoveringPassword = false;
+        openDashboard(data.user);
+    });
+}
+function handleReset(event){
+    return authAction(event, 'resetMessage', async auth => {
+        if(location.protocol === 'file:') throw new Error('Password-reset links need a web address. Serve this page over HTTP(S) and add its URL to Supabase Auth > URL Configuration before requesting a reset.');
+        const {error} = await auth.resetPasswordForEmail(document.getElementById('resetEmail').value.trim().toLowerCase(), redirectOptions());
+        if(error) throw error;
+        setAuthMessage('resetMessage', 'If an account exists for this email, password-reset instructions have been sent.', 'success');
+    });
+}
+function handleNewPassword(event){
+    return authAction(event, 'newPasswordMessage', async auth => {
+        const password = document.getElementById('newPassword').value;
+        if(password.length < 8) throw new Error('Password must contain at least 8 characters.');
+        if(password !== document.getElementById('newPassword2').value) throw new Error('Passwords do not match.');
+        const {data, error} = await auth.updateUser({password});
+        if(error) throw error;
+        recoveringPassword = false;
+        openDashboard(data.user);
+    });
+}
 async function logoutUser(){
-    try{
-        await authApi("/logout",{});
-    }catch(err){
-        console.warn("Logout request failed:",err.message);
-    }
-    document.getElementById("appShell").style.display = "none";
-    document.getElementById("authOverlay").style.display = "flex";
-    document.getElementById("loggedInEmail").textContent = "";
-    document.getElementById("loginPassword").value = "";
-    showAuthStep("loginStep");
+    lockDashboard();
+    showAuthStep('loginStep');
+    try {
+        const {error} = await getAuthClient().auth.signOut({scope: 'local'});
+        if(error) throw error;
+        document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
+    } catch(error){ setAuthMessage('loginMessage', 'Sign-out could not complete. ' + authError(error), 'error'); }
 }
-
 async function checkExistingSession(){
-    /*
-     * With a configured backend, call a /session endpoint here.
-     * The backend's secure session cookie allows the same account to
-     * be used from different devices after normal sign-in.
-     */
-    try{
-        const result = await authApi("/session",{});
-        if(result && result.authenticated){
-            document.getElementById("loggedInEmail").textContent = result.email || "";
-            document.getElementById("authOverlay").style.display = "none";
-            document.getElementById("appShell").style.display = "block";
-        }
-    }catch(err){
-        // Expected while AUTH_API_BASE is not configured.
-    }
+    try {
+        const auth = getAuthClient().auth;
+        const {data: {session}, error} = await auth.getSession();
+        if(error) throw error;
+        if(!session) return;
+        if(recoveringPassword){ showAuthStep('newPasswordStep'); return; }
+        const {data, error: userError} = await auth.getUser();
+        if(userError) throw userError;
+        openDashboard(data.user);
+    } catch(error){ setAuthMessage('loginMessage', authError(error), 'error'); }
 }
 
 
