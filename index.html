@@ -479,7 +479,7 @@ button.secondary {
 <body>
 
 <!-- =========================================================
-     LOGIN / EMAIL VERIFICATION
+     SIGN UP / SIGN IN
      ========================================================= -->
 <div class="auth-overlay" id="authOverlay">
   <div class="auth-card">
@@ -487,7 +487,7 @@ button.secondary {
 
     <div class="auth-step active" id="loginStep">
       <h2>Sign in</h2>
-      <p>Use your verified email address and password to access the dashboard.</p>
+      <p>Use your email address and password to access the dashboard.</p>
       <form class="auth-form" onsubmit="return handleLogin(event)">
         <div>
           <label for="loginEmail">Email address</label>
@@ -502,13 +502,12 @@ button.secondary {
       </form>
       <div class="auth-links">
         <button type="button" onclick="showAuthStep('registerStep')">Create account</button>
-        <button type="button" onclick="showAuthStep('resetStep')">Forgot password?</button>
       </div>
     </div>
 
     <div class="auth-step" id="registerStep">
       <h2>Create account</h2>
-      <p>Register with an email address, then follow the confirmation instructions in your email.</p>
+      <p>Create an account with your email address and password.</p>
       <form class="auth-form" onsubmit="return handleRegister(event)">
         <div>
           <label for="registerEmail">Email address</label>
@@ -523,57 +522,13 @@ button.secondary {
           <input id="registerPassword2" type="password" autocomplete="new-password" minlength="8" required>
         </div>
         <div class="auth-message" id="registerMessage"></div>
-        <button type="submit">Register &amp; send verification</button>
+        <button type="submit">Sign up</button>
       </form>
       <div class="auth-links">
         <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
       </div>
     </div>
 
-    <div class="auth-step" id="verifyStep">
-      <h2>Verify your email</h2>
-      <p>Check the email sent to <strong id="verifyEmail"></strong>. Click its confirmation link to open the online dashboard. If you stay on this page, return to sign in after confirming. If the email contains a code, enter it below.</p>
-      <form class="auth-form" onsubmit="return handleVerify(event)">
-        <div>
-          <label for="verificationCode">Verification code</label>
-          <input id="verificationCode" inputmode="numeric" autocomplete="one-time-code"
-                 maxlength="10" pattern="[0-9]{6,10}" required>
-        </div>
-        <div class="auth-message" id="verifyMessage"></div>
-        <button type="submit">Verify email</button>
-      </form>
-      <div class="auth-links">
-        <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
-        <button type="button" onclick="resendVerification()">Resend email</button>
-      </div>
-    </div>
-
-    <div class="auth-step" id="resetStep">
-      <h2>Reset password</h2>
-      <p>Enter your email address to request a password-reset link.</p>
-      <form class="auth-form" onsubmit="return handleReset(event)">
-        <div>
-          <label for="resetEmail">Email address</label>
-          <input id="resetEmail" type="email" autocomplete="email" required>
-        </div>
-        <div class="auth-message" id="resetMessage"></div>
-        <button type="submit">Request password reset</button>
-      </form>
-      <div class="auth-links">
-        <button type="button" onclick="showAuthStep('loginStep')">Back to sign in</button>
-      </div>
-    </div>
-    <div class="auth-step" id="newPasswordStep">
-      <h2>Choose a new password</h2>
-      <form class="auth-form" onsubmit="return handleNewPassword(event)">
-        <label for="newPassword">New password</label>
-        <input id="newPassword" type="password" autocomplete="new-password" minlength="8" required>
-        <label for="newPassword2">Confirm new password</label>
-        <input id="newPassword2" type="password" autocomplete="new-password" minlength="8" required>
-        <div class="auth-message" id="newPasswordMessage"></div>
-        <button type="submit">Save new password</button>
-      </form>
-    </div>
   </div>
 </div>
 
@@ -885,35 +840,21 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.116.0/dist/umd/supabase.js"></script>
 <script>
 
-// Supabase manages API routes, API-key headers, and refreshing the session.
-// Passwords are never stored; the session is kept only in this browser tab.
-// Supabase Auth > URL Configuration: set Site URL and an allowed Redirect URL
-// to this exact address, including the trailing slash.
-const AUTH_REDIRECT_URL = "https://marketvolatility.github.io/advance-login/";
+// In Supabase Authentication > Sign In / Providers > Email, disable Confirm email.
+// The SDK handles API keys and session refresh. Passwords are never stored here.
 const SUPABASE_URL = "https://qmiplvdkrwksokiuehrd.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_JsrzOaKxp0RJo2Se4MDctg_tGiG_GaD";
 let authClient;
-let pendingVerificationEmail = "";
-let recoveringPassword = new URLSearchParams(location.hash.slice(1)).get('type') === 'recovery';
-
 function getAuthClient(){
     if(authClient) return authClient;
-    if(!window.supabase) throw new Error('The sign-in library could not load. Check your internet connection and reload this page.');
+    if(!window.supabase) throw new Error('The sign-in library could not load. Check your connection and reload.');
     let storage;
-    try { storage = window.sessionStorage; } catch (_) { /* Private browser storage may be unavailable. */ }
+    try { storage = window.sessionStorage; } catch (_) {}
     authClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-        auth: { storage, persistSession: !!storage, autoRefreshToken: true, detectSessionInUrl: true }
+        auth: {storage, persistSession: !!storage, autoRefreshToken: true, detectSessionInUrl: false}
     });
-    authClient.auth.onAuthStateChange((event, session) => {
-        if(event === 'PASSWORD_RECOVERY'){
-            recoveringPassword = true;
-            lockDashboard();
-            showAuthStep('newPasswordStep');
-        } else if(event === 'SIGNED_OUT'){
-            recoveringPassword = false;
-            lockDashboard();
-            showAuthStep('loginStep');
-        }
+    authClient.auth.onAuthStateChange(event => {
+        if(event === 'SIGNED_OUT'){ lockDashboard(); showAuthStep('loginStep'); }
     });
     return authClient;
 }
@@ -927,13 +868,14 @@ function setAuthMessage(id, message, type=''){
     if(el){ el.textContent = message; el.className = 'auth-message ' + type; }
 }
 function authError(error){
+    if(error.code === 'email_not_confirmed') return 'Email confirmation is still required by the server. The site owner must disable Confirm email in Supabase’s Email provider settings.';
     if(/load failed|failed to fetch|network|fetch failed/i.test(error.message || ''))
-        return 'Cannot reach the authentication service. Check your internet connection and try again. If this continues, check that the Supabase project is active and its URL is correct.';
+        return 'Cannot reach the authentication service. Check your internet connection and try again.';
     return error.message || 'Authentication failed. Please try again.';
 }
 async function authAction(event, messageId, action){
-    event?.preventDefault();
-    const button = event?.currentTarget?.querySelector('button[type="submit"]');
+    event.preventDefault();
+    const button = event.currentTarget.querySelector('button[type="submit"]');
     if(button?.disabled) return false;
     if(button) button.disabled = true;
     setAuthMessage(messageId, 'Please wait…');
@@ -942,27 +884,18 @@ async function authAction(event, messageId, action){
     finally { if(button) button.disabled = false; }
     return false;
 }
-function redirectOptions(){
-    // Always return to the hosted dashboard, including when opened locally.
-    return { redirectTo: AUTH_REDIRECT_URL };
-}
 function lockDashboard(){
     document.getElementById('appShell').style.display = 'none';
     document.getElementById('authOverlay').style.display = 'flex';
     document.getElementById('loggedInEmail').textContent = '';
 }
 function openDashboard(user){
-    if(!user?.email_confirmed_at) throw new Error('Please confirm your email before signing in.');
+    if(!user?.id) throw new Error('No authenticated user was returned. Please sign in again.');
     document.getElementById('loggedInEmail').textContent = user.email || '';
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('appShell').style.display = 'block';
     document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
     renderDashboard();
-}
-function showVerification(email){
-    pendingVerificationEmail = email;
-    document.getElementById('verifyEmail').textContent = email;
-    showAuthStep('verifyStep');
 }
 function handleRegister(event){
     return authAction(event, 'registerMessage', async auth => {
@@ -970,64 +903,18 @@ function handleRegister(event){
         const password = document.getElementById('registerPassword').value;
         if(password !== document.getElementById('registerPassword2').value) throw new Error('Passwords do not match.');
         if(password.length < 8) throw new Error('Password must contain at least 8 characters.');
-        const redirect = redirectOptions().redirectTo;
-        const {data, error} = await auth.signUp({email, password, options: redirect ? {emailRedirectTo: redirect} : {}});
+        const {data, error} = await auth.signUp({email, password});
         if(error) throw error;
-        document.getElementById('registerPassword').value = '';
-        document.getElementById('registerPassword2').value = '';
-        if(data.session){ openDashboard(data.user); return; }
-        showVerification(email);
-        setAuthMessage('verifyMessage', 'Check your email for a confirmation link or code. If you already have an account, sign in or reset your password.', 'success');
-    });
-}
-function handleVerify(event){
-    return authAction(event, 'verifyMessage', async auth => {
-        if(!pendingVerificationEmail) throw new Error('Please register or sign in first.');
-        const {data, error} = await auth.verifyOtp({email: pendingVerificationEmail, token: document.getElementById('verificationCode').value.trim(), type: 'email'});
-        if(error) throw error;
+        if(!data.session) throw new Error('Sign-up did not return a session. Disable Confirm email in Supabase’s Email provider settings, then try signing in.');
         openDashboard(data.user);
-    });
-}
-function resendVerification(){
-    return authAction(null, 'verifyMessage', async auth => {
-        if(!pendingVerificationEmail) throw new Error('Please register or sign in first.');
-        const redirect = redirectOptions().redirectTo;
-        const {error} = await auth.resend({type: 'signup', email: pendingVerificationEmail, options: redirect ? {emailRedirectTo: redirect} : {}});
-        if(error) throw error;
-        setAuthMessage('verifyMessage', 'Confirmation email requested. Check your inbox and spam folder.', 'success');
     });
 }
 function handleLogin(event){
     return authAction(event, 'loginMessage', async auth => {
         const email = document.getElementById('loginEmail').value.trim().toLowerCase();
         const {data, error} = await auth.signInWithPassword({email, password: document.getElementById('loginPassword').value});
-        if(error){
-            if(error.code === 'email_not_confirmed'){
-                showVerification(email);
-                setAuthMessage('verifyMessage', 'Confirm your email before signing in. You can request another confirmation email below.', 'error');
-                return;
-            }
-            throw error;
-        }
-        recoveringPassword = false;
-        openDashboard(data.user);
-    });
-}
-function handleReset(event){
-    return authAction(event, 'resetMessage', async auth => {
-        const {error} = await auth.resetPasswordForEmail(document.getElementById('resetEmail').value.trim().toLowerCase(), redirectOptions());
         if(error) throw error;
-        setAuthMessage('resetMessage', 'If an account exists for this email, password-reset instructions have been sent.', 'success');
-    });
-}
-function handleNewPassword(event){
-    return authAction(event, 'newPasswordMessage', async auth => {
-        const password = document.getElementById('newPassword').value;
-        if(password.length < 8) throw new Error('Password must contain at least 8 characters.');
-        if(password !== document.getElementById('newPassword2').value) throw new Error('Passwords do not match.');
-        const {data, error} = await auth.updateUser({password});
-        if(error) throw error;
-        recoveringPassword = false;
+        if(!data.session) throw new Error('Sign-in did not return a session. Please try again.');
         openDashboard(data.user);
     });
 }
@@ -1041,23 +928,11 @@ async function logoutUser(){
     } catch(error){ setAuthMessage('loginMessage', 'Sign-out could not complete. ' + authError(error), 'error'); }
 }
 async function checkExistingSession(){
-    // Capture link errors before the SDK processes the URL fragment.
-    const callbackParams = new URLSearchParams(location.hash.slice(1));
-    if(callbackParams.has('error') || callbackParams.has('error_code')){
-        lockDashboard();
-        showAuthStep('loginStep');
-        const expired = callbackParams.get('error_code') === 'otp_expired';
-        setAuthMessage('loginMessage', expired
-            ? 'This email link has expired or has already been used. Try signing in. If your email is still unconfirmed, request a new confirmation email.'
-            : 'The email link could not be verified. Try signing in or request a new confirmation or password-reset email.', 'error');
-        return;
-    }
     try {
         const auth = getAuthClient().auth;
         const {data: {session}, error} = await auth.getSession();
         if(error) throw error;
         if(!session) return;
-        if(recoveringPassword){ showAuthStep('newPasswordStep'); return; }
         const {data, error: userError} = await auth.getUser();
         if(userError) throw userError;
         openDashboard(data.user);
