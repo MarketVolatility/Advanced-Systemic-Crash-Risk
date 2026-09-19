@@ -567,8 +567,10 @@ button.secondary {
         Risk-Weighted + Momentum + Cross-Asset
         <div class="user-menu">
             <span class="user-email" id="loggedInEmail"></span>
+            <button class="secondary" id="syncNowBtn" onclick="syncNow()">Sync now</button>
             <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
         </div>
+        <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
 
@@ -885,12 +887,12 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
 <p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
-<p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–3, amber 4–11, red 12–40. Hover over a value for its score.</p>
+<p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Hover over a value for its score.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
 </div>
-<p class="table-note">History is stored for this account in this browser only. It does not sync between devices and is removed if browser data is cleared. Default sample values are not saved automatically.</p>
+<p class="table-note">History syncs to your account automatically every 8 seconds while logged in (and via "Sync now"), so it follows you across devices. It's still cached locally too, so it survives a refresh even offline. Default sample values are not saved automatically.</p>
 </section>
 
 </div>
@@ -913,10 +915,78 @@ function getAuthClient(){
         auth: {storage, persistSession: !!storage, autoRefreshToken: true, detectSessionInUrl: false}
     });
     authClient.auth.onAuthStateChange(event => {
-        if(event === 'SIGNED_OUT'){ lockDashboard(); showAuthStep('loginStep'); }
+        if(event === 'SIGNED_OUT'){ stopAutoSync(); lockDashboard(); showAuthStep('loginStep'); }
     });
     return authClient;
 }
+
+// --- Cross-device sync ---
+// This app's only real data is entryHistory, already kept in localStorage
+// under historyKey() (which itself is scoped per user id). Syncing just means
+// mirroring that one key's JSON to a Supabase row for the same user, pulling
+// it on login (overwrites local with cloud) and pushing periodically + on
+// demand while logged in.
+let syncIntervalHandle = null;
+
+async function pushSnapshotToCloud(){
+    if(!window.supabase) return {ok:false, reason:'Supabase not initialized'};
+    const client = getAuthClient();
+    const {data:userData} = await client.auth.getUser();
+    const user = userData && userData.user;
+    if(!user) return {ok:false, reason:'not logged in'};
+    const raw = localStorage.getItem(historyKey()) || '[]';
+    const {error} = await client
+        .from('user_app_data')
+        .upsert({user_id:user.id, data:{entryHistory: raw}, updated_at:new Date().toISOString()});
+    if(error) return {ok:false, reason:error.message};
+    return {ok:true};
+}
+
+async function pullSnapshotFromCloud(){
+    if(!window.supabase) return {ok:false, reason:'Supabase not initialized'};
+    const client = getAuthClient();
+    const {data:userData} = await client.auth.getUser();
+    const user = userData && userData.user;
+    if(!user) return {ok:false, reason:'not logged in'};
+    const {data, error} = await client
+        .from('user_app_data')
+        .select('data')
+        .eq('user_id', user.id)
+        .maybeSingle();
+    if(error) return {ok:false, reason:error.message};
+    if(data && data.data && data.data.entryHistory !== undefined){
+        localStorage.setItem(historyKey(), data.data.entryHistory);
+        return {ok:true, found:true};
+    }
+    return {ok:true, found:false};
+}
+
+function startAutoSync(){
+    if(syncIntervalHandle) clearInterval(syncIntervalHandle);
+    syncIntervalHandle = setInterval(async () => {
+        const result = await pushSnapshotToCloud();
+        const el = document.getElementById('syncStatus');
+        if(el){
+            el.textContent = result.ok ? `Auto-synced at ${new Date().toLocaleTimeString()}.` : `Sync failed: ${result.reason}`;
+            el.style.color = result.ok ? 'var(--text-muted)' : '#f59e0b';
+        }
+    }, 8000);
+}
+
+function stopAutoSync(){
+    if(syncIntervalHandle){ clearInterval(syncIntervalHandle); syncIntervalHandle = null; }
+}
+
+async function syncNow(){
+    const el = document.getElementById('syncStatus');
+    if(el){ el.textContent = 'Syncing…'; el.style.color = 'var(--text-muted)'; }
+    const result = await pushSnapshotToCloud();
+    if(el){
+        el.textContent = result.ok ? `Synced at ${new Date().toLocaleTimeString()}.` : `Sync failed: ${result.reason}`;
+        el.style.color = result.ok ? '#10b981' : '#f59e0b';
+    }
+}
+
 function showAuthStep(id){
     document.querySelectorAll('.auth-step').forEach(el => el.classList.remove('active'));
     document.getElementById(id)?.classList.add('active');
@@ -948,14 +1018,29 @@ function lockDashboard(){
     document.getElementById('authOverlay').style.display = 'flex';
     document.getElementById('loggedInEmail').textContent = '';
 }
-function openDashboard(user){
+async function openDashboard(user){
     if(!user?.id) throw new Error('No authenticated user was returned. Please sign in again.');
     document.getElementById('loggedInEmail').textContent = user.email || '';
     document.getElementById('authOverlay').style.display = 'none';
     document.getElementById('appShell').style.display = 'block';
     document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
     loadEntryHistory(user.id);
+
+    const syncEl = document.getElementById('syncStatus');
+    if(syncEl){ syncEl.textContent = 'Checking for cloud data…'; syncEl.style.color = 'var(--text-muted)'; }
+    const pullResult = await pullSnapshotFromCloud();
+    if(pullResult.ok && pullResult.found){
+        loadEntryHistory(user.id); // re-load from localStorage now that the cloud copy has overwritten it
+        if(syncEl){ syncEl.textContent = 'Loaded your saved history from the cloud.'; syncEl.style.color = '#10b981'; }
+    } else if(pullResult.ok && !pullResult.found){
+        await pushSnapshotToCloud();
+        if(syncEl){ syncEl.textContent = "No cloud data yet — saved this device's history as your starting point."; syncEl.style.color = '#10b981'; }
+    } else {
+        if(syncEl){ syncEl.textContent = `Could not reach cloud data: ${pullResult.reason}`; syncEl.style.color = '#f59e0b'; }
+    }
+
     renderDashboard();
+    startAutoSync();
 }
 function handleRegister(event){
     return authAction(event, 'registerMessage', async auth => {
@@ -966,7 +1051,7 @@ function handleRegister(event){
         const {data, error} = await auth.signUp({email, password});
         if(error) throw error;
         if(!data.session) throw new Error('Sign-up did not return a session. Disable Confirm email in Supabase’s Email provider settings, then try signing in.');
-        openDashboard(data.user);
+        await openDashboard(data.user);
     });
 }
 function handleLogin(event){
@@ -975,10 +1060,11 @@ function handleLogin(event){
         const {data, error} = await auth.signInWithPassword({email, password: document.getElementById('loginPassword').value});
         if(error) throw error;
         if(!data.session) throw new Error('Sign-in did not return a session. Please try again.');
-        openDashboard(data.user);
+        await openDashboard(data.user);
     });
 }
 async function logoutUser(){
+    stopAutoSync();
     lockDashboard();
     showAuthStep('loginStep');
     try {
@@ -995,7 +1081,7 @@ async function checkExistingSession(){
         if(!session) return;
         const {data, error: userError} = await auth.getUser();
         if(userError) throw userError;
-        openDashboard(data.user);
+        await openDashboard(data.user);
     } catch(error){ setAuthMessage('loginMessage', authError(error), 'error'); }
 }
 
@@ -1283,7 +1369,7 @@ function renderEntryHistory(){
     document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
     const head = document.getElementById('historyHead'); head.replaceChildren();
     const heading = document.createElement('tr');
-    ['Delete','Entry','Date','Time','Composite Crash Risk Score (0–40)',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
+    ['Delete','Entry','Date','Time',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
         const th=document.createElement('th'); th.scope='col'; th.textContent=label; heading.appendChild(th);
     }); head.appendChild(heading);
     const body = document.getElementById('historyBody'); body.replaceChildren();
@@ -1302,12 +1388,6 @@ function renderEntryHistory(){
         const dateText=date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
         [isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
-        const score = historyColumns.reduce((total,[key])=>total + metricConfig[key].calc(entry.values[key]),0);
-        const scoreCell = document.createElement('td');
-        scoreCell.textContent = String(score);
-        scoreCell.className = score >= 12 ? 'history-red' : score >= 4 ? 'history-amber' : 'history-normal';
-        scoreCell.title = score+' / 40 composite risk points';
-        tr.appendChild(scoreCell);
         historyColumns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
             td.textContent=String(value); td.className=risk.className;
