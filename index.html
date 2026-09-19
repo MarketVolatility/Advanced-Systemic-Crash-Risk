@@ -885,7 +885,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
 <p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
-<p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Hover over a value for its score.</p>
+<p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–3, amber 4–11, red 12–40. Hover over a value for its score.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
@@ -1283,7 +1283,7 @@ function renderEntryHistory(){
     document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
     const head = document.getElementById('historyHead'); head.replaceChildren();
     const heading = document.createElement('tr');
-    ['Delete','Entry','Date','Time',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
+    ['Delete','Entry','Date','Time','Composite Crash Risk Score (0–40)',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
         const th=document.createElement('th'); th.scope='col'; th.textContent=label; heading.appendChild(th);
     }); head.appendChild(heading);
     const body = document.getElementById('historyBody'); body.replaceChildren();
@@ -1302,6 +1302,12 @@ function renderEntryHistory(){
         const dateText=date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
         [isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
+        const score = historyColumns.reduce((total,[key])=>total + metricConfig[key].calc(entry.values[key]),0);
+        const scoreCell = document.createElement('td');
+        scoreCell.textContent = String(score);
+        scoreCell.className = score >= 12 ? 'history-red' : score >= 4 ? 'history-amber' : 'history-normal';
+        scoreCell.title = score+' / 40 composite risk points';
+        tr.appendChild(scoreCell);
         historyColumns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
             td.textContent=String(value); td.className=risk.className;
