@@ -491,6 +491,8 @@ button.secondary {
 .history-table th:first-child {z-index:3;}
 .history-delete {color:var(--red); background:transparent; border:1px solid transparent; padding:2px 10px; min-width:36px; min-height:36px; font-size:25px; line-height:1;}
 .history-delete:hover,.history-delete:focus-visible {background:rgba(239,68,68,.12); border-color:var(--red);}
+.history-date-input {color-scheme:dark; background:var(--bg-color); color:var(--text-main); border:1px solid var(--border); border-radius:5px; padding:6px; font:inherit;}
+.history-date-save {padding:7px 10px; margin-left:6px; font-size:12px;}
 .history-normal {color:#fff;}
 .history-amber {color:var(--amber);}
 .history-red {color:var(--red);}
@@ -886,7 +888,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
-<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Dates and times show when values were entered, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
+<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Edit a saved row’s date and time, then select Save. Rows are reordered by date; the newest saved row supplies the current dashboard values. Dates default to entry time and can be changed to your observation time, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
 <p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–3, amber 4–11, red 12–40. Hover over a value for its score.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
@@ -1360,6 +1362,32 @@ function deleteHistoryEntry(entry){
     }
     renderDashboard();
 }
+function updateEntryDateTime(entry,dateText,timeText){
+    if(!historyOwner || !entryHistory.includes(entry)) return false;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(dateText) || !/^\d{2}:\d{2}(?::\d{2})?$/.test(timeText)){
+        alert('Enter a complete date and time.'); return false;
+    }
+    const [year,month,day]=dateText.split('-').map(Number);
+    const [hour,minute,second=0]=timeText.split(':').map(Number);
+    const date=new Date(0);
+    date.setFullYear(year,month-1,day); date.setHours(hour,minute,second,0);
+    if(year<1 || !Number.isFinite(date.getTime()) || date.getFullYear()!==year || date.getMonth()!==month-1 || date.getDate()!==day || date.getHours()!==hour || date.getMinutes()!==minute || date.getSeconds()!==second){
+        alert('Enter a valid local date and time.'); return false;
+    }
+    const updated=entryHistory.map(row=>row===entry ? {...row,savedAt:date.toISOString()} : row)
+        .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
+    try { localStorage.setItem(historyKey(),JSON.stringify(updated)); }
+    catch(error){ alert('The date and time could not be saved to browser storage. The original entry has been kept.'); return false; }
+    entryHistory=updated;
+    historyStorageError='';
+    if(currentEntryTime){
+        currentEntryTime=entryHistory[0].savedAt;
+        currentData={...entryHistory[0].values};
+        syncManualInputs();
+    }
+    renderDashboard();
+    return true;
+}
 function historyRisk(key,value){
     const config = metricConfig[key], points = config.calc(value);
     return {className:points === 0 ? 'history-normal' : points >= config.maxPoints ? 'history-red' : 'history-amber', points, max:config.maxPoints};
@@ -1387,7 +1415,24 @@ function renderEntryHistory(){
         const date=entry.savedAt ? new Date(entry.savedAt) : null;
         const dateText=date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
-        [isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past',dateText,timeText].forEach(text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);});
+        const entryCell=document.createElement('td');
+        entryCell.textContent=isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past';
+        tr.appendChild(entryCell);
+        const dateCell=document.createElement('td'),timeCell=document.createElement('td');
+        if(date){
+            const dateInput=document.createElement('input');
+            dateInput.type='date'; dateInput.value=dateText; dateInput.min='0001-01-01'; dateInput.max='9999-12-31';
+            dateInput.className='history-date-input'; dateInput.setAttribute('aria-label','Entry date for '+dateText+' '+timeText);
+            const timeInput=document.createElement('input');
+            timeInput.type='time'; timeInput.step='1'; timeInput.value=timeText;
+            timeInput.className='history-date-input'; timeInput.setAttribute('aria-label','Entry time for '+dateText+' '+timeText);
+            const saveButton=document.createElement('button');
+            saveButton.type='button'; saveButton.textContent='Save'; saveButton.className='history-date-save';
+            saveButton.title='Save this entry’s date and time';
+            saveButton.onclick=()=>updateEntryDateTime(entry,dateInput.value,timeInput.value);
+            dateCell.appendChild(dateInput); timeCell.appendChild(timeInput); timeCell.appendChild(saveButton);
+        } else { dateCell.textContent='—'; timeCell.textContent='—'; }
+        tr.appendChild(dateCell); tr.appendChild(timeCell);
         const score = historyColumns.reduce((total,[key])=>total + metricConfig[key].calc(entry.values[key]),0);
         const scoreCell = document.createElement('td');
         scoreCell.textContent = String(score);
