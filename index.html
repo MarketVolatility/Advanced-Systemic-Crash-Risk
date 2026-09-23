@@ -903,7 +903,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
 </div>
-<p class="table-note">History syncs to your account automatically every 8 seconds while logged in (and via "Sync now"), so it follows you across devices. It's still cached locally too, so it survives a refresh even offline. Default sample values are not saved automatically.</p>
+<p class="table-note">History syncs to your account automatically every 8 minutes while logged in (and via "Sync now"), so it follows you across devices. It's still cached locally too, so it survives a refresh even offline. Default sample values are not saved automatically.</p>
 </section>
 
 
@@ -1034,7 +1034,7 @@ function startAutoSync(){
             el.textContent = result.ok ? `Auto-synced at ${new Date().toLocaleTimeString()}.` : `Sync failed: ${result.reason}`;
             el.style.color = result.ok ? 'var(--text-muted)' : '#f59e0b';
         }
-    }, 8000);
+    }, 8 * 60 * 1000);
 }
 
 function stopAutoSync(){
