@@ -492,6 +492,7 @@ button.secondary {
 .history-delete {color:var(--red); background:transparent; border:1px solid transparent; padding:2px 10px; min-width:36px; min-height:36px; font-size:25px; line-height:1;}
 .history-delete:hover,.history-delete:focus-visible {background:rgba(239,68,68,.12); border-color:var(--red);}
 .history-date-input {color-scheme:dark; background:var(--bg-color); color:var(--text-main); border:1px solid var(--border); border-radius:5px; padding:6px; font:inherit;}
+.history-value-input {width:100px; background:var(--bg-color); border:1px solid var(--border); border-radius:5px; padding:7px; font:inherit; text-align:right;}
 .history-date-save {padding:7px 10px; margin-left:6px; font-size:12px;}
 .history-normal {color:#fff;}
 .history-amber {color:var(--amber);}
@@ -888,13 +889,25 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
-<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Edit a saved row’s date and time, then select Save. Rows are reordered by date; the newest saved row supplies the current dashboard values. Dates default to entry time and can be changed to your observation time, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
+<p class="table-note">Saved when you select Parse &amp; Update or Save Manual Changes. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Edit a saved row’s date, time or indicator values, then select Save. Its composite score is calculated automatically from the 18 indicators. Rows are reordered by date; the newest saved row supplies the current dashboard values. Dates default to entry time and can be changed to your observation time, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
 <p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–3, amber 4–11, red 12–40. Hover over a value for its score.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
 </div>
 <p class="table-note">History syncs to your account automatically every 8 seconds while logged in (and via "Sync now"), so it follows you across devices. It's still cached locally too, so it survives a refresh even offline. Default sample values are not saved automatically.</p>
+</section>
+
+
+<section class="control-panel" aria-labelledby="riskChartHeading">
+<h2 class="panel-title" id="riskChartHeading">Composite crash risk over time</h2>
+<label for="riskChartRange">Time range</label>
+<select id="riskChartRange" onchange="renderRiskChart()" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
+</select>
+<p class="table-note">Shows saved entries within the selected period ending now, using their edited dates and local time. Unsaved changes and future-dated entries are excluded. Hover or focus on a point for its date and score.</p>
+<p id="riskChartSummary" class="table-note" role="status"></p>
+<div style="overflow-x:auto"><svg id="riskChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="Composite crash risk score from 0 to 40 over time"></svg></div>
 </section>
 
 </div>
@@ -1362,7 +1375,8 @@ function deleteHistoryEntry(entry){
     }
     renderDashboard();
 }
-function updateEntryDateTime(entry,dateText,timeText){
+function updateEntryDateTime(entry,dateText,timeText,values=entry.values){
+    if(!validSnapshot(values)){ alert("Enter a valid number for all 18 indicators."); return false; }
     if(!historyOwner || !entryHistory.includes(entry)) return false;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dateText) || !/^\d{2}:\d{2}(?::\d{2})?$/.test(timeText)){
         alert('Enter a complete date and time.'); return false;
@@ -1374,10 +1388,10 @@ function updateEntryDateTime(entry,dateText,timeText){
     if(year<1 || !Number.isFinite(date.getTime()) || date.getFullYear()!==year || date.getMonth()!==month-1 || date.getDate()!==day || date.getHours()!==hour || date.getMinutes()!==minute || date.getSeconds()!==second){
         alert('Enter a valid local date and time.'); return false;
     }
-    const updated=entryHistory.map(row=>row===entry ? {...row,savedAt:date.toISOString()} : row)
+    const updated=entryHistory.map(row=>row===entry ? {...row,savedAt:date.toISOString(),values:{...values}} : row)
         .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
     try { localStorage.setItem(historyKey(),JSON.stringify(updated)); }
-    catch(error){ alert('The date and time could not be saved to browser storage. The original entry has been kept.'); return false; }
+    catch(error){ alert('The entry could not be saved to browser storage. The original entry has been kept.'); return false; }
     entryHistory=updated;
     historyStorageError='';
     if(currentEntryTime){
@@ -1392,7 +1406,50 @@ function historyRisk(key,value){
     const config = metricConfig[key], points = config.calc(value);
     return {className:points === 0 ? 'history-normal' : points >= config.maxPoints ? 'history-red' : 'history-amber', points, max:config.maxPoints};
 }
+function compositeScore(values){
+    return historyColumns.reduce((total,[key])=>total+metricConfig[key].calc(values[key]),0);
+}
+function chartWindow(range,now=new Date()){
+    const start=new Date(now);
+    if(range==='1w') start.setDate(start.getDate()-7);
+    else {
+        const months=({'1m':1,'3m':3,'6m':6,'1y':12,'2y':24,'3y':36,'4y':48,'5y':60})[range] || 3;
+        const day=start.getDate(); start.setDate(1); start.setMonth(start.getMonth()-months);
+        const last=new Date(start.getFullYear(),start.getMonth()+1,0).getDate();start.setDate(Math.min(day,last));
+    }
+    return {start,end:new Date(now)};
+}
+function chartEntries(range,now=new Date()){
+    const {start,end}=chartWindow(range,now);
+    return {start,end,points:entryHistory.filter(row=>Date.parse(row.savedAt)>=start.getTime() && Date.parse(row.savedAt)<=end.getTime())
+        .map(row=>({time:Date.parse(row.savedAt),score:compositeScore(row.values)})).sort((a,b)=>a.time-b.time)};
+}
+function renderRiskChart(){
+    const svg=document.getElementById('riskChart');
+    const {start,end,points}=chartEntries(document.getElementById('riskChartRange').value);
+    svg.replaceChildren();
+    const add=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(text!==undefined)el.textContent=text;svg.appendChild(el);return el;};
+    const left=55,right=930,top=24,bottom=282;
+    const x=t=>left+(t-start.getTime())/(end-start)*(right-left),y=n=>bottom-n/40*(bottom-top);
+    [[0,4,'#ffffff'],[4,12,'#f59e0b'],[12,40,'#ef4444']].forEach(([lo,hi,color])=>add('rect',{x:left,y:y(hi),width:right-left,height:y(lo)-y(hi),fill:color,opacity:.05}));
+    [0,4,8,12,16,26,40].forEach(n=>{add('line',{x1:left,x2:right,y1:y(n),y2:y(n),stroke:'#334155'});add('text',{x:left-12,y:y(n)+4,fill:'#94a3b8','text-anchor':'end','font-size':12},n);});
+    for(let i=0;i<=4;i++){
+        const t=start.getTime()+(end-start)*i/4;
+        add('text',{x:x(t),y:bottom+25,fill:'#94a3b8','font-size':11,'text-anchor':i===0?'start':i===4?'end':'middle'},new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}));
+    }
+    add('text',{x:left,y:15,fill:'#94a3b8','font-size':12},'Score (0–40)');
+    if(points.length>1)add('polyline',{points:points.map(p=>x(p.time)+','+y(p.score)).join(' '),fill:'none',stroke:'#60a5fa','stroke-width':2});
+    points.forEach(p=>{
+        const label=new Date(p.time).toLocaleString()+' — score '+p.score+' / 40';
+        const dot=add('circle',{cx:x(p.time),cy:y(p.score),r:4,fill:p.score>=12?'#ef4444':p.score>=4?'#f59e0b':'#fff',tabindex:0,'aria-label':label});
+        const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label;dot.appendChild(title);
+        dot.onfocus=()=>{document.getElementById('riskChartSummary').textContent=label;};
+    });
+    document.getElementById('riskChartSummary').textContent=points.length ? points.length+' saved entries · Latest score in this range: '+points[points.length-1].score+' / 40' : 'No saved entries in this time range. Select a wider range or save an entry.';
+}
+
 function renderEntryHistory(){
+    renderRiskChart();
     document.getElementById('historyTimezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
     document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
     const head = document.getElementById('historyHead'); head.replaceChildren();
@@ -1418,6 +1475,7 @@ function renderEntryHistory(){
         const entryCell=document.createElement('td');
         entryCell.textContent=isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past';
         tr.appendChild(entryCell);
+        const numberInputs={};
         const dateCell=document.createElement('td'),timeCell=document.createElement('td');
         if(date){
             const dateInput=document.createElement('input');
@@ -1428,8 +1486,16 @@ function renderEntryHistory(){
             timeInput.className='history-date-input'; timeInput.setAttribute('aria-label','Entry time for '+dateText+' '+timeText);
             const saveButton=document.createElement('button');
             saveButton.type='button'; saveButton.textContent='Save'; saveButton.className='history-date-save';
-            saveButton.title='Save this entry’s date and time';
-            saveButton.onclick=()=>updateEntryDateTime(entry,dateInput.value,timeInput.value);
+            saveButton.title='Save this entry’s date, time and indicator values';
+            saveButton.onclick=()=>{
+                const values={};
+                for(const [key] of historyColumns){
+                    const raw=numberInputs[key].value.trim();
+                    if(!raw || !Number.isFinite(Number(raw))){ alert('Enter a valid number for every indicator.'); return; }
+                    values[key]=Number(raw);
+                }
+                updateEntryDateTime(entry,dateInput.value,timeInput.value,values);
+            };
             dateCell.appendChild(dateInput); timeCell.appendChild(timeInput); timeCell.appendChild(saveButton);
         } else { dateCell.textContent='—'; timeCell.textContent='—'; }
         tr.appendChild(dateCell); tr.appendChild(timeCell);
@@ -1441,7 +1507,16 @@ function renderEntryHistory(){
         tr.appendChild(scoreCell);
         historyColumns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
-            td.textContent=String(value); td.className=risk.className;
+            if(date){
+                const input=document.createElement('input'); input.type='number'; input.step='any'; input.value=String(value);
+                input.className='history-value-input '+risk.className;
+                input.setAttribute('aria-label',key+' for '+dateText+' '+timeText);
+                input.oninput=()=>{
+                    const raw=input.value.trim(),n=Number(raw);
+                    input.className='history-value-input '+(raw && Number.isFinite(n) ? historyRisk(key,n).className : 'history-normal');
+                };
+                numberInputs[key]=input; td.appendChild(input);
+            } else { td.textContent=String(value); td.className=risk.className; }
             td.title=risk.points+' / '+risk.max+' risk points'; tr.appendChild(td);
         }); body.appendChild(tr);
     });
