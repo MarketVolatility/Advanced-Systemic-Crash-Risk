@@ -918,25 +918,45 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div style="overflow-x:auto"><svg id="riskChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="Composite crash risk score from 0 to 40 over time"></svg></div>
 </section>
 
-<section class="control-panel" aria-labelledby="volatilityHistoryTitle">
-<h2 class="panel-title" id="volatilityHistoryTitle">VOLATILITY REGIME</h2>
-<p class="table-note">Dated entries · Score out of 10. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="VOLATILITY REGIME history"><table class="history-table"><thead id="volatilityHistoryHead"></thead><tbody id="volatilityHistoryBody"></tbody></table></div>
+<section class="control-panel" aria-labelledby="volatilityChartHeading">
+<h2 class="panel-title" id="volatilityChartHeading">VOLATILITY REGIME</h2>
+<label for="volatilityChartRange">Time range</label>
+<select id="volatilityChartRange" onchange="renderRiskChart('volatilityChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
+</select>
+<p class="table-note">Saved scores over time · Maximum 10 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
+<p id="volatilityChartSummary" class="table-note" role="status"></p>
+<div style="overflow-x:auto"><svg id="volatilityChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="VOLATILITY REGIME score from 0 to 10 over time"></svg></div>
 </section>
-<section class="control-panel" aria-labelledby="creditHistoryTitle">
-<h2 class="panel-title" id="creditHistoryTitle">CREDIT REGIME</h2>
-<p class="table-note">Dated entries · Score out of 11. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="CREDIT REGIME history"><table class="history-table"><thead id="creditHistoryHead"></thead><tbody id="creditHistoryBody"></tbody></table></div>
+<section class="control-panel" aria-labelledby="creditChartHeading">
+<h2 class="panel-title" id="creditChartHeading">CREDIT REGIME</h2>
+<label for="creditChartRange">Time range</label>
+<select id="creditChartRange" onchange="renderRiskChart('creditChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
+</select>
+<p class="table-note">Saved scores over time · Maximum 11 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
+<p id="creditChartSummary" class="table-note" role="status"></p>
+<div style="overflow-x:auto"><svg id="creditChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="CREDIT REGIME score from 0 to 11 over time"></svg></div>
 </section>
-<section class="control-panel" aria-labelledby="macroHistoryTitle">
-<h2 class="panel-title" id="macroHistoryTitle">MACRO SHOCK</h2>
-<p class="table-note">Dated entries · Score out of 8. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="MACRO SHOCK history"><table class="history-table"><thead id="macroHistoryHead"></thead><tbody id="macroHistoryBody"></tbody></table></div>
+<section class="control-panel" aria-labelledby="macroChartHeading">
+<h2 class="panel-title" id="macroChartHeading">MACRO SHOCK</h2>
+<label for="macroChartRange">Time range</label>
+<select id="macroChartRange" onchange="renderRiskChart('macroChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
+</select>
+<p class="table-note">Saved scores over time · Maximum 8 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
+<p id="macroChartSummary" class="table-note" role="status"></p>
+<div style="overflow-x:auto"><svg id="macroChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="MACRO SHOCK score from 0 to 8 over time"></svg></div>
 </section>
-<section class="control-panel" aria-labelledby="equityHistoryTitle">
-<h2 class="panel-title" id="equityHistoryTitle">EQUITY STRUCTURE</h2>
-<p class="table-note">Dated entries · Score out of 9. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="EQUITY STRUCTURE history"><table class="history-table"><thead id="equityHistoryHead"></thead><tbody id="equityHistoryBody"></tbody></table></div>
+<section class="control-panel" aria-labelledby="equityChartHeading">
+<h2 class="panel-title" id="equityChartHeading">EQUITY STRUCTURE</h2>
+<label for="equityChartRange">Time range</label>
+<select id="equityChartRange" onchange="renderRiskChart('equityChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
+</select>
+<p class="table-note">Saved scores over time · Maximum 9 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
+<p id="equityChartSummary" class="table-note" role="status"></p>
+<div style="overflow-x:auto"><svg id="equityChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="EQUITY STRUCTURE score from 0 to 9 over time"></svg></div>
 </section>
 
 </div>
@@ -1462,33 +1482,39 @@ function chartWindow(range,now=new Date()){
     }
     return {start,end:new Date(now)};
 }
-function chartEntries(range,now=new Date()){
+const regimeCharts = {"volatilityChart": {"maximum": 10, "keys": ["vix", "vix_chg", "vix_5d", "move", "vix_term"]}, "creditChart": {"maximum": 11, "keys": ["hy", "hy_5d", "hy_20d", "bbb"]}, "macroChart": {"maximum": 8, "keys": ["yield", "yield_20d", "wti", "wti_20d"]}, "equityChart": {"maximum": 9, "keys": ["dma50", "dma200", "breadth", "breadth_20d"]}};
+function chartEntries(range,now=new Date(),scoreFor=compositeScore){
     const {start,end}=chartWindow(range,now);
     return {start,end,points:entryHistory.filter(row=>Date.parse(row.savedAt)>=start.getTime() && Date.parse(row.savedAt)<=end.getTime())
-        .map(row=>({time:Date.parse(row.savedAt),score:compositeScore(row.values)})).sort((a,b)=>a.time-b.time)};
+        .map(row=>({time:Date.parse(row.savedAt),score:scoreFor(row.values)})).sort((a,b)=>a.time-b.time)};
 }
-function renderRiskChart(){
-    const svg=document.getElementById('riskChart');
-    const {start,end,points}=chartEntries(document.getElementById('riskChartRange').value);
+function renderRiskChart(chartId='riskChart'){
+    const config=regimeCharts[chartId];
+    const maximum=config ? config.maximum : 40;
+    const amber=config ? Math.ceil(maximum*0.34) : 4;
+    const red=config ? Math.ceil(maximum*0.67) : 12;
+    const scoreFor=config ? values=>config.keys.reduce((sum,key)=>sum+metricConfig[key].calc(values[key]),0) : compositeScore;
+    const svg=document.getElementById(chartId);
+    const {start,end,points}=chartEntries(document.getElementById(chartId+'Range').value,new Date(),scoreFor);
     svg.replaceChildren();
     const add=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(text!==undefined)el.textContent=text;svg.appendChild(el);return el;};
     const left=55,right=930,top=24,bottom=282;
-    const x=t=>left+(t-start.getTime())/(end-start)*(right-left),y=n=>bottom-n/40*(bottom-top);
-    [[0,4,'#ffffff'],[4,12,'#f59e0b'],[12,40,'#ef4444']].forEach(([lo,hi,color])=>add('rect',{x:left,y:y(hi),width:right-left,height:y(lo)-y(hi),fill:color,opacity:.05}));
-    [0,4,8,12,16,26,40].forEach(n=>{add('line',{x1:left,x2:right,y1:y(n),y2:y(n),stroke:'#334155'});add('text',{x:left-12,y:y(n)+4,fill:'#94a3b8','text-anchor':'end','font-size':12},n);});
+    const x=t=>left+(t-start.getTime())/(end-start)*(right-left),y=n=>bottom-n/maximum*(bottom-top);
+    [[0,amber,'#ffffff'],[amber,red,'#f59e0b'],[red,maximum,'#ef4444']].forEach(([lo,hi,color])=>add('rect',{x:left,y:y(hi),width:right-left,height:y(lo)-y(hi),fill:color,opacity:.05}));
+    (config ? Array.from({length:maximum+1},(_,i)=>i) : [0,4,8,12,16,26,40]).forEach(n=>{add('line',{x1:left,x2:right,y1:y(n),y2:y(n),stroke:'#334155'});add('text',{x:left-12,y:y(n)+4,fill:'#94a3b8','text-anchor':'end','font-size':12},n);});
     for(let i=0;i<=4;i++){
         const t=start.getTime()+(end-start)*i/4;
         add('text',{x:x(t),y:bottom+25,fill:'#94a3b8','font-size':11,'text-anchor':i===0?'start':i===4?'end':'middle'},new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}));
     }
-    add('text',{x:left,y:15,fill:'#94a3b8','font-size':12},'Score (0–40)');
+    add('text',{x:left,y:15,fill:'#94a3b8','font-size':12},'Score (0–'+maximum+')');
     if(points.length>1)add('polyline',{points:points.map(p=>x(p.time)+','+y(p.score)).join(' '),fill:'none',stroke:'#60a5fa','stroke-width':2});
     points.forEach(p=>{
-        const label=new Date(p.time).toLocaleString()+' — score '+p.score+' / 40';
-        const dot=add('circle',{cx:x(p.time),cy:y(p.score),r:4,fill:p.score>=12?'#ef4444':p.score>=4?'#f59e0b':'#fff',tabindex:0,'aria-label':label});
+        const label=new Date(p.time).toLocaleString()+' — score '+p.score+' / '+maximum;
+        const dot=add('circle',{cx:x(p.time),cy:y(p.score),r:4,fill:p.score>=red?'#ef4444':p.score>=amber?'#f59e0b':'#fff',tabindex:0,'aria-label':label});
         const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=label;dot.appendChild(title);
-        dot.onfocus=()=>{document.getElementById('riskChartSummary').textContent=label;};
+        dot.onfocus=()=>{document.getElementById(chartId+'Summary').textContent=label;};
     });
-    document.getElementById('riskChartSummary').textContent=points.length ? points.length+' saved entries · Latest score in this range: '+points[points.length-1].score+' / 40' : 'No saved entries in this time range. Select a wider range or save an entry.';
+    document.getElementById(chartId+'Summary').textContent=points.length ? points.length+' saved entries · Latest score in this range: '+points[points.length-1].score+' / '+maximum : 'No saved entries in this time range. Select a wider range or save an entry.';
 }
 
 function renderEntryHistory(){
@@ -1496,10 +1522,10 @@ function renderEntryHistory(){
     document.getElementById('historyTimezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
     document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
     renderHistoryTable('history',historyColumns,'Composite Crash Risk Score',40,false);
-    renderHistoryTable('volatilityHistory',["vix", "vix_chg", "vix_5d", "move", "vix_term"].map(key=>historyColumns.find(column=>column[0]===key)),'VOLATILITY REGIME score',10,true);
-    renderHistoryTable('creditHistory',["hy", "hy_5d", "hy_20d", "bbb"].map(key=>historyColumns.find(column=>column[0]===key)),'CREDIT REGIME score',11,true);
-    renderHistoryTable('macroHistory',["yield", "yield_20d", "wti", "wti_20d"].map(key=>historyColumns.find(column=>column[0]===key)),'MACRO SHOCK score',8,true);
-    renderHistoryTable('equityHistory',["dma50", "dma200", "breadth", "breadth_20d"].map(key=>historyColumns.find(column=>column[0]===key)),'EQUITY STRUCTURE score',9,true);
+    renderRiskChart('volatilityChart');
+    renderRiskChart('creditChart');
+    renderRiskChart('macroChart');
+    renderRiskChart('equityChart');
 }
 function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
     const head = document.getElementById(prefix+'Head'); head.replaceChildren();
