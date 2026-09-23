@@ -499,7 +499,14 @@ button.secondary {
 .history-red {color:var(--red);}
 .history-current {background:rgba(59,130,246,.08);}
 </style>
-</head>
+<style>
+* {scrollbar-color:#a66a3f #241a14; scrollbar-width:auto;}
+::-webkit-scrollbar {width:14px;height:14px;}
+::-webkit-scrollbar-track {background:#241a14;}
+::-webkit-scrollbar-thumb {background:#a66a3f;border:3px solid #241a14;border-radius:8px;}
+::-webkit-scrollbar-thumb:hover {background:#c58a58;}
+::-webkit-scrollbar-corner {background:#241a14;}
+</style></head>
 
 <body>
 
@@ -709,7 +716,7 @@ button.secondary {
     ⚡ Quick Paste Update- copy and paste this to your AI
 </div>
 
-<div class="info-box">
+<div class="info-box" id="quickPastePrompt">
     Generate the latest values in number only in the following order:
     <br><br>
     <strong>
@@ -734,6 +741,7 @@ button.secondary {
     </strong>
 </div>
 
+<div style="margin-bottom:12px"><button type="button" onclick="copyQuickPastePrompt()">Copy prompt</button> <span id="copyPromptStatus" class="table-note" role="status"></span></div>
 <textarea
 class="paste-box"
 id="quickPasteInput"
@@ -908,6 +916,27 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Shows saved entries within the selected period ending now, using their edited dates and local time. Unsaved changes and future-dated entries are excluded. Hover or focus on a point for its date and score.</p>
 <p id="riskChartSummary" class="table-note" role="status"></p>
 <div style="overflow-x:auto"><svg id="riskChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="Composite crash risk score from 0 to 40 over time"></svg></div>
+</section>
+
+<section class="control-panel" aria-labelledby="volatilityHistoryTitle">
+<h2 class="panel-title" id="volatilityHistoryTitle">VOLATILITY REGIME</h2>
+<p class="table-note">Dated entries · Score out of 10. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="VOLATILITY REGIME history"><table class="history-table"><thead id="volatilityHistoryHead"></thead><tbody id="volatilityHistoryBody"></tbody></table></div>
+</section>
+<section class="control-panel" aria-labelledby="creditHistoryTitle">
+<h2 class="panel-title" id="creditHistoryTitle">CREDIT REGIME</h2>
+<p class="table-note">Dated entries · Score out of 11. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="CREDIT REGIME history"><table class="history-table"><thead id="creditHistoryHead"></thead><tbody id="creditHistoryBody"></tbody></table></div>
+</section>
+<section class="control-panel" aria-labelledby="macroHistoryTitle">
+<h2 class="panel-title" id="macroHistoryTitle">MACRO SHOCK</h2>
+<p class="table-note">Dated entries · Score out of 8. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="MACRO SHOCK history"><table class="history-table"><thead id="macroHistoryHead"></thead><tbody id="macroHistoryBody"></tbody></table></div>
+</section>
+<section class="control-panel" aria-labelledby="equityHistoryTitle">
+<h2 class="panel-title" id="equityHistoryTitle">EQUITY STRUCTURE</h2>
+<p class="table-note">Dated entries · Score out of 9. White: calm; amber: watch; red: stressed. Edit values and select Save to update all tables and the graph. Deleting a row removes the shared entry from every table.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="EQUITY STRUCTURE history"><table class="history-table"><thead id="equityHistoryHead"></thead><tbody id="equityHistoryBody"></tbody></table></div>
 </section>
 
 </div>
@@ -1406,6 +1435,20 @@ function historyRisk(key,value){
     const config = metricConfig[key], points = config.calc(value);
     return {className:points === 0 ? 'history-normal' : points >= config.maxPoints ? 'history-red' : 'history-amber', points, max:config.maxPoints};
 }
+async function copyQuickPastePrompt(){
+    const prompt=document.getElementById('quickPastePrompt').textContent.replace(/\s+/g,' ').trim();
+    const status=document.getElementById('copyPromptStatus');
+    try {
+        if(!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
+        await navigator.clipboard.writeText(prompt);
+        status.textContent='Prompt copied.';
+    } catch(error){
+        const selection=window.getSelection();
+        const range=document.createRange();range.selectNodeContents(document.getElementById('quickPastePrompt'));
+        selection.removeAllRanges();selection.addRange(range);
+        status.textContent='Automatic copy unavailable. Prompt selected — press Ctrl+C or Command+C.';
+    }
+}
 function compositeScore(values){
     return historyColumns.reduce((total,[key])=>total+metricConfig[key].calc(values[key]),0);
 }
@@ -1452,12 +1495,19 @@ function renderEntryHistory(){
     renderRiskChart();
     document.getElementById('historyTimezone').textContent = Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time';
     document.getElementById('historyNotice').textContent = historyStorageError || (entryHistory.length ? entryHistory.length+' saved entries.' : (historyPreviewHidden ? 'No saved entries. Save an update to add a row.' : 'No saved entries yet. Current values are unsaved samples.'));
-    const head = document.getElementById('historyHead'); head.replaceChildren();
+    renderHistoryTable('history',historyColumns,'Composite Crash Risk Score',40,false);
+    renderHistoryTable('volatilityHistory',["vix", "vix_chg", "vix_5d", "move", "vix_term"].map(key=>historyColumns.find(column=>column[0]===key)),'VOLATILITY REGIME score',10,true);
+    renderHistoryTable('creditHistory',["hy", "hy_5d", "hy_20d", "bbb"].map(key=>historyColumns.find(column=>column[0]===key)),'CREDIT REGIME score',11,true);
+    renderHistoryTable('macroHistory',["yield", "yield_20d", "wti", "wti_20d"].map(key=>historyColumns.find(column=>column[0]===key)),'MACRO SHOCK score',8,true);
+    renderHistoryTable('equityHistory',["dma50", "dma200", "breadth", "breadth_20d"].map(key=>historyColumns.find(column=>column[0]===key)),'EQUITY STRUCTURE score',9,true);
+}
+function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
+    const head = document.getElementById(prefix+'Head'); head.replaceChildren();
     const heading = document.createElement('tr');
-    ['Delete','Entry','Date','Time','Composite Crash Risk Score (0–40)',...historyColumns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
+    ['Delete','Entry','Date','Time',scoreLabel+' (0–'+maximum+')',...columns.map(([,label,unit])=>label+' ('+unit+')')].forEach(label=>{
         const th=document.createElement('th'); th.scope='col'; th.textContent=label; heading.appendChild(th);
     }); head.appendChild(heading);
-    const body = document.getElementById('historyBody'); body.replaceChildren();
+    const body = document.getElementById(prefix+'Body'); body.replaceChildren();
     const entries = currentEntryTime || historyPreviewHidden ? entryHistory : [{savedAt:null,values:currentData},...entryHistory];
     entries.forEach((entry,index)=>{
         const isCurrent = index===0 && !historyPreviewHidden;
@@ -1488,8 +1538,8 @@ function renderEntryHistory(){
             saveButton.type='button'; saveButton.textContent='Save'; saveButton.className='history-date-save';
             saveButton.title='Save this entry’s date, time and indicator values';
             saveButton.onclick=()=>{
-                const values={};
-                for(const [key] of historyColumns){
+                const values={...entry.values};
+                for(const [key] of columns){
                     const raw=numberInputs[key].value.trim();
                     if(!raw || !Number.isFinite(Number(raw))){ alert('Enter a valid number for every indicator.'); return; }
                     values[key]=Number(raw);
@@ -1499,13 +1549,13 @@ function renderEntryHistory(){
             dateCell.appendChild(dateInput); timeCell.appendChild(timeInput); timeCell.appendChild(saveButton);
         } else { dateCell.textContent='—'; timeCell.textContent='—'; }
         tr.appendChild(dateCell); tr.appendChild(timeCell);
-        const score = historyColumns.reduce((total,[key])=>total + metricConfig[key].calc(entry.values[key]),0);
+        const score = columns.reduce((total,[key])=>total + metricConfig[key].calc(entry.values[key]),0);
         const scoreCell = document.createElement('td');
         scoreCell.textContent = String(score);
-        scoreCell.className = score >= 12 ? 'history-red' : score >= 4 ? 'history-amber' : 'history-normal';
-        scoreCell.title = score+' / 40 composite risk points';
+        scoreCell.className = score >= (isRegime ? maximum*0.67 : 12) ? 'history-red' : score >= (isRegime ? maximum*0.34 : 4) ? 'history-amber' : 'history-normal';
+        scoreCell.title = score+' / '+maximum+' risk points';
         tr.appendChild(scoreCell);
-        historyColumns.forEach(([key])=>{
+        columns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value),td=document.createElement('td');
             if(date){
                 const input=document.createElement('input'); input.type='number'; input.step='any'; input.value=String(value);
