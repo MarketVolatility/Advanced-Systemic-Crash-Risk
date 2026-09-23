@@ -910,7 +910,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="riskChartHeading">
 <h2 class="panel-title" id="riskChartHeading">Composite crash risk over time</h2>
 <label for="riskChartRange">Time range</label>
-<select id="riskChartRange" onchange="renderRiskChart()" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<select id="riskChartRange" onchange="setAllChartRanges(this.value)" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
 <option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
 </select>
 <p class="table-note">Shows saved entries within the selected period ending now, using their edited dates and local time. Unsaved changes and future-dated entries are excluded. Hover or focus on a point for its date and score.</p>
@@ -921,7 +921,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="volatilityChartHeading">
 <h2 class="panel-title" id="volatilityChartHeading">VOLATILITY REGIME</h2>
 <label for="volatilityChartRange">Time range</label>
-<select id="volatilityChartRange" onchange="renderRiskChart('volatilityChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<select id="volatilityChartRange" onchange="setAllChartRanges(this.value)" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
 <option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
 </select>
 <p class="table-note">Saved scores over time · Maximum 10 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
@@ -931,7 +931,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="creditChartHeading">
 <h2 class="panel-title" id="creditChartHeading">CREDIT REGIME</h2>
 <label for="creditChartRange">Time range</label>
-<select id="creditChartRange" onchange="renderRiskChart('creditChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<select id="creditChartRange" onchange="setAllChartRanges(this.value)" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
 <option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
 </select>
 <p class="table-note">Saved scores over time · Maximum 11 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
@@ -941,7 +941,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="macroChartHeading">
 <h2 class="panel-title" id="macroChartHeading">MACRO SHOCK</h2>
 <label for="macroChartRange">Time range</label>
-<select id="macroChartRange" onchange="renderRiskChart('macroChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<select id="macroChartRange" onchange="setAllChartRanges(this.value)" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
 <option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
 </select>
 <p class="table-note">Saved scores over time · Maximum 8 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
@@ -951,7 +951,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <section class="control-panel" aria-labelledby="equityChartHeading">
 <h2 class="panel-title" id="equityChartHeading">EQUITY STRUCTURE</h2>
 <label for="equityChartRange">Time range</label>
-<select id="equityChartRange" onchange="renderRiskChart('equityChart')" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
+<select id="equityChartRange" onchange="setAllChartRanges(this.value)" style="background:var(--bg-color);color:var(--text-main);padding:8px;border:1px solid var(--border);border-radius:6px;margin-left:10px;">
 <option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option>
 </select>
 <p class="table-note">Saved scores over time · Maximum 9 points. White: calm; amber: watch; red: stressed. Uses edited entry dates in local time; excludes unsaved and future-dated entries. Hover or focus on a point for details.</p>
@@ -1487,6 +1487,12 @@ function chartEntries(range,now=new Date(),scoreFor=compositeScore){
     const {start,end}=chartWindow(range,now);
     return {start,end,points:entryHistory.filter(row=>Date.parse(row.savedAt)>=start.getTime() && Date.parse(row.savedAt)<=end.getTime())
         .map(row=>({time:Date.parse(row.savedAt),score:scoreFor(row.values)})).sort((a,b)=>a.time-b.time)};
+}
+function setAllChartRanges(range){
+    if(!['1w','1m','3m','6m','1y','2y','3y','4y','5y'].includes(range)) return;
+    const chartIds=['riskChart',...Object.keys(regimeCharts)];
+    chartIds.forEach(id=>{ document.getElementById(id+'Range').value=range; });
+    chartIds.forEach(id=>renderRiskChart(id));
 }
 function renderRiskChart(chartId='riskChart'){
     const config=regimeCharts[chartId];
