@@ -70,6 +70,7 @@
 .user-menu{display:flex;align-items:center;gap:8px;}
 .user-email{font-size:12px;color:var(--text-muted);}
 .logout-btn{padding:7px 11px;font-size:12px;}
+.funding-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:18px 0}.funding-fields label{display:flex;flex-direction:column;gap:6px}.funding-fields input,#fundingAsOf,#fundingRange{background:var(--bg-color);color:var(--text-main);border:1px solid var(--border);border-radius:6px;padding:8px}#fundingPanel button{margin:4px}#fundingPanel details{margin:16px 0}
 </style>
 
 <style>
@@ -963,6 +964,31 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 <div id="forcedSelling"></div>
+<section class="control-panel" id="fundingPanel" aria-labelledby="fundingHeading">
+<h2 class="panel-title" id="fundingHeading">Dollar funding stress · diagnostic only</h2>
+<p class="table-note">Fed central-bank liquidity swaps (SWPT), USD millions. Weekly outstanding balances are not gross drawdowns or proof of yen-carry liquidation. No contribution to the 44-point score. White figures are informational, not a low-risk classification.</p>
+<p id="fundingSummary" role="status"></p>
+<label for="fundingAsOf">Information available as of (local date and time)</label> <input type="datetime-local" id="fundingAsOf" onchange="renderFunding()"> <button type="button" onclick="document.getElementById('fundingAsOf').value='';renderFunding()">Now</button>
+<p class="table-note">Uses publication timestamps, including revisions. Unknown values stay blank. Stale means more than 14 days since the selected observation; this is a freshness label, not a risk threshold.</p>
+<h3>Current and past dollar funding entries</h3>
+<p class="table-note">Add a weekly release below or paste researched JSON. Edit a row to append a correction while retaining its original version. The red × deletes a release and its corrections after confirmation. Saved locally per account and included in the existing eight-minute sync and Sync now. Export before deleting if you need a permanent audit copy.</p>
+<div class="funding-fields" id="fundingFields"></div>
+<button type="button" id="fundingSave" onclick="saveFundingForm()">Save funding entry</button> <button type="button" onclick="resetFundingForm()">Cancel edit / clear</button>
+<details><summary>Research prompt, import and export</summary>
+<button type="button" onclick="fundingPrompt()">Generate AI research prompt</button> <button type="button" onclick="copyFundingPrompt()">Copy prompt</button>
+<textarea id="fundingPrompt" class="paste-box" rows="4" readonly aria-label="Funding research prompt"></textarea>
+<label for="fundingImport">Paste JSON array of releases</label><textarea id="fundingImport" class="paste-box" rows="4"></textarea>
+<button type="button" onclick="importFunding()">Validate &amp; import releases</button> <button type="button" onclick="exportFunding()">Export history JSON</button>
+<p class="table-note">Import adds new release versions and skips exact duplicates. It never overwrites an existing version. Source and timestamp verification require checking the original release. Identifying a test requires explicit official evidence and settlement/maturity dates; small size alone is insufficient.</p></details>
+<p id="fundingStatus" class="table-note" role="status"></p>
+<div class="data-table-scroll"><table class="history-table"><thead><tr><th>Delete</th><th>Edit</th><th>Saved at</th><th>Observation</th><th>Published (UTC)</th><th>Balance (USD m)</th><th>Weekly change (USD m)</th><th>Tests outstanding (USD m)</th><th>Adjusted balance (USD m)</th><th>Adjustment status</th><th>Evidence</th></tr></thead><tbody id="fundingRows"></tbody></table></div>
+<details><summary>Original releases and correction audit</summary><pre id="fundingAudit" style="max-height:240px;overflow:auto;white-space:pre-wrap"></pre></details>
+<label for="fundingRange">Time range</label> <select id="fundingRange" onchange="setAllChartRanges(this.value)"><option value="1w">1 week</option><option value="1m">1 month</option><option value="3m" selected>3 months</option><option value="6m">6 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option></select>
+<p class="table-note">Blue stepped line: latest known raw balance. Amber bars below: weekly dollar change, only when the preceding weekly observation is available. Steps begin at publication, never at the earlier observation date. A line stops when data becomes stale. Hover or focus on marks for values.</p>
+<div style="overflow-x:auto"><svg id="fundingChart" viewBox="0 0 960 420" style="width:100%;min-width:580px" role="img" aria-label="Dollar swap balances and weekly changes by publication date"></svg></div>
+<p class="table-note"><a href="https://fred.stlouisfed.org/series/SWPT" target="_blank" rel="noopener">Fed / FRED SWPT</a> · <a href="https://www.newyorkfed.org/markets/desk-operations/central-bank-liquidity-swap-operations" target="_blank" rel="noopener">NY Fed operations and tests</a>. Manual research/import is available now. Automatic source collection requires the separately documented server setup; account sync does not download market data.</p>
+</section>
+
 <div id="historicalStudies"></div>
 
 </div>
@@ -991,9 +1017,9 @@ function getAuthClient(){
 }
 
 // --- Cross-device sync ---
-// This app's only real data is entryHistory, already kept in localStorage
+// Market entryHistory and dollar funding release history are kept in localStorage
 // under historyKey() (which itself is scoped per user id). Syncing just means
-// mirroring that one key's JSON to a Supabase row for the same user, pulling
+// mirroring both histories to a Supabase row for the same user, pulling
 // it on login (overwrites local with cloud) and pushing periodically + on
 // demand while logged in.
 let syncIntervalHandle = null;
@@ -1007,7 +1033,7 @@ async function pushSnapshotToCloud(){
     const raw = localStorage.getItem(historyKey()) || '[]';
     const {error} = await client
         .from('user_app_data')
-        .upsert({user_id:user.id, data:{entryHistory: raw}, updated_at:new Date().toISOString()});
+        .upsert({user_id:user.id, data:{entryHistory: raw, fundingHistory:localStorage.getItem(fundingKey()) || '[]'}, updated_at:new Date().toISOString()});
     if(error) return {ok:false, reason:error.message};
     return {ok:true};
 }
@@ -1025,6 +1051,7 @@ async function pullSnapshotFromCloud(){
         .maybeSingle();
     if(error) return {ok:false, reason:error.message};
     if(data && data.data && data.data.entryHistory !== undefined){
+        if(data.data.fundingHistory !== undefined){ const f=JSON.parse(data.data.fundingHistory); if(!Array.isArray(f))throw Error('Invalid cloud funding history'); f.forEach(validateFunding); localStorage.setItem(fundingKey(), JSON.stringify(f)); }
         localStorage.setItem(historyKey(), data.data.entryHistory);
         return {ok:true, found:true};
     }
@@ -1382,6 +1409,7 @@ function syncManualInputs(){
 function loadEntryHistory(userId){
     historyPreviewHidden = false;
     historyOwner = userId;
+    loadFunding();
     entryHistory = [];
     currentEntryTime = null;
     historyStorageError = '';
@@ -1503,6 +1531,7 @@ function setAllChartRanges(range){
     const chartIds=['riskChart',...Object.keys(regimeCharts)];
     chartIds.forEach(id=>{ document.getElementById(id+'Range').value=range; });
     chartIds.forEach(id=>renderRiskChart(id));
+    document.getElementById('fundingRange').value=range;renderFunding();
 }
 function renderRiskChart(chartId='riskChart'){
     const config=regimeCharts[chartId];
@@ -1547,6 +1576,7 @@ function renderEntryHistory(){
     renderRiskChart('equityChart');
     renderRiskChart('forcedChart');
     renderForcedSelling();
+    renderFunding();
 }
 function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
     const head = document.getElementById(prefix+'Head'); head.replaceChildren();
@@ -2169,6 +2199,97 @@ function renderGroupedFactors(tbody,values,day){
         for(const factor of factors){const row=document.createElement('tr');const score=factor.low===factor.high?String(factor.low):factor.low+'–'+factor.high;const color=factor.low!==factor.high?'history-normal':factor.low===0?'history-normal':factor.low===factor.max?'history-red':'history-amber';for(const text of [factor.name,factor.value,factor.low!==factor.high?'Incomplete':factor.low===0?'Calm':factor.low===factor.max?'Stressed':'Watch',score+' / '+factor.max]){const td=document.createElement('td');td.textContent=text;td.className=color;row.appendChild(td);}tbody.appendChild(row);}
     }
 }
+// Release versions are immutable. User corrections append a new version with a new availability time.
+let fundingRecords=[], fundingEdit=null;
+const fundingFields=[['observationDate','Observation date','date'],['publishedAt','Publication date/time (UTC; ISO 8601)','text'],['balance','Balance outstanding (USD million)','number'],['testBalance','Explicitly identified tests outstanding (USD million; blank if unknown)','number'],['testEvidence','Official test evidence URL (required for adjustment)','url'],['source','Official release URL','url']];
+function fundingKey(){return 'crash-risk-funding-v1:'+historyOwner;}
+function fundingNumber(n){return n===null||n===undefined?'—':n.toLocaleString(undefined,{maximumFractionDigits:3});}
+function validateFunding(r){
+    if(!r||!/^\d{4}-\d{2}-\d{2}$/.test(r.observationDate)||!Number.isFinite(Date.parse(r.observationDate))||new Date(r.observationDate).toISOString().slice(0,10)!==r.observationDate)throw Error('A valid observation date is required.');
+    if(typeof r.publishedAt!=='string'||!/(Z|[+-]\d{2}:\d{2})$/.test(r.publishedAt)||!Number.isFinite(Date.parse(r.publishedAt)))throw Error('Publication time must include its timezone, e.g. 2026-09-17T20:30:00Z.');
+    if(Date.parse(r.publishedAt)<Date.parse(r.observationDate)||Date.parse(r.publishedAt)>Date.now())throw Error('Publication must follow the observation and cannot be in the future.');
+    if(!Number.isFinite(r.balance)||r.balance<0)throw Error('Balance must be a nonnegative number in USD millions.');
+    if(r.testBalance!==null&&(!Number.isFinite(r.testBalance)||r.testBalance<0||r.testBalance>r.balance))throw Error('Tests must be null or between zero and the raw balance.');
+    function official(s){try{const u=new URL(s);return u.protocol==='https:'&&['fred.stlouisfed.org','alfred.stlouisfed.org','www.federalreserve.gov','www.newyorkfed.org'].includes(u.hostname);}catch{return false;}}
+    if(!official(r.source))throw Error('Use an HTTPS Fed, NY Fed, FRED or ALFRED source URL.');
+    if(r.testBalance!==null&&!official(r.testEvidence))throw Error('A test adjustment, including verified zero, requires an official evidence URL.');
+    return {...r,publishedAt:new Date(r.publishedAt).toISOString()};
+}
+function fundingVersionsAt(records,time){
+    const m=new Map();records.filter(r=>Date.parse(r.publishedAt)<=time).sort((a,b)=>Date.parse(a.publishedAt)-Date.parse(b.publishedAt)).forEach(r=>m.set(r.observationDate,r));
+    return [...m.values()].sort((a,b)=>a.observationDate.localeCompare(b.observationDate));
+}
+function fundingChange(r,records,time){
+    const prevDate=new Date(Date.parse(r.observationDate)-7*86400000).toISOString().slice(0,10);
+    const p=fundingVersionsAt(records,time).find(v=>v.observationDate===prevDate);
+    return p?r.balance-p.balance:null;
+}
+function loadFunding(){
+    fundingRecords=[];fundingEdit=null;
+    try{const raw=localStorage.getItem(fundingKey());const list=raw?JSON.parse(raw):[];if(!Array.isArray(list))throw Error('Invalid history');fundingRecords=list.map(validateFunding);}
+    catch(e){const s=document.getElementById('fundingStatus');if(s)s.textContent='Funding history could not load: '+e.message;}
+    renderFunding();
+}
+function persistFunding(next){
+    if(!historyOwner)throw Error('Sign in before saving funding history.');
+    localStorage.setItem(fundingKey(),JSON.stringify(next));fundingRecords=next;renderFunding();
+}
+function fundingId(){return 'funding-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
+function saveFundingForm(){
+    try{
+        const raw=Object.fromEntries(fundingFields.map(([k])=>{const v=document.getElementById('funding_'+k).value.trim();return [k,['balance','testBalance'].includes(k)?(v===''?null:Number(v)):v];}));
+        const r=validateFunding(raw),now=new Date().toISOString();
+        if(fundingEdit){const old=fundingRecords.find(v=>v.id===fundingEdit);if(!old)throw Error('Entry changed. Start editing again.');r.publishedAt=now;r.observationDate=old.observationDate;r.supersedes=old.id;}
+        r.id=fundingId();r.savedAt=now;
+        if(fundingRecords.some(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt))throw Error('This observation and publication already exist. Edit the existing row.');
+        persistFunding([...fundingRecords,r]);resetFundingForm();document.getElementById('fundingStatus').textContent='Funding entry saved. Queued for normal account sync.';
+    }catch(e){document.getElementById('fundingStatus').textContent=e.message;}
+}
+function resetFundingForm(){fundingEdit=null;fundingFields.forEach(([k])=>{document.getElementById('funding_'+k).value='';document.getElementById('funding_'+k).disabled=false;});document.getElementById('fundingSave').textContent='Save funding entry';}
+function editFunding(r){fundingEdit=r.id;fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');document.getElementById('funding_observationDate').disabled=true;document.getElementById('funding_publishedAt').value=new Date().toISOString();document.getElementById('funding_publishedAt').disabled=true;document.getElementById('fundingSave').textContent='Save correction (available from now)';document.getElementById('fundingStatus').textContent='The original release is retained. Corrections take effect now to avoid changing what was known earlier.';}
+function deleteFunding(r){if(!confirm('Delete the funding observation '+r.observationDate+' and all its saved versions?'))return;try{persistFunding(fundingRecords.filter(v=>v.observationDate!==r.observationDate));resetFundingForm();}catch(e){document.getElementById('fundingStatus').textContent=e.message;}}
+function importFunding(){
+    try{const data=JSON.parse(document.getElementById('fundingImport').value);if(!Array.isArray(data)||data.length>10000)throw Error('Provide an array of at most 10,000 releases.');
+        const next=[...fundingRecords];let count=0;
+        data.forEach(raw=>{const checked=validateFunding(raw);const r=Object.fromEntries(fundingFields.map(([k])=>[k,checked[k]]));r.publishedAt=checked.publishedAt;
+            const old=next.find(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt);
+            if(old){if(fundingFields.some(([k])=>(old[k]??'')!==(r[k]??'')))throw Error('Conflicting values for an existing publication. Edit the row to preserve its original version.');return;}
+            next.push({...r,id:fundingId(),savedAt:new Date().toISOString()});count++;
+        });persistFunding(next);document.getElementById('fundingStatus').textContent=count+' new release versions imported. Publication timestamps and test evidence are supplied by the importer; verify them against originals.';
+    }catch(e){document.getElementById('fundingStatus').textContent='Nothing imported: '+e.message;}
+}
+function exportFunding(){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(fundingRecords,null,2)],{type:'application/json'}));a.href=url;a.download='dollar-funding-history.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+function fundingPrompt(){document.getElementById('fundingPrompt').value='Research Fed SWPT weekly dollar liquidity swap balances for the past year through today. Return ONLY a JSON array with observationDate (YYYY-MM-DD), publishedAt (exact first-publication timestamp with timezone), balance (USD millions), testBalance (USD millions or null), testEvidence (official URL or empty string), source (official release URL). Preserve separate revisions with their actual publication times. Use original Fed H.4.1 releases or ALFRED vintages and NY Fed operation results. Never use an observation date as a publication date. If exact availability cannot be verified, omit that release and explain outside the JSON. testBalance must include only explicitly identified operational-test transactions outstanding on the observation date, using settlement and maturity dates. Use null unless full reconciliation, including a verified zero, is possible. Do not infer tests from transaction size, invent values, or return risk scores. Review sources before importing.';}
+async function copyFundingPrompt(){try{if(!document.getElementById('fundingPrompt').value)fundingPrompt();await navigator.clipboard.writeText(document.getElementById('fundingPrompt').value);document.getElementById('fundingStatus').textContent='Prompt copied.';}catch{document.getElementById('fundingStatus').textContent='Select and copy the prompt manually; clipboard access is unavailable.';}}
+function renderFunding(){
+    const body=document.getElementById('fundingRows');if(!body)return;
+    const fieldHost=document.getElementById('fundingFields');if(!fieldHost.children.length)fundingFields.forEach(([k,label,type])=>{const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.id='funding_'+k;input.type=type;if(type==='number'){input.min='0';input.step='any';}l.appendChild(input);fieldHost.appendChild(l);});
+    const requested=document.getElementById('fundingAsOf').value;const parsed=Date.parse(requested);const time=Number.isFinite(parsed)?Math.min(parsed,Date.now()):Date.now();
+    const visible=fundingVersionsAt(fundingRecords,time),latest=visible.at(-1),fresh=latest&&time-Date.parse(latest.observationDate)<=14*86400000;
+    document.getElementById('fundingSummary').textContent=latest?'As of '+new Date(time).toLocaleString()+': '+fundingNumber(latest.balance)+' USD m · Weekly change '+fundingNumber(fundingChange(latest,fundingRecords,time))+' USD m · Observation '+latest.observationDate+' · Published '+latest.publishedAt+' · '+(fresh?'Current':'Stale')+' · '+(latest.testBalance===null?'Test adjustment unverified':'Test adjustment supplied; verify evidence'):'No published funding entries available at this time. Add or import verified releases below.';
+    body.replaceChildren();visible.slice().reverse().forEach(r=>{
+        const tr=document.createElement('tr');const cell=text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);return td;};
+        const del=document.createElement('button');del.textContent='×';del.style.color='#ef4444';del.setAttribute('aria-label','Delete funding observation '+r.observationDate);del.onclick=()=>deleteFunding(r);cell('').appendChild(del);
+        const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>editFunding(r);cell('').appendChild(edit);
+        [r.savedAt,r.observationDate,r.publishedAt,fundingNumber(r.balance),fundingNumber(fundingChange(r,fundingRecords,time)),fundingNumber(r.testBalance),fundingNumber(r.testBalance===null?null:r.balance-r.testBalance),r.testBalance===null?'Unverified':'Evidence supplied'].forEach(cell);
+        const sources=cell('');[r.source,r.testEvidence].filter(Boolean).forEach(url=>{const a=document.createElement('a');a.href=url;a.textContent=url===r.source?' Release ':' Tests ';a.target='_blank';a.rel='noopener';sources.appendChild(a);});body.appendChild(tr);
+    });document.getElementById('fundingAudit').textContent=JSON.stringify(fundingRecords,null,2);renderFundingChart(time);
+}
+function renderFundingChart(time){
+    const svg=document.getElementById('fundingChart');svg.replaceChildren();const {start,end}=chartWindow(document.getElementById('fundingRange').value||'3m',new Date(time));
+    const a=+start,b=+end,x=t=>60+(t-a)/(b-a)*850;
+    const times=[a,...new Set(fundingRecords.map(r=>Date.parse(r.publishedAt)).filter(t=>t>a&&t<=b)),b].sort((u,v)=>u-v);
+    const points=times.map(t=>{const r=fundingVersionsAt(fundingRecords,t).at(-1);return {t,r,change:r?fundingChange(r,fundingRecords,t):null};});
+    const max=Math.max(1,...points.map(p=>p.r?.balance||0)),y=n=>230-n/max*195;const changes=points.filter(p=>p.t>a&&p.t<b&&p.change!==null);const cm=Math.max(1,...changes.map(p=>Math.abs(p.change)));
+    const add=(tag,attrs,text)=>{const el=document.createElementNS('http://www.w3.org/2000/svg',tag);Object.entries(attrs).forEach(([k,v])=>el.setAttribute(k,String(v)));if(text!==undefined)el.textContent=text;svg.appendChild(el);return el;};
+    add('text',{x:60,y:18,fill:'#94a3b8'},'Balance (USD million)');add('text',{x:60,y:280,fill:'#94a3b8'},'Weekly change (USD million)');
+    for(let i=0;i<5;i++){const n=max*i/4;add('line',{x1:60,x2:910,y1:y(n),y2:y(n),stroke:'#334155'});add('text',{x:52,y:y(n)+4,fill:'#94a3b8','text-anchor':'end','font-size':11},fundingNumber(n));const t=a+(b-a)*i/4;add('text',{x:x(t),y:408,fill:'#94a3b8','text-anchor':i===0?'start':i===4?'end':'middle','font-size':11},new Date(t).toISOString().slice(0,10));}
+    add('line',{x1:60,x2:910,y1:335,y2:335,stroke:'#94a3b8'});
+    points.forEach((p,i)=>{if(!p.r)return;const expiry=Date.parse(p.r.observationDate)+14*86400000;if(p.t>expiry)return;const stop=Math.min(points[i+1]?.t??b,expiry);add('path',{d:'M '+x(p.t)+' '+y(p.r.balance)+' H '+x(stop),stroke:'#60a5fa','stroke-width':2,fill:'none'});const prev=points[i-1];if(prev?.r&&p.t<=Date.parse(prev.r.observationDate)+14*86400000)add('line',{x1:x(p.t),x2:x(p.t),y1:y(prev.r.balance),y2:y(p.r.balance),stroke:'#60a5fa'});const dot=add('circle',{cx:x(p.t),cy:y(p.r.balance),r:3,fill:'#60a5fa',tabindex:0});const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=p.r.observationDate+' | published '+p.r.publishedAt+' | '+p.r.balance+' USD m';dot.appendChild(title);});
+    changes.forEach(p=>{const h=Math.abs(p.change)/cm*45;const bar=add('rect',{x:x(p.t)-3,y:p.change>=0?335-h:335,width:6,height:Math.max(1,h),fill:'#b58b51',tabindex:0});const title=document.createElementNS('http://www.w3.org/2000/svg','title');title.textContent=new Date(p.t).toISOString()+' | weekly change '+p.change+' USD m';bar.appendChild(title);});
+    if(!points.some(p=>p.r))add('text',{x:300,y:120,fill:'#94a3b8'},'No published data in this period');
+}
+document.addEventListener('DOMContentLoaded',renderFunding);
 </script>
 
 </body>
