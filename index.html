@@ -73,6 +73,17 @@
 .funding-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:18px 0}.funding-fields label{display:flex;flex-direction:column;gap:6px}.funding-fields input,#fundingAsOf,#fundingRange{background:var(--bg-color);color:var(--text-main);border:1px solid var(--border);border-radius:6px;padding:8px}#fundingPanel button{margin:4px}#fundingPanel details{margin:16px 0}
 
 #systemicRiskReference p{line-height:1.7;margin:12px 0}#systemicRiskReference h3{margin:24px 0 12px}#systemicRiskReference h4{margin:20px 0 8px}.systemic-reference-table{min-width:850px;table-layout:fixed;width:100%}.systemic-reference-table th[scope="row"]{width:22%}.systemic-reference-table td{vertical-align:top;overflow-wrap:break-word}
+
+#systemicRiskReference{line-height:1.7}
+#systemicRiskReference .panel-title{line-height:1.35;overflow-wrap:break-word}
+#systemicRiskReference p{margin:0 0 14px}
+#systemicRiskReference h3{margin:30px 0 14px;padding-top:20px;border-top:1px solid var(--border);line-height:1.4}
+#systemicRiskReference h4{margin:22px 0 10px;line-height:1.4}
+#systemicRiskReference ul,#systemicRiskReference ol{margin:0 0 18px;padding-left:26px}
+#systemicRiskReference li{margin:0 0 10px;padding-left:3px;line-height:1.7}
+#systemicRiskReference .data-table-scroll{margin:18px 0 24px}
+#systemicRiskReference th,#systemicRiskReference td{padding:14px 16px;vertical-align:top;line-height:1.65}
+#systemicRiskReference .reference-formula{padding:14px 18px;border:1px solid var(--border);border-radius:8px;background:var(--bg-color);font-size:1.05rem;overflow-x:auto}
 </style>
 
 <style>
@@ -1025,19 +1036,23 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div id="historicalStudies"></div>
 
 <section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
-<h2 class="panel-title" id="systemicRiskReferenceHeading">In Depth Explanation</h2>
+<h2 class="panel-title" id="systemicRiskReferenceHeading">In Depth Explanation of this Advanced Systemic Crash Risk Dashboard</h2>
 <p class="table-note">Explanatory reference. The illustrative thresholds below do not replace the dashboard’s scoring rules in the Risk Factor Table.</p>
 <h3>Five primary regimes</h3>
 <p>The framework categorizes risk into five primary regimes, tracking specific mechanisms and triggers:</p>
-<p>🌪️ Volatility Regime: Covers the VIX (measuring 30-day implied equity volatility, elevated &gt;20), VIX 1D % and 5D % (tracking sudden and sustained volatility acceleration), VIX 3M-1M Spread (measuring curve inversion &lt;0.0), and the MOVE Index (tracking fixed-income instability &gt;100–110).</p>
-<p>💳 Credit Regime: Focuses on HY OAS (junk bond spreads widening &gt;350 bp) alongside 5D and 20D changes for short- and long-term credit freezes, plus BBB OAS monitoring investment-grade stress.</p>
-<p>⚡ Macro Shock: Monitors the 10Y Yield and its 20D velocity changes (spikes &gt;4.5% and &gt;15 bp), alongside WTI Crude absolute prices and 20D momentum (&gt;$90/bbl and &gt;10%).</p>
-<p>📐 Equity Structure: Evaluates technical health via S&amp;P vs 50DMA and 200DMA distance (&lt;0%), as well as Breadth % &gt;50DMA participation and its 20D momentum decay.</p>
-<p>🌊 Forced Selling: Tracks the USDJPY 3-Session % (rapid Yen surges ≤-1.5%) to signal carry trade unwinding.</p>
+<ul>
+<li><strong>🌪️ Volatility Regime:</strong> Covers the VIX (measuring 30-day implied equity volatility, elevated &gt;20), VIX 1D % and 5D % (tracking sudden and sustained volatility acceleration), VIX 3M-1M Spread (measuring curve inversion &lt;0.0), and the MOVE Index (tracking fixed-income instability &gt;100–110).</li>
+<li><strong>💳 Credit Regime:</strong> Focuses on HY OAS (junk bond spreads widening &gt;350 bp) alongside 5D and 20D changes for short- and long-term credit freezes, plus BBB OAS monitoring investment-grade stress.</li>
+<li><strong>⚡ Macro Shock:</strong> Monitors the 10Y Yield and its 20D velocity changes (spikes &gt;4.5% and &gt;15 bp), alongside WTI Crude absolute prices and 20D momentum (&gt;$90/bbl and &gt;10%).</li>
+<li><strong>📐 Equity Structure:</strong> Evaluates technical health via S&amp;P vs 50DMA and 200DMA distance (&lt;0%), as well as Breadth % &gt;50DMA participation and its 20D momentum decay.</li>
+<li><strong>🌊 Forced Selling:</strong> Tracks the USDJPY 3-Session % (rapid Yen surges ≤-1.5%) to signal carry trade unwinding.</li>
+</ul>
 <h3>🔍 Secondary Risk Filters (Structural Context)</h3>
 <p>Additional systemic amplifiers evaluated for selling pressure severity include:</p>
-<p>FINRA Margin Debt: Tracks leverage expansion (YoY ≥ 40%) for bubbles and contraction (3M ≤ -10%) for liquidations.</p>
-<p>S&amp;P 500 Volume Ratio: Compares volume against the 20-day average ( ≥ 1.5–2.0) with negative returns to signal institutional liquidation.</p>
+<ul>
+<li><strong>FINRA Margin Debt:</strong> Tracks leverage expansion (YoY ≥ 40%) for bubbles and contraction (3M ≤ -10%) for liquidations.</li>
+<li><strong>S&amp;P 500 Volume Ratio:</strong> Compares volume against the 20-day average ( ≥ 1.5–2.0) with negative returns to signal institutional liquidation.</li>
+</ul>
 <div class="data-table-scroll" tabindex="0" role="region" aria-label="Systemic risk factors matrix; scroll horizontally on smaller screens">
 <table class="glossary-table systemic-reference-table"><thead><tr><th scope="col">Risk Factor</th><th scope="col">🔄 Normal Market Conditions</th><th scope="col">🚨 Crash Mechanism &amp; Systemic Triggers</th></tr></thead><tbody>
 <tr><th scope="row">🌪️ VIX &amp; Volatility Acceleration (VIX Level, VIX 1D %, VIX 5D %)</th><td>Suppressed / Mean-Reverting: VIX sits between 12–18. Daily fluctuations reflect standard noise or expected earnings adjustments without persistent directional momentum.</td><td>The Shock: VIX spikes above 20–25 with rapid 1D and 5D acceleration (&gt;10%). This shows sudden institutional panic and an aggressive rush to buy short-term equity insurance, signaling an active downside cascade.</td></tr>
@@ -1058,8 +1073,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p>In healthy markets, the spread is positive (VIX3M is higher than the VIX). This is because the future is inherently uncertain. Investors naturally demand a higher premium to insure against stock market turbulence over a longer 90-day horizon than a short 30-day horizon.</p>
 <h4>🚨 Crash Mechanism: Curve Inversion (Backwardation)</h4>
 <p>When systemic panic hits, the spread turns negative (VIX becomes higher than VIX3M). This inversion indicates that investors are aggressively buying immediate, front-month protective put options to safeguard their portfolios right now.</p>
-<p>The Signal: A negative spread means the market is pricing in an acute, immediate shock.</p>
-<p>Why it Matters: Persistent inversion shows that institutional investors expect extreme near-term chaos, a classic hallmark of an ongoing or imminent market crash.</p>
+<ul><li><strong>The Signal:</strong> A negative spread means the market is pricing in an acute, immediate shock.</li><li><strong>Why it Matters:</strong> Persistent inversion shows that institutional investors expect extreme near-term chaos, a classic hallmark of an ongoing or imminent market crash.</li></ul>
 
 <h3>💳 2. High-Yield Option-Adjusted Spread (HY OAS)</h3>
 <p>The <strong>HY OAS</strong> measures the additional interest rate yield that &quot;junk bonds&quot; (riskier corporate debt) must pay over risk-free U.S. Treasuries, mathematically adjusted to remove the distortions of embedded options (like a company's right to call back debt early).</p>
@@ -1071,6 +1085,47 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <li><strong>The Signal:</strong> Investors dump junk bonds and flee to the safety of U.S. Treasuries (&quot;flight to quality&quot;). This causes high-yield bond prices to crash and their yields to spike. As a result, the <strong>HY OAS widens aggressively</strong>.</li>
 <li><strong>Why it Matters:</strong> Equity markets cannot function without credit. When HY OAS spikes rapidly (e.g., jumping over 400–500+ basis points), it signals an <strong>institutional liquidity freeze</strong>. If companies cannot refinance their debt, bankruptcies follow, and stock prices inevitably collapse.</li>
 </ul>
+<h3>📐 3. Mathematical Formula: 200DMA Distance Velocity</h3>
+<p>The 200DMA Distance Velocity and Forced Selling components help the dashboard identify structural market stress and potential selling pressure. The mathematical and scoring logic is explained below.</p>
+<p class="table-note">200DMA Distance Velocity is a contextual diagnostic and adds no points. The Forced Selling category contributes up to 6 points to the 44-point total.</p>
+<p>This metric isolates the momentum of trend decay—how quickly the index moves relative to its long-term anchor—rather than looking only at the absolute price level. It requires two calculations.</p>
+<h4>Step 1: Calculate the percentage distance from the 200DMA</h4>
+<p>For trading session <var>t</var>, the percentage distance <var>D<sub>t</sub></var> is the S&amp;P 500 closing price <var>P<sub>t</sub></var> divided by its 200-day simple moving average, minus 1, multiplied by 100.</p>
+<p class="reference-formula" aria-label="D at t equals P at t divided by SMA 200 at t, minus one, multiplied by one hundred"><var>D<sub>t</sub></var> = (<var>P<sub>t</sub></var> / <var>SMA<sub>200,t</sub></var> − 1) × 100</p>
+<p>The 200-day simple moving average includes the current session’s closing price.</p>
+<h4>Step 2: Calculate velocity over five equity trading sessions</h4>
+<p>Velocity <var>V<sub>t</sub></var> is the percentage-point difference between the current distance and the distance exactly five equity trading sessions earlier.</p>
+<p class="reference-formula" aria-label="V at t equals D at t minus D at t minus five"><var>V<sub>t</sub></var> = <var>D<sub>t</sub></var> − <var>D<sub>t−5</sub></var></p>
+<h4>🚨 Stress triggers</h4>
+<p>These warnings apply only while the S&amp;P 500 is below its 200-day moving average (<var>D<sub>t</sub></var> &lt; 0%).</p>
+<ul><li><strong>Watch:</strong> Velocity ≤ −3 percentage points over five sessions.</li><li><strong>Stress:</strong> Velocity ≤ −5 percentage points over five sessions, indicating a faster deterioration in the index’s position relative to its trend.</li></ul>
+<h3>🌊 4. Exact Scoring Bounds: Forced Selling Category</h3>
+<p>The Forced Selling category has a maximum of <strong>6 points</strong> within the dashboard’s <strong>44-point</strong> total. It combines USDJPY carry-trade stress, FINRA margin leverage, and volume selling pressure.</p>
+<h4>A. USDJPY carry-trade stress · maximum 2 points</h4>
+<p>This component measures the percentage change in USDJPY over three FX trading sessions. A negative change means the yen has strengthened against the dollar.</p>
+<ul><li><strong>0 points:</strong> Change &gt; −1.5%.</li><li><strong>1 point · amber:</strong> Change ≤ −1.5% and &gt; −3.0%, indicating rapid yen appreciation and potential pressure on carry trades.</li><li><strong>2 points · red:</strong> Change ≤ −3.0%, indicating a more severe yen surge and potential pressure to reduce positions financed in yen.</li></ul>
+<h4>B. FINRA margin leverage · maximum 2 points</h4>
+<p>This component evaluates monthly FINRA margin debt using year-over-year growth and the three-month change. It takes the <strong>higher of the two scores</strong>; the scores are not added together.</p>
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="FINRA margin leverage scoring thresholds">
+<table class="glossary-table"><thead><tr><th scope="col">Measure</th><th scope="col">0 points</th><th scope="col">1 point · amber</th><th scope="col">2 points · red</th></tr></thead><tbody>
+<tr><th scope="row">Leverage buildup · YoY change</th><td>&lt; 20%</td><td>≥ 20% and &lt; 40%</td><td>≥ 40%</td></tr>
+<tr><th scope="row">Deleveraging · three-month change</th><td>&gt; −5%</td><td>≤ −5% and &gt; −10%</td><td>≤ −10%</td></tr>
+</tbody></table></div>
+<h4>C. Volume selling pressure · maximum 2 points</h4>
+<p>The volume ratio compares current-session reported S&amp;P 500 volume with the average of the preceding 20 sessions, excluding the current session.</p>
+<p class="reference-formula"><var>R<sub>vol</sub></var> = reported session volume / prior 20-session average volume</p>
+<p>Points apply only when at least one of these conditions is met:</p>
+<ol><li>The S&amp;P 500 daily closing return is negative (&lt; 0%).</li><li>The S&amp;P 500 closes in the bottom 25% of its daily high–low range.</li></ol>
+<p>When either condition is met, the volume thresholds are:</p>
+<ul><li><strong>0 points:</strong> Volume ratio &lt; 1.5.</li><li><strong>1 point · amber:</strong> Volume ratio ≥ 1.5 and &lt; 2.0.</li><li><strong>2 points · red:</strong> Volume ratio ≥ 2.0.</li></ul>
+<p>These are heuristic pressure signals, not proof of institutional liquidation or a confirmed market bottom. Missing inputs produce score ranges rather than assumed zero risk.</p>
+<h4>📊 Forced Selling Regime Summary Grid</h4>
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="Forced Selling category scoring summary">
+<table class="glossary-table"><thead><tr><th scope="col">Component</th><th scope="col">Metric horizon</th><th scope="col">Amber trigger · 1 point</th><th scope="col">Red trigger · 2 points</th><th scope="col">Maximum</th></tr></thead><tbody>
+<tr><th scope="row">USDJPY carry</th><td>3 FX sessions</td><td>≤ −1.5% and &gt; −3.0%</td><td>≤ −3.0%</td><td>2 points</td></tr>
+<tr><th scope="row">Margin debt</th><td>Monthly · YoY or 3M</td><td>YoY ≥ 20% or 3M ≤ −5%, unless a red threshold is reached</td><td>YoY ≥ 40% or 3M ≤ −10%</td><td>2 points · higher score only</td></tr>
+<tr><th scope="row">Volume pressure</th><td>Daily vs. prior 20 sessions</td><td>Ratio ≥ 1.5 and &lt; 2.0, with a negative return or bottom-quarter close</td><td>Ratio ≥ 2.0, with a negative return or bottom-quarter close</td><td>2 points</td></tr>
+</tbody><tfoot><tr><th scope="row" colspan="4">Total Forced Selling category maximum</th><td><strong>6 points</strong></td></tr></tfoot></table></div>
 </section>
 
 </div>
