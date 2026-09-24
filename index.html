@@ -71,6 +71,8 @@
 .user-email{font-size:12px;color:var(--text-muted);}
 .logout-btn{padding:7px 11px;font-size:12px;}
 .funding-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px;margin:18px 0}.funding-fields label{display:flex;flex-direction:column;gap:6px}.funding-fields input,#fundingAsOf,#fundingRange{background:var(--bg-color);color:var(--text-main);border:1px solid var(--border);border-radius:6px;padding:8px}#fundingPanel button{margin:4px}#fundingPanel details{margin:16px 0}
+
+#systemicRiskReference p{line-height:1.7;margin:12px 0}#systemicRiskReference h3{margin:24px 0 12px}#systemicRiskReference h4{margin:20px 0 8px}.systemic-reference-table{min-width:850px;table-layout:fixed;width:100%}.systemic-reference-table th[scope="row"]{width:22%}.systemic-reference-table td{vertical-align:top;overflow-wrap:break-word}
 </style>
 
 <style>
@@ -1021,6 +1023,44 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 <div id="historicalStudies"></div>
+
+<section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
+<h2 class="panel-title" id="systemicRiskReferenceHeading">📊 Systemic Risk Factors Matrix</h2>
+<p class="table-note">Explanatory reference. The illustrative thresholds below do not replace the dashboard’s scoring rules in the Risk Factor Table.</p>
+<h3>Five primary regimes</h3>
+<p>The framework categorizes risk into five primary regimes, tracking specific mechanisms and triggers:</p>
+<p>🌪️ Volatility Regime: Covers the VIX (measuring 30-day implied equity volatility, elevated &gt;20), VIX 1D % and 5D % (tracking sudden and sustained volatility acceleration), VIX 3M-1M Spread (measuring curve inversion &lt;0.0), and the MOVE Index (tracking fixed-income instability &gt;100–110).</p>
+<p>💳 Credit Regime: Focuses on HY OAS (junk bond spreads widening &gt;350 bp) alongside 5D and 20D changes for short- and long-term credit freezes, plus BBB OAS monitoring investment-grade stress.</p>
+<p>⚡ Macro Shock: Monitors the 10Y Yield and its 20D velocity changes (spikes &gt;4.5% and &gt;15 bp), alongside WTI Crude absolute prices and 20D momentum (&gt;$90/bbl and &gt;10%).</p>
+<p>📐 Equity Structure: Evaluates technical health via S&amp;P vs 50DMA and 200DMA distance (&lt;0%), as well as Breadth % &gt;50DMA participation and its 20D momentum decay.</p>
+<p>🌊 Forced Selling: Tracks the USDJPY 3-Session % (rapid Yen surges ≤-1.5%) to signal carry trade unwinding.</p>
+<h3>🔍 Secondary Risk Filters (Structural Context)</h3>
+<p>Additional systemic amplifiers evaluated for selling pressure severity include:</p>
+<p>FINRA Margin Debt: Tracks leverage expansion (YoY ≥ 40%) for bubbles and contraction (3M ≤ -10%) for liquidations.</p>
+<p>S&amp;P 500 Volume Ratio: Compares volume against the 20-day average ( ≥ 1.5–2.0) with negative returns to signal institutional liquidation.</p>
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="Systemic risk factors matrix; scroll horizontally on smaller screens">
+<table class="glossary-table systemic-reference-table"><thead><tr><th scope="col">Risk Factor</th><th scope="col">🔄 Normal Market Conditions</th><th scope="col">🚨 Crash Mechanism &amp; Systemic Triggers</th></tr></thead><tbody>
+<tr><th scope="row">🌪️ VIX &amp; Volatility Acceleration (VIX Level, VIX 1D %, VIX 5D %)</th><td>Suppressed / Mean-Reverting: VIX sits between 12–18. Daily fluctuations reflect standard noise or expected earnings adjustments without persistent directional momentum.</td><td>The Shock: VIX spikes above 20–25 with rapid 1D and 5D acceleration (&gt;10%). This shows sudden institutional panic and an aggressive rush to buy short-term equity insurance, signaling an active downside cascade.</td></tr>
+<tr><th scope="row">📉 VIX 3M–1M Spread (Volatility Term Structure)</th><td>Contango: The spread is positive. Investors naturally demand a higher premium to insure against stock market turbulence over a longer 90-day horizon (VIX3M) than a short 30-day horizon (VIX).</td><td>Backwardation: The spread turns negative (&lt; 0). Investors aggressively bid up immediate, front-month protective options to shield portfolios right now, signaling expectations of an acute, near-term structural crash.</td></tr>
+<tr><th scope="row">📈 MOVE Index (Bond Market Volatility)</th><td>Stable Funding: Sits below 80–90. Treasury yields move predictably, allowing commercial banks, mortgage providers, and institutional desks to price and hedge fixed-income assets safely.</td><td>Liquidity Freeze: Index spikes above 100–110. Violent, erratic shifts in the Treasury yield curve break down traditional hedging models, forcing market makers to widen bid-ask spreads and restrict systemic liquidity.</td></tr>
+<tr><th scope="row">💳 Credit Spreads (HY OAS &amp; BBB OAS)</th><td>Tight Spreads: HY OAS hovers between 250–350 bp; BBB sits near 100 bp. Strong corporate cash flows make bond defaults highly unlikely, encouraging capital flow into riskier corporate debt.</td><td>Credit Crunch: HY OAS widens aggressively past 400–500 bp (alongside spiking 5D/20D deltas). Bond investors dump junk debt for safe-haven Treasuries, freezing the refinancing channels that corporations need to avoid bankruptcy.</td></tr>
+<tr><th scope="row">⚡ 10Y Treasury Yield (Absolute &amp; 20D Velocity)</th><td>Balanced Macro: Yields trade within established macroeconomic ranges matching steady growth and moderate, controlled inflation targets.</td><td>Rate Shock: Yields spike vertically (20D change &gt; +15–30 bp). Sudden yield surges instantly devalue existing fixed-income portfolios, crush equity valuations via higher discount rates, and shock highly leveraged financial systems.</td></tr>
+<tr><th scope="row">🛢️ WTI Crude Oil (Absolute &amp; 20D Velocity)</th><td>Equilibrium Price: Prices remain aligned with stable global industrial demand, keeping supply chains profitable without triggering consumer wallet tightening.</td><td>Stagflationary Spike: WTI surges past $90/bbl with rapid 20D momentum (&gt;10%). Spiking energy costs act as an immediate tax on global economic output, driving up inflation and forcing central banks to tighten monetary policy into a slowing economy.</td></tr>
+<tr><th scope="row">📐 Trend Distances (S&amp;P vs 50DMA &amp; 200DMA)</th><td>Bullish Structure: S&amp;P 500 trades safely above both lines (+3% to +10%). Short-term pullbacks find natural buying support at the rolling 50-day average, confirming a healthy, resilient uptrend.</td><td>Technical Breakdown: S&amp;P plunges below both averages (&lt; 0%). Crossing beneath the 200DMA triggers systematic, algorithmic selling models and trend-following liquidations, accelerating market losses.</td></tr>
+<tr><th scope="row">🌾 Market Breadth (% &gt; 50DMA &amp; 20D Change)</th><td>Broad Participation: &gt; 65% of individual stocks trade above their 50DMAs. The broader index advance is driven by health across multiple underlying sectors, rather than just a few mega-caps.</td><td>Internal Decay: Breadth collapses &lt; 40% or drops sharply over 20 sessions (≤ -10 pp). The index may look stable on the surface, but the underlying foundation is crumbling as fewer stocks sustain the uptrend—a classic sign of impending distribution.</td></tr>
+<tr><th scope="row">🌊 USD/JPY Carry Trade (3-Session % Change)</th><td>Stable Carry: Exchange rates remain steady or grind slowly higher. Macro investors safely borrow cheap Yen to invest in higher-yielding global assets (like U.S. equities and tech debt).</td><td>The Unwind: USD/JPY drops rapidly (≤ -1.5% to -3% across 3 days). A surging Yen forces international macro funds to instantly liquidate their global asset positions to pay back their tightening Yen-denominated loans, sparking a cross-asset cascade.</td></tr>
+<tr><th scope="row">💰 FINRA Margin Debt (YoY % &amp; 3M Change %)</th><td>Controlled Leverage: Moderate growth tracks expanding asset values. Leverage acts as an efficient amplifier of capital efficiency across retail and institutional brokerages.</td><td>Forced Deleveraging: YoY growth hits extreme peaks (≥ 40%) indicating an asset bubble, followed by a violent 3M contraction (≤ -10%). A sudden drop signals widespread margin calls, forcing liquidations as brokers dump client shares into falling markets.</td></tr>
+<tr><th scope="row">🛒 S&amp;P 500 Volume Ratio (Session vs 20D Average)</th><td>Institutional Balance: Volume mirrors the trailing 20-day average (~1.0x). Capital flows cleanly between buyers and sellers without causing disruptive intraday gaps.</td><td>Institutional Capitulation: Volume surges past 1.5x–2.0x the average while the index closes down or at the absolute bottom of its daily range. This signals heavy institutional distribution and panic-selling, overwhelming all available bids.</td></tr>
+</tbody></table></div>
+<h3>📉 The VIX 3M–1M Spread (Volatility Term Structure)</h3>
+<p>The VIX measures expected stock market volatility over the next 30 days (1 month), while the VIX3M measures expected volatility over the next 90 days (3 months).</p>
+<h4>🔄 Normal Market Conditions (Contango)</h4>
+<p>In healthy markets, the spread is positive (VIX3M is higher than the VIX). This is because the future is inherently uncertain. Investors naturally demand a higher premium to insure against stock market turbulence over a longer 90-day horizon than a short 30-day horizon.</p>
+<h4>🚨 Crash Mechanism: Curve Inversion (Backwardation)</h4>
+<p>When systemic panic hits, the spread turns negative (VIX becomes higher than VIX3M). This inversion indicates that investors are aggressively buying immediate, front-month protective put options to safeguard their portfolios right now.</p>
+<p>The Signal: A negative spread means the market is pricing in an acute, immediate shock.</p>
+<p>Why it Matters: Persistent inversion shows that institutional investors expect extreme near-term chaos, a classic hallmark of an ongoing or imminent market crash.</p>
+</section>
 
 </div>
 </div>
