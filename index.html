@@ -540,7 +540,16 @@ button.secondary {
 ::-webkit-scrollbar-thumb {background:#66452f;border:3px solid #241a14;border-radius:8px;}
 ::-webkit-scrollbar-thumb:hover {background:#80583c;}
 ::-webkit-scrollbar-corner {background:#241a14;}
-</style><style>.history-repair{padding:16px;border:1px solid var(--border);border-radius:10px;margin:16px 0}.history-repair label{display:block;margin:12px 0 6px}.history-repair textarea{box-sizing:border-box;width:100%}#forcedSelling h3{margin-top:24px}#forcedSelling select{border:1px solid var(--border);border-radius:6px}.history-table td{font-variant-numeric:tabular-nums}</style><style>.factor-category th{background:#172337;color:#dbeafe;text-align:left;padding:13px 15px;font-size:13px;letter-spacing:.04em}.history-repair button{margin:4px 6px 4px 0}</style></head>
+</style><style>.history-repair{padding:16px;border:1px solid var(--border);border-radius:10px;margin:16px 0}.history-repair label{display:block;margin:12px 0 6px}.history-repair textarea{box-sizing:border-box;width:100%}#forcedSelling h3{margin-top:24px}#forcedSelling select{border:1px solid var(--border);border-radius:6px}.history-table td{font-variant-numeric:tabular-nums}</style><style>.factor-category th{background:#172337;color:#dbeafe;text-align:left;padding:13px 15px;font-size:13px;letter-spacing:.04em}.history-repair button{margin:4px 6px 4px 0}</style>
+<style id="sticky-table-headers">
+/* A bounded scroll region keeps every table's column labels visible. */
+#appShell .data-table-scroll,#appShell .matrix-wrap{position:relative;max-height:min(520px,70vh);overflow:auto;isolation:isolate}
+#appShell table{border-collapse:separate;border-spacing:0;overflow:visible}
+#appShell table thead th{position:sticky;top:0;z-index:4;background:var(--card-bg2,#1e293b);box-shadow:0 1px 0 var(--border)}
+#appShell .history-table thead th:first-child{z-index:5}
+#appShell .data-table-scroll:focus-visible,#appShell .matrix-wrap:focus-visible{outline:2px solid #947454;outline-offset:2px}
+</style>
+</head>
 
 <body>
 
@@ -648,7 +657,7 @@ button.secondary {
             📊 Systemic Risk Regime Matrix — Maximum 44 Points
         </div>
 
-        <div class="matrix-wrap">
+        <div class="matrix-wrap" tabindex="0" role="region" aria-label="Risk score bands; scroll to review all rows">
             <table class="regime-matrix">
                 <thead>
                     <tr>
@@ -734,6 +743,7 @@ button.secondary {
 
 </div>
 
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="Risk factors; scroll to review all rows">
 <table>
 
 <thead>
@@ -748,6 +758,7 @@ button.secondary {
 <tbody id="metricTableBody"></tbody>
 
 </table>
+</div>
 
 
 <!-- QUICK PASTE -->
