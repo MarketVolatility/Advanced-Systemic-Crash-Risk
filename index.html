@@ -972,9 +972,19 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Uses publication timestamps, including revisions. Unknown values stay blank. Stale means more than 14 days since the selected observation; this is a freshness label, not a risk threshold.</p>
 <h3>Current and past dollar funding entries</h3>
 <p class="table-note">Add a weekly release below or paste researched JSON. Edit a row to append a correction while retaining its original version. The red × deletes a release and its corrections after confirmation. Saved locally per account and included in the existing eight-minute sync and Sync now. Export before deleting if you need a permanent audit copy.</p>
+<div class="history-repair" aria-labelledby="fundingQuickHeading">
+<h3 id="fundingQuickHeading">Quick Paste Update · dollar funding</h3>
+<p class="table-note">Copy the prompt to your AI, paste its JSON response below, then select Fill entry boxes. Review the source and select Save funding entry to add it to history. This updates the dollar funding fields only.</p>
+<button type="button" onclick="generateFundingQuickPrompt()">Generate latest-data prompt</button> <button type="button" onclick="copyFundingQuickPrompt()">Copy prompt</button>
+<textarea id="fundingQuickPrompt" class="paste-box" rows="5" readonly aria-label="AI prompt for latest dollar funding release"></textarea>
+<label for="fundingQuickPaste">Paste AI response (one JSON object)</label>
+<textarea id="fundingQuickPaste" class="paste-box" rows="5" placeholder='{"observationDate":"YYYY-MM-DD","publishedAt":"ISO timestamp with timezone","balance":null,"testBalance":null,"testEvidence":"","source":""}'></textarea>
+<button type="button" onclick="fillFundingFromAI()">Validate &amp; fill entry boxes</button>
+<p id="fundingQuickStatus" class="table-note" role="status"></p>
+</div>
 <div class="funding-fields" id="fundingFields"></div>
 <button type="button" id="fundingSave" onclick="saveFundingForm()">Save funding entry</button> <button type="button" onclick="resetFundingForm()">Cancel edit / clear</button>
-<details><summary>Research prompt, import and export</summary>
+<details><summary>Bulk historical research, import and export</summary>
 <button type="button" onclick="fundingPrompt()">Generate AI research prompt</button> <button type="button" onclick="copyFundingPrompt()">Copy prompt</button>
 <textarea id="fundingPrompt" class="paste-box" rows="4" readonly aria-label="Funding research prompt"></textarea>
 <label for="fundingImport">Paste JSON array of releases</label><textarea id="fundingImport" class="paste-box" rows="4"></textarea>
@@ -2290,6 +2300,38 @@ function renderFundingChart(time){
     if(!points.some(p=>p.r))add('text',{x:300,y:120,fill:'#94a3b8'},'No published data in this period');
 }
 document.addEventListener('DOMContentLoaded',renderFunding);
+function generateFundingQuickPrompt(){
+    const asOf=new Date().toISOString();
+    document.getElementById('fundingQuickPrompt').value=`Research the latest published Federal Reserve central-bank dollar liquidity swap balance (SWPT, weekly Wednesday level) available as of ${asOf}. Browse official sources. Return ONLY one valid JSON object, without Markdown fences, commentary or computed risk scores, with exactly these six keys:
+{"observationDate":"YYYY-MM-DD","publishedAt":"ISO 8601 timestamp with explicit timezone","balance":null,"testBalance":null,"testEvidence":"","source":""}
+Use balance in USD MILLIONS, not billions; use a JSON number without thousands separators. observationDate is the Wednesday measured, while publishedAt is the verified publication timestamp for this exact data vintage. Do not substitute the observation date, retrieval time or a guessed time for publication. Use the latest release actually published by the cutoff, not a future scheduled release. Match the balance to that release and retain the actual revision publication time if using a revision.
+Use https://fred.stlouisfed.org/series/SWPT and original Federal Reserve H.4.1 releases or ALFRED vintages. source must link to an official supporting page on fred.stlouisfed.org, alfred.stlouisfed.org, www.federalreserve.gov or www.newyorkfed.org using HTTPS.
+For testBalance, reconcile only transactions explicitly identified as operational-readiness tests in https://www.newyorkfed.org/markets/desk-operations/central-bank-liquidity-swap-operations that remained outstanding on observationDate, using settlement and maturity dates. Report their total in USD millions only if full reconciliation is verified, with an official HTTPS testEvidence URL. Otherwise use testBalance:null and testEvidence:"". Zero requires verified evidence that no operational tests were outstanding; never infer tests from small size.
+Do not invent unavailable numbers or dates. If balance, observationDate, or exact publication timestamp cannot be verified, return null for that field and the official source URL if available. The app will keep incomplete responses unsaved for review. Do not include weekly change: the app calculates it from saved prior-week history.`;
+}
+async function copyFundingQuickPrompt(){
+    generateFundingQuickPrompt();
+    try{await navigator.clipboard.writeText(document.getElementById('fundingQuickPrompt').value);document.getElementById('fundingQuickStatus').textContent='Prompt copied. Paste it into your AI, then paste its JSON response below.';}
+    catch{document.getElementById('fundingQuickStatus').textContent='Clipboard unavailable. Select and copy the prompt above manually.';}
+}
+function fillFundingFromAI(){
+    const status=document.getElementById('fundingQuickStatus');
+    try{
+        let text=document.getElementById('fundingQuickPaste').value.trim();
+        if(/^```(?:json)?\s*[\s\S]*\s*```$/i.test(text))text=text.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
+        const raw=JSON.parse(text);
+        if(!raw||Array.isArray(raw)||typeof raw!=='object')throw Error('Paste one JSON object for the latest release. Use bulk import for a history array.');
+        const keys=fundingFields.map(([k])=>k);
+        if(keys.some(k=>!Object.hasOwn(raw,k))||Object.keys(raw).some(k=>!keys.includes(k)))throw Error('The response must contain exactly observationDate, publishedAt, balance, testBalance, testEvidence and source.');
+        if(raw.observationDate===null||raw.publishedAt===null||raw.balance===null)throw Error('The AI could not verify the observation date, publication timestamp or balance. Research those missing fields before saving.');
+        const r=validateFunding(raw);
+        // Validate the entire response before changing an in-progress form or edit.
+        resetFundingForm();
+        fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');
+        status.textContent='Entry boxes filled. Review the source and publication time, then click Save funding entry. No history has been changed yet.';
+    }catch(e){status.textContent='Entry boxes unchanged: '+e.message;}
+}
+document.addEventListener('DOMContentLoaded',generateFundingQuickPrompt);
 </script>
 
 </body>
