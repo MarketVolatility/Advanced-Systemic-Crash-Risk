@@ -721,7 +721,7 @@ button.secondary {
 </div>
 
 <div class="info-box" id="quickPastePrompt">
-    Generate exactly 29 comma-separated values only (numbers; null for unavailable margin, volume or USDJPY momentum fields) in the following order. Use the latest completed trading session and the latest published FINRA debt month. For USDJPY momentum use (latest FX session close / close 3 FX trading sessions earlier − 1) × 100, from one consistent source; use null if unavailable. Use reported ^GSPC volume consistently; average the preceding 20 sessions excluding the current session. Debt changes compare the same series with 12 and 3 months earlier. Do not invent unavailable values:
+    Generate exactly 29 comma-separated values only (numbers; null for any unavailable field) in the following order. Use the latest completed trading session and the latest published FINRA debt month. For USDJPY momentum use (latest FX session close / close 3 FX trading sessions earlier − 1) × 100, from one consistent source; use null if unavailable. Use reported ^GSPC volume consistently; average the preceding 20 sessions excluding the current session. Debt changes compare the same series with 12 and 3 months earlier. Do not invent unavailable values:
     <br><br>
     <strong>
     VIX,
@@ -746,7 +746,7 @@ button.secondary {
     </strong>
 </div>
 
-<details class="table-note"><summary>Generate Quick Paste from structured provider data</summary><p>This converts normalized provider JSON; it does not connect to a live provider. Obtain the datasets from your chosen provider and map them to this template. Keys, units, dates and all 20 prior-session volumes are checked. Missing core indicators stop generation. Provider session completeness and data accuracy still require verification.</p><button type="button" onclick="providerTemplate()">Load JSON template</button><label for="providerJson">Provider JSON</label><textarea id="providerJson" class="paste-box" rows="5"></textarea><button type="button" onclick="generateProviderQuickPaste()">Validate &amp; generate 29 values</button><p id="providerStatus" role="status"></p></details><label for="quickPasteDate">Observation date (optional; blank uses entry time)</label><input type="date" id="quickPasteDate"><p class="table-note">A specified date is saved at local noon to identify that observation day; this is not a market-data timestamp.</p><div style="margin-bottom:12px"><button type="button" onclick="copyQuickPastePrompt()">Copy prompt</button> <span id="copyPromptStatus" class="table-note" role="status"></span></div>
+<details class="table-note"><summary>Generate Quick Paste from structured provider data</summary><p>This converts normalized provider JSON; it does not connect to a live provider. Obtain the datasets from your chosen provider and map them to this template. Keys, units, dates and all 20 prior-session volumes are checked. Missing indicators must be explicit null and produce score ranges. Provider session completeness and data accuracy still require verification.</p><button type="button" onclick="providerTemplate()">Load JSON template</button><label for="providerJson">Provider JSON</label><textarea id="providerJson" class="paste-box" rows="5"></textarea><button type="button" onclick="generateProviderQuickPaste()">Validate &amp; generate 29 values</button><p id="providerStatus" role="status"></p></details><label for="quickPasteDate">Observation date (optional; blank uses entry time)</label><input type="date" id="quickPasteDate"><p class="table-note">A specified date is saved at local noon to identify that observation day; this is not a market-data timestamp.</p><div style="margin-bottom:12px"><button type="button" onclick="copyQuickPastePrompt()">Copy prompt</button> <span id="copyPromptStatus" class="table-note" role="status"></span></div>
 <textarea
 class="paste-box"
 id="quickPasteInput"
@@ -1374,10 +1374,10 @@ let historyPreviewHidden = false;
 let historyStorageError = '';
 function historyKey(){ return 'crash-risk-history-v1:' + historyOwner; }
 function validSnapshot(values){
-    return values && historyColumns.every(([key]) => Number.isFinite(values[key])) && (values.sp500 == null || (Number.isFinite(values.sp500) && values.sp500>0));
+    return values && historyColumns.every(([key]) => Object.hasOwn(values,key) && (values[key]===null || Number.isFinite(values[key]))) && (values.sp500 == null || (Number.isFinite(values.sp500) && values.sp500>0));
 }
 function syncManualInputs(){
-    inputColumns.forEach(([key]) => { document.getElementById('in_'+key).value = currentData[key] ?? forcedInputsForDate(currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(new Date()))[key] ?? (key==='sp500' ? sp500ForDate(currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(new Date()))?.close ?? '' : ''); });
+    inputColumns.forEach(([key]) => { document.getElementById('in_'+key).value = (Object.hasOwn(currentData,key)?currentData[key]??'':undefined) ?? forcedInputsForDate(currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(new Date()))[key] ?? (key==='sp500' ? sp500ForDate(currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(new Date()))?.close ?? '' : ''); });
 }
 function loadEntryHistory(userId){
     historyPreviewHidden = false;
@@ -1434,7 +1434,7 @@ function deleteHistoryEntry(entry){
 }
 function updateEntryDateTime(entry,dateText,timeText,values=entry.values){
     if(validateForcedInputs(values)){alert(validateForcedInputs(values));return false;}
-    if(!validSnapshot(values)){ alert("Enter a valid number for all 18 indicators."); return false; }
+    if(!validSnapshot(values)){ alert("Use a number or null for every indicator."); return false; }
     if(!historyOwner || !entryHistory.includes(entry)) return false;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dateText) || !/^\d{2}:\d{2}(?::\d{2})?$/.test(timeText)){
         alert('Enter a complete date and time.'); return false;
@@ -1496,7 +1496,7 @@ const regimeCharts = {"volatilityChart": {"maximum": 10, "keys": ["vix", "vix_ch
 function chartEntries(range,now=new Date(),scoreFor=compositeScore){
     const {start,end}=chartWindow(range,now);
     return {start,end,points:entryHistory.filter(row=>Date.parse(row.savedAt)>=start.getTime() && Date.parse(row.savedAt)<=end.getTime())
-        .map(row=>({time:Date.parse(row.savedAt),score:scoreFor(row.values,localCalendarDate(new Date(row.savedAt))),high:scoreFor===compositeScore?compositeRange(row.values,localCalendarDate(new Date(row.savedAt))).high:scoreFor===forcedCategoryScore?forcedCategoryRange(row.values,localCalendarDate(new Date(row.savedAt))).high:scoreFor(row.values)})).sort((a,b)=>a.time-b.time)};
+        .map(row=>({time:Date.parse(row.savedAt),score:scoreFor(row.values,localCalendarDate(new Date(row.savedAt))),high:scoreFor.range?scoreFor.range(row.values,localCalendarDate(new Date(row.savedAt))).high:scoreFor===compositeScore?compositeRange(row.values,localCalendarDate(new Date(row.savedAt))).high:scoreFor===forcedCategoryScore?forcedCategoryRange(row.values,localCalendarDate(new Date(row.savedAt))).high:scoreFor(row.values)})).sort((a,b)=>a.time-b.time)};
 }
 function setAllChartRanges(range){
     if(!['1w','1m','3m','6m','1y','2y','3y','4y','5y'].includes(range)) return;
@@ -1509,7 +1509,8 @@ function renderRiskChart(chartId='riskChart'){
     const maximum=config ? config.maximum : 44;
     const amber=config ? Math.ceil(maximum*0.34) : 4;
     const red=config ? Math.ceil(maximum*0.67) : 12;
-    const scoreFor=config?.forced ? forcedCategoryScore : config ? values=>config.keys.reduce((sum,key)=>sum+metricPoints(key,values),0) : compositeScore;
+    const scoreFor=config?.forced ? forcedCategoryScore : config ? (values,day)=>historicalScoreRange(values,config.keys,day).low : compositeScore;
+    if(config&&!config.forced)scoreFor.range=(values,day)=>historicalScoreRange(values,config.keys,day);
     const svg=document.getElementById(chartId);
     const {start,end,points}=chartEntries(document.getElementById(chartId+'Range').value,new Date(),scoreFor);
     svg.replaceChildren();
@@ -1523,7 +1524,7 @@ function renderRiskChart(chartId='riskChart'){
         add('text',{x:x(t),y:bottom+25,fill:'#94a3b8','font-size':11,'text-anchor':i===0?'start':i===4?'end':'middle'},new Date(t).toLocaleDateString(undefined,{year:'numeric',month:'short',day:'numeric'}));
     }
     add('text',{x:left,y:15,fill:'#94a3b8','font-size':12},'Score (0–'+maximum+')');
-    if((!config || config.forced) && points.some(p=>p.high!==p.score))add('polygon',{points:[...points.map(p=>x(p.time)+','+y(p.score)),...points.slice().reverse().map(p=>x(p.time)+','+y(p.high))].join(' '),fill:'#60a5fa',opacity:.18});
+    if(points.some(p=>p.high!==p.score))add('polygon',{points:[...points.map(p=>x(p.time)+','+y(p.score)),...points.slice().reverse().map(p=>x(p.time)+','+y(p.high))].join(' '),fill:'#60a5fa',opacity:.18});
     if(points.length>1)add('polyline',{points:points.map(p=>x(p.time)+','+y(p.score)).join(' '),fill:'none',stroke:'#60a5fa','stroke-width':2});
     points.forEach(p=>{
         const label=new Date(p.time).toLocaleString()+' — score '+p.score+(p.high!==p.score?'–'+p.high:'')+' / '+maximum;
@@ -1587,8 +1588,8 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
                 const values={...entry.values};
                 for(const [key] of columns){
                     const raw=numberInputs[key].value.trim();
-                    if(!raw || !Number.isFinite(Number(raw))){ alert('Enter a valid number for every indicator.'); return; }
-                    values[key]=Number(raw);
+                    if(raw && !Number.isFinite(Number(raw))){ alert('Use a number, or leave unavailable indicators blank.'); return; }
+                    values[key]=raw?Number(raw):null;
                 }
                 for(const [key] of forcedColumns){const raw=numberInputs[key].value.trim();values[key]=dateInput.value!==dateText && raw===numberInputs[key].defaultValue ? forcedInputsForDate(dateInput.value)[key]??null : raw===''?null:Number(raw);}
                 const spRaw=numberInputs.sp500.value.trim();
@@ -1615,7 +1616,7 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
         columns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value,entry.values),td=document.createElement('td');
             if(date){
-                const input=document.createElement('input'); input.type='number'; input.step='any'; input.value=String(value);
+                const input=document.createElement('input'); input.type='number'; input.step='any'; input.value=Number.isFinite(value)?String(value):'';
                 input.className='history-value-input '+risk.className;
                 input.setAttribute('aria-label',key+' for '+dateText+' '+timeText);
                 input.oninput=()=>{
@@ -1623,7 +1624,7 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
                     const edited={...entry.values};columns.forEach(([k])=>{const text=numberInputs[k]?.value.trim();edited[k]=text?Number(text):null;});columns.forEach(([k])=>{numberInputs[k].className='history-value-input '+(Number.isFinite(edited[k])?historyRisk(k,edited[k],edited).className:'history-normal');});
                 };
                 numberInputs[key]=input; td.appendChild(input);
-            } else { td.textContent=String(value); td.className=risk.className; }
+            } else { td.textContent=Number.isFinite(value)?String(value):''; td.className=risk.className; }
             td.title=key==='jpy'?'USDJPY level is reference only. Risk comes from the separate 3-session change.':risk.points+' / '+risk.max+' risk points'; tr.appendChild(td);
         });
         const inferred=forcedInputsForDate(date ? dateText : localCalendarDate(new Date()));
@@ -1742,87 +1743,14 @@ function updateSummary(score,max){
    ========================================================= */
 
 function updateRegimes(){
-
-    /* VOLATILITY */
-
-    let volScore =
-        metricPoints('vix',currentData) +
-        metricPoints('vix_chg',currentData) +
-        metricPoints('vix_5d',currentData) +
-        metricPoints('move',currentData) +
-        metricPoints('vix_term',currentData);
-
-    setRegime(
-        "volRegime",
-        "volDesc",
-        volScore,
-        10,
-        "Volatility contained.",
-        "Volatility rising.",
-        "Volatility stress."
-    );
-
-
-    /* CREDIT */
-
-    let creditScore =
-        metricPoints('hy',currentData) +
-        metricPoints('hy_5d',currentData) +
-        metricPoints('hy_20d',currentData) +
-        metricPoints('bbb',currentData);
-
-    setRegime(
-        "creditRegime",
-        "creditDesc",
-        creditScore,
-        11,
-        "Credit markets calm.",
-        "Credit spreads widening.",
-        "Credit stress / systemic warning."
-    );
-
-
-    /* MACRO */
-
-    let macroScore =
-        metricPoints('yield',currentData) +
-        metricPoints('yield_20d',currentData) +
-        metricPoints('wti',currentData) +
-        metricPoints('wti_20d',currentData);
-
-    setRegime(
-        "macroRegime",
-        "macroDesc",
-        macroScore,
-        8,
-        "Macro shock limited.",
-        "Rates/oil becoming restrictive.",
-        "Major macro shock."
-    );
-
-
-    /* EQUITIES */
-
-    let equityScore =
-        metricPoints('dma50',currentData) +
-        metricPoints('dma200',currentData) +
-        metricPoints('breadth',currentData) +
-        metricPoints('breadth_20d',currentData);
-
-    setRegime(
-        "equityRegime",
-        "equityDesc",
-        equityScore,
-        9,
-        "Equity structure healthy.",
-        "Equity breadth deteriorating.",
-        "Major equity technical stress."
-    );
-    const forced=forcedCategoryRange(currentData,currentEntryTime?localCalendarDate(new Date(currentEntryTime)):localCalendarDate(new Date()));
-    setRegime('forcedRegime','forcedDesc',forced.low,6,'Forced-selling pressure limited.','Carry-trade, leverage or volume pressure rising.','Elevated forced-selling pressure.');
-    if(forced.low!==forced.high){document.getElementById('forcedRegime').textContent='INCOMPLETE '+forced.low+'–'+forced.high+' / 6';document.getElementById('forcedDesc').textContent='Missing inputs: update margin or volume values.';}
+    const day=currentEntryTime?localCalendarDate(new Date(currentEntryTime)):localCalendarDate(new Date());
+    const mapping={volatilityChart:['volRegime','volDesc','Volatility contained.','Volatility rising.','Volatility stress.'],creditChart:['creditRegime','creditDesc','Credit markets calm.','Credit spreads widening.','Credit stress / systemic warning.'],macroChart:['macroRegime','macroDesc','Macro shock limited.','Rates/oil becoming restrictive.','Major macro shock.'],equityChart:['equityRegime','equityDesc','Equity structure healthy.','Equity breadth deteriorating.','Major equity technical stress.'],forcedChart:['forcedRegime','forcedDesc','Forced-selling pressure limited.','Carry-trade, leverage or volume pressure rising.','Elevated forced-selling pressure.']};
+    for(const [key,config] of Object.entries(regimeCharts)){
+        const [id,desc,...labels]=mapping[key],range=config.forced?forcedCategoryRange(currentData,day):historicalScoreRange(currentData,config.keys,day);
+        setRegime(id,desc,range.low,config.maximum,...labels);
+        if(range.low!==range.high){document.getElementById(id).textContent='INCOMPLETE '+range.low+'–'+range.high+' / '+config.maximum;document.getElementById(id).style.color='var(--text-main)';document.getElementById(desc).textContent='Unavailable inputs produce a possible score range.';}
+    }
 }
-
 
 function setRegime(
     valueId,
@@ -1881,7 +1809,7 @@ function updateFromManual(){
     const values = {};
     for(const [key] of inputColumns){
         const text = document.getElementById('in_'+key).value.trim();
-        if(!text && forcedColumns.some(([k])=>k===key)){values[key]=null;continue;}
+        if(!text){values[key]=null;continue;}
         if(!text || !Number.isFinite(Number(text)) || (key==='sp500' && Number(text)<=0)){ alert('Enter a valid number for every indicator. No entry was saved.'); return; }
         values[key] = Number(text);
     }
@@ -1891,8 +1819,8 @@ function parseQuickPaste(){
     const items=document.getElementById('quickPasteInput').value.trim().replace(/^\[|\]$/g,'').split(',').map(v=>v.trim());
     if(items.length!==inputColumns.length && items.length!==26 && items.length!==27){alert('Provide exactly 29 comma-separated values in the listed order. Use null for unavailable new fields.');return;}
     const values={};
-    for(let i=0;i<items.length;i++){const raw=items[i];if(i>=19&&raw.toLowerCase()==='null'){values[inputColumns[i][0]]=null;continue;}if(!raw||!Number.isFinite(Number(raw))){alert('Use numbers, or null for unavailable margin/volume inputs.');return;}values[inputColumns[i][0]]=Number(raw);}
-    if(values.sp500<=0){alert('S&P 500 close must be positive.');return;}
+    for(let i=0;i<items.length;i++){const raw=items[i];if(raw.toLowerCase()==='null'){values[inputColumns[i][0]]=null;continue;}if(!raw||!Number.isFinite(Number(raw))){alert('Use a number or null for each field. Leave no empty fields.');return;}values[inputColumns[i][0]]=Number(raw);}
+    if(values.sp500!==null&&values.sp500<=0){alert('S&P 500 close must be positive.');return;}
     const day=document.getElementById('quickPasteDate').value;
     if(day&&(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(Date.parse(day))||day>localCalendarDate(new Date()))){alert('Enter a valid observation date that is not in the future.');return;}
     commitEntry(values,day||null);
@@ -2169,10 +2097,10 @@ function convertProviderData(payload){
     if(!['USD','USD million'].includes(f.debtUnit))throw Error('Declare finraData.debtUnit as USD or USD million.');
     if(debt!=null&&(!/^\d{4}-\d{2}-\d{2}$/.test(f.publishedAt)||!Number.isFinite(Date.parse(f.publishedAt))||f.publishedAt>asOf))throw Error('Debt requires a publication date no later than asOf.');
     const raw=[o.current_vix,o.vix_daily_change,o.vix_5d_change,c.high_yield_oas,c.hy_oas_5d_delta,c.hy_oas_20d_delta,c.bbb_oas,m.us_10y_yield,m.yield_20d_delta,m.sp500_dist_50dma,m.sp500_dist_200dma,m.wti_crude_price,m.wti_20d_change,m.ice_move_index,m.forex_usd_jpy,m.sp500_breadth,m.breadth_20d_delta,o.vix3m_vix_spread,m.sp500_close,f.published_month,debt==null?null:debt/(f.debtUnit==='USD'?1e6:1),f.debt_yoy_percentage,f.debt_3m_percentage,m.current_session_volume,observations.reduce((n,r)=>n+r.volume,0)/20,m.sp500_1d_pct,m.forex_usd_jpy_3d_pct??null,m.sp500_high??null,m.sp500_low??null];
-    raw.forEach((v,i)=>{if(i>=19&&v===null)return;if(!Number.isFinite(v))throw Error('Missing or nonnumeric field: '+inputColumns[i][1]);});
+    raw.forEach((v,i)=>{if(v===null)return;if(!Number.isFinite(v))throw Error('Missing or nonnumeric field: '+inputColumns[i][1]);});
     const values=Object.fromEntries(inputColumns.map(([key],i)=>[key,raw[i]]));
     const error=validateForcedInputs(values);if(error)throw Error(error);
-    if(values.sp500<=0||values.vix<0||values.jpy<=0||values.breadth<0||values.breadth>100)throw Error('Price, VIX, USDJPY or breadth is outside its valid range.');
+    if((Number.isFinite(values.sp500)&&values.sp500<=0)||(Number.isFinite(values.vix)&&values.vix<0)||(Number.isFinite(values.jpy)&&values.jpy<=0)||(Number.isFinite(values.breadth)&&(values.breadth<0||values.breadth>100)))throw Error('Price, VIX, USDJPY or breadth is outside its valid range.');
     if(values.margin_month!=null&&String(values.margin_month)>asOf.slice(0,7).replace('-',''))throw Error('Debt reference month cannot be after the observation date.');
     return {asOf,values,csv:raw.map(v=>v===null?'null':String(v)).join(',')};
 }
