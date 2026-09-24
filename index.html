@@ -1025,7 +1025,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div id="historicalStudies"></div>
 
 <section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
-<h2 class="panel-title" id="systemicRiskReferenceHeading">📊 Systemic Risk Factors Matrix</h2>
+<h2 class="panel-title" id="systemicRiskReferenceHeading">In Depth Explanation</h2>
 <p class="table-note">Explanatory reference. The illustrative thresholds below do not replace the dashboard’s scoring rules in the Risk Factor Table.</p>
 <h3>Five primary regimes</h3>
 <p>The framework categorizes risk into five primary regimes, tracking specific mechanisms and triggers:</p>
@@ -1052,7 +1052,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <tr><th scope="row">💰 FINRA Margin Debt (YoY % &amp; 3M Change %)</th><td>Controlled Leverage: Moderate growth tracks expanding asset values. Leverage acts as an efficient amplifier of capital efficiency across retail and institutional brokerages.</td><td>Forced Deleveraging: YoY growth hits extreme peaks (≥ 40%) indicating an asset bubble, followed by a violent 3M contraction (≤ -10%). A sudden drop signals widespread margin calls, forcing liquidations as brokers dump client shares into falling markets.</td></tr>
 <tr><th scope="row">🛒 S&amp;P 500 Volume Ratio (Session vs 20D Average)</th><td>Institutional Balance: Volume mirrors the trailing 20-day average (~1.0x). Capital flows cleanly between buyers and sellers without causing disruptive intraday gaps.</td><td>Institutional Capitulation: Volume surges past 1.5x–2.0x the average while the index closes down or at the absolute bottom of its daily range. This signals heavy institutional distribution and panic-selling, overwhelming all available bids.</td></tr>
 </tbody></table></div>
-<h3>📉 The VIX 3M–1M Spread (Volatility Term Structure)</h3>
+<h3>📉 1. The VIX 3M–1M Spread (Volatility Term Structure)</h3>
 <p>The VIX measures expected stock market volatility over the next 30 days (1 month), while the VIX3M measures expected volatility over the next 90 days (3 months).</p>
 <h4>🔄 Normal Market Conditions (Contango)</h4>
 <p>In healthy markets, the spread is positive (VIX3M is higher than the VIX). This is because the future is inherently uncertain. Investors naturally demand a higher premium to insure against stock market turbulence over a longer 90-day horizon than a short 30-day horizon.</p>
@@ -1060,6 +1060,17 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p>When systemic panic hits, the spread turns negative (VIX becomes higher than VIX3M). This inversion indicates that investors are aggressively buying immediate, front-month protective put options to safeguard their portfolios right now.</p>
 <p>The Signal: A negative spread means the market is pricing in an acute, immediate shock.</p>
 <p>Why it Matters: Persistent inversion shows that institutional investors expect extreme near-term chaos, a classic hallmark of an ongoing or imminent market crash.</p>
+
+<h3>💳 2. High-Yield Option-Adjusted Spread (HY OAS)</h3>
+<p>The <strong>HY OAS</strong> measures the additional interest rate yield that &quot;junk bonds&quot; (riskier corporate debt) must pay over risk-free U.S. Treasuries, mathematically adjusted to remove the distortions of embedded options (like a company's right to call back debt early).</p>
+<h4>🔄 Normal Market Conditions</h4>
+<p>In a growing economy, corporate defaults are rare. Investors are comfortable holding lower-rated corporate debt, causing high-yield spreads to compress and sit tight against Treasuries (often between <strong>250 to 350 basis points</strong>).</p>
+<h4>🚨 Crash Mechanism: The Credit Squeeze</h4>
+<p>Because the bond market is heavily dominated by large institutional lenders, it almost always sniffs out economic trouble before the stock market does. When economic growth stalls or liquidity dries up, institutions fear that highly leveraged companies will default on their loans.</p>
+<ul>
+<li><strong>The Signal:</strong> Investors dump junk bonds and flee to the safety of U.S. Treasuries (&quot;flight to quality&quot;). This causes high-yield bond prices to crash and their yields to spike. As a result, the <strong>HY OAS widens aggressively</strong>.</li>
+<li><strong>Why it Matters:</strong> Equity markets cannot function without credit. When HY OAS spikes rapidly (e.g., jumping over 400–500+ basis points), it signals an <strong>institutional liquidity freeze</strong>. If companies cannot refinance their debt, bankruptcies follow, and stock prices inevitably collapse.</li>
+</ul>
 </section>
 
 </div>
