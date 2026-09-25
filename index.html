@@ -551,7 +551,16 @@ button.secondary {
 </style>
 <style>.indicator-intro{max-width:100%;margin:12px 0 20px}.indicator-intro p{line-height:1.65;margin:0 0 12px}.indicator-intro p:last-child{margin-bottom:0}</style>
 <style>.fred-live-panel{border:1px solid var(--border);border-radius:12px;padding:20px;margin:22px 0;background:var(--card-bg)}.fred-key-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px}.fred-key-row label{flex:1;min-width:180px}.fred-key-row input{flex:2;min-width:180px;padding:12px;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:8px}.fred-key-row button{padding:11px 16px}#fredFetchButton{background:#2563eb;color:white}#fredFetchButton:disabled{opacity:.55;cursor:wait}</style>
-</head>
+<style>
+.overview-details{border:1px solid var(--border);border-radius:12px;margin:18px 0;padding:16px;background:var(--card-bg)}
+.summary-grid>.overview-details{align-self:start;margin:0}
+.overview-details>summary{cursor:pointer;font-weight:600;font-size:17px;padding:6px;line-height:1.5}
+.overview-details>summary:focus-visible{outline:2px solid #947454;outline-offset:4px}
+.overview-details[open]>summary{margin-bottom:18px}
+.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.overview-grid .control-panel{margin:0}
+.overview-grid h3{margin-top:0}.overview-alert{padding:10px 0;border-bottom:1px solid var(--border);line-height:1.5}
+@media(max-width:700px){.overview-grid{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}}
+</style></head>
 
 <body>
 
@@ -654,7 +663,7 @@ button.secondary {
         </div>
     </div>
 
-    <div class="scale-card">
+    <details class="scale-card overview-details"><summary>Score bands and interpretation</summary>
         <div class="scale-title">
             📊 Systemic Risk Regime Matrix — Maximum 44 Points
         </div>
@@ -709,10 +718,12 @@ button.secondary {
                 </tbody>
             </table>
         </div>
-    </div>
+    </details>
 
 </div>
-
+<div class="overview-grid"><section class="control-panel"><h3>Major score contributors</h3><div id="overviewContributors"></div><p class="table-note">Highest category contributions; missing inputs remain ranges.</p></section><section class="control-panel"><h3>Data freshness</h3><div id="overviewFreshness"></div><a href="#dashboardUpdate">Update data</a></section></div>
+<section class="control-panel"><h3>Current diagnostic alerts</h3><div id="overviewAlerts" aria-live="polite"></div><p class="table-note">Independent of the selected chart period. Diagnostic watches do not add to the 44-point score.</p><a href="#liquidityDiagnostics">Explore funding and leadership diagnostics</a></section>
+<details class="overview-details"><summary>Category breakdown and all risk factors</summary>
 <p class="table-note">Scoring v6.4 · Category limits remain 10 + 11 + 8 + 9 + 6 = 44. Narrow volatility curves, joint oil/yield pressure and conditional breadth deterioration are scored together. MOVE appears only in Volatility. These thresholds are heuristic, not optimized or validated crash probabilities. Historical graphs are recalculated using this same version.</p>
 <!-- REGIME SIGNALS -->
 
@@ -763,7 +774,9 @@ button.secondary {
 </div>
 
 
+</details>
 <!-- QUICK PASTE -->
+<details class="overview-details dashboard-section"><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
 <p class="table-note">Paste researched market values. Saved numbers can be edited in History. <a href="#fundingQuickHeading">Update dollar funding data</a>.</p>
 
@@ -839,6 +852,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 </div>
 
+</details>
+<details class="overview-details dashboard-section"><summary>History and risk charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
 <p class="table-note">Review market entries and linked charts. <a href="#fundingHeading">Dollar funding history</a>.</p>
 <section class="control-panel" aria-labelledby="historyHeading">
@@ -917,6 +932,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div style="overflow-x:auto"><svg id="forcedChart" viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="FORCED SELLING score from 0 to 6 over time"></svg></div>
 </section>
 
+</details>
+<details class="overview-details dashboard-section"><summary>Forced selling and funding diagnostics</summary>
 <h2 class="section-heading" id="forcedSellingHeading">Risk Factors for Force Selling</h2>
 <div id="forcedSelling"></div>
 <section class="control-panel" id="fundingPanel" aria-labelledby="fundingHeading">
@@ -985,7 +1002,11 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <li>Extra scoring requires historical publication vintages, missing-data rules, independent validation and checks for double-counting existing credit, breadth and volume inputs.</li>
 </ul></details></section>
 
+</details>
+<details class="overview-details dashboard-section"><summary>Examples of Past Crashes</summary>
 <div id="historicalStudies" tabindex="-1"></div>
+</details>
+<details class="overview-details dashboard-section"><summary>Methodology and indicator explanations</summary>
 <h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2>
 <section class="control-panel" aria-labelledby="glossaryHeading">
 <h2 class="panel-title" id="glossaryHeading">Indicator explanations</h2>
@@ -1087,6 +1108,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <tr><th scope="row">Volume pressure</th><td>Daily vs. prior 20 sessions</td><td>Ratio ≥ 1.5 and &lt; 2.0, with a negative return or bottom-quarter close</td><td>Ratio ≥ 2.0, with a negative return or bottom-quarter close</td><td>2 points</td></tr>
 </tbody><tfoot><tr><th scope="row" colspan="4">Total Forced Selling category maximum</th><td><strong>6 points</strong></td></tr></tfoot></table></div>
 </section>
+</details>
 
 </div>
 </div>
@@ -1794,6 +1816,33 @@ function getStatus(points,maxPoints){
    RENDER TABLE
    ========================================================= */
 
+function renderOpeningOverview(){
+    const host=document.getElementById('overviewContributors');if(!host)return;
+    const today=localCalendarDate(new Date()),day=currentEntryTime?localCalendarDate(new Date(currentEntryTime)):today;
+    const names=['Volatility','Credit','Macro shock','Equity structure','Forced selling'];
+    const ranked=Object.values(regimeCharts).map((c,i)=>({name:names[i],max:c.maximum,...(c.forced?forcedCategoryRange(currentData,day):historicalScoreRange(currentData,c.keys,day))})).sort((a,b)=>b.low-a.low||b.high-a.high);
+    host.innerHTML=ranked.slice(0,3).map(r=>'<p><strong>'+r.name+'</strong> · '+r.low+(r.high!==r.low?'–'+r.high:'')+' / '+r.max+'</p>').join('');
+    const cp=liquidityHistoryRows(),rotation=relativeMomentumRows(),latest=cp.filter(r=>r.date<=today&&Number.isFinite(r.sector)).at(-1);
+    const freshness=document.getElementById('overviewFreshness');
+    freshness.textContent=(currentEntryTime?'Current entry: '+new Date(currentEntryTime).toLocaleString()+'. Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.':'Sample values — no saved current entry. Update data before interpreting this score.')+' '+(latest?'Latest paired CP observation: '+latest.date+'. ':'No paired CP observations. ')+(fredLiveData?'FRED fetched: '+new Date(fredLiveData.fetchedAt).toLocaleString()+'.':'CP data uses embedded history or saved inputs; no live FRED download loaded.');
+    const alerts=document.getElementById('overviewAlerts');alerts.replaceChildren();
+    [['sector','Financial vs nonfinancial CP',cp,'high'],['financialBill','Financial CP vs Treasury bills',cp,'high'],['nonfinancialBill','Nonfinancial CP vs Treasury bills',cp,'high'],['momentum','Nasdaq leadership',rotation,'low']].forEach(([key,label,rows,direction])=>{
+        const r=diagnosticWatch(rows,key,today,direction),p=document.createElement('p');p.className='overview-alert'+(r.state==='watch'?' history-amber':'');
+        p.textContent=label+': '+(r.state==='watch'?'WATCH':r.state==='not-triggered'?'No watch triggered — not a low-risk assurance':'Unavailable')+(r.date?' · '+r.date:'')+(r.reason?' · '+r.reason:'')+(r.exceptions?.length?' · '+r.exceptions.join('; '):'');alerts.appendChild(p);
+    });
+}
+function revealDashboardTarget(){
+    const id=decodeURIComponent(location.hash.slice(1));if(!id)return;
+    const target=document.getElementById(id);if(!target)return;
+    let node=target.parentElement;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}
+    target.scrollIntoView({block:'start'});
+}
+document.addEventListener('DOMContentLoaded',()=>{
+    window.addEventListener('hashchange',revealDashboardTarget);
+    document.querySelectorAll('#appShell a[href^="#"]').forEach(a=>a.addEventListener('click',()=>setTimeout(revealDashboardTarget,0)));
+    revealDashboardTarget();
+});
+
 function renderDashboard(){
     renderEntryHistory();
 
@@ -1806,6 +1855,7 @@ function renderDashboard(){
     updateSummary(bounds.low,44);
     if(bounds.low!==bounds.high){document.getElementById('totalScoreDisp').innerText=bounds.low+'–'+bounds.high+' / 44';document.getElementById('statusTermDisp').innerText='Incomplete data';document.getElementById('scoreSubtext').innerText='Missing inputs create a possible score range. Update the entry below.';}
     updateRegimes();
+    renderOpeningOverview();
 
     document.getElementById("lastCheckDate").innerText =
         "Last check: " +
@@ -2525,6 +2575,7 @@ function renderLiquidityDiagnostics(){
     const chosen=windows[period],range=chartWindow(document.getElementById('liquidityRange').value||'9m');
     document.getElementById('liquidityRange').disabled=!!chosen;
     const begin=chosen?chosen[0]:localCalendarDate(range.start),end=chosen?chosen[1]:localCalendarDate(range.end);
+    renderOpeningOverview();
     const cp=liquidityHistoryRows(),cpMap=new Map(cp.map(r=>[r.date,r])),rotation=relativeMomentumRows(),rotationMap=new Map(rotation.map(r=>[r.date,r]));
     renderDiagnosticAlerts(cp,rotation,end,!!chosen);
     const dates=[...new Set([...cpMap.keys(),...rotationMap.keys()])].filter(d=>d>=begin&&d<=end).sort();
