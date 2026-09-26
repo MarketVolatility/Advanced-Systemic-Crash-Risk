@@ -560,7 +560,18 @@ button.secondary {
 .overview-grid{display:grid;grid-template-columns:1fr;gap:20px}.overview-grid .control-panel{margin:0}
 .overview-grid h3{margin-top:0}.overview-alert{padding:10px 0;border-bottom:1px solid var(--border);line-height:1.5}
 @media(max-width:700px){.overview-grid{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}}
-</style><style>.dashboard-nav a[aria-current="location"]{color:#facc15;background:#322d16}.free-key{color:#b5bd56}.summary-grid{grid-template-columns:1fr}</style></head>
+</style><style>.dashboard-nav a[aria-current="location"]{color:#facc15;background:#322d16}.free-key{color:#b5bd56}.summary-grid{grid-template-columns:1fr}</style><style>
+.freshness-strip{margin:-8px 0 24px;padding:12px 16px;border-left:2px solid var(--border);color:#b8c0cc;font-size:12px;line-height:1.65}
+.freshness-strip h2{font-size:12px;color:inherit;font-weight:600;margin:0 0 5px}.freshness-strip p{margin:2px 0}
+.dashboard-section .panel-title{font-size:21px;line-height:1.4}.dashboard-section h3{font-size:17px;line-height:1.5;color:#dbe2ec;margin:22px 0 10px}
+.dashboard-section p,.dashboard-section li{line-height:1.7}.dashboard-section .table-note{color:#aeb8c7;font-size:13px}
+.dashboard-section:has(#dashboardMethodology){color:#cbd5e1;font-size:14px}
+.dashboard-section:has(#dashboardMethodology) .control-panel{padding:24px;margin:18px 0}
+.dashboard-section:has(#dashboardMethodology) p{margin:10px 0 16px}
+.dashboard-section:has(#dashboardMethodology) li{margin:8px 0}
+.dashboard-section:has(#dashboardMethodology) table{font-size:13px;line-height:1.6}
+@media(max-width:600px){.dashboard-section:has(#dashboardMethodology) .control-panel{padding:16px}.freshness-strip{padding:10px;font-size:11px}}
+</style></head>
 
 <body>
 
@@ -637,7 +648,8 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a></nav>
+<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a></nav>
+<aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
 <p class="table-note">A summary of the dashboard’s heuristic stress signals. The score is not a crash probability or confirmation of forced selling.</p>
 
@@ -662,7 +674,36 @@ button.secondary {
     </div>
 
 </div>
-    <details class="scale-card overview-details"><summary>Score bands and interpretation</summary>
+<div class="signal-grid">
+
+    <div class="signal-card">
+        <div class="signal-title">Volatility Regime</div>
+        <div class="signal-value" id="volRegime">—</div>
+        <div class="signal-description" id="volDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Credit Regime</div>
+        <div class="signal-value" id="creditRegime">—</div>
+        <div class="signal-description" id="creditDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Macro Shock</div>
+        <div class="signal-value" id="macroRegime">—</div>
+        <div class="signal-description" id="macroDesc"></div>
+    </div>
+
+    <div class="signal-card">
+        <div class="signal-title">Equity Structure</div>
+        <div class="signal-value" id="equityRegime">—</div>
+        <div class="signal-description" id="equityDesc"></div>
+    </div>
+<div class="signal-card"><div class="signal-title">Forced Selling</div><div class="signal-value" id="forcedRegime">—</div><div class="signal-description" id="forcedDesc"></div></div>
+
+</div>
+
+    <details class="scale-card overview-details"><summary>Score Bands</summary>
         <div class="scale-title">
             📊 Systemic Risk Regime Matrix — Maximum 44 Points
         </div>
@@ -719,35 +760,6 @@ button.secondary {
         </div>
     </details>
 
-<div class="overview-grid"><section class="control-panel"><h3>Data freshness</h3><div id="overviewFreshness"></div><a href="#dashboardUpdate">Update data</a></section></div>
-<div class="signal-grid">
-
-    <div class="signal-card">
-        <div class="signal-title">Volatility Regime</div>
-        <div class="signal-value" id="volRegime">—</div>
-        <div class="signal-description" id="volDesc"></div>
-    </div>
-
-    <div class="signal-card">
-        <div class="signal-title">Credit Regime</div>
-        <div class="signal-value" id="creditRegime">—</div>
-        <div class="signal-description" id="creditDesc"></div>
-    </div>
-
-    <div class="signal-card">
-        <div class="signal-title">Macro Shock</div>
-        <div class="signal-value" id="macroRegime">—</div>
-        <div class="signal-description" id="macroDesc"></div>
-    </div>
-
-    <div class="signal-card">
-        <div class="signal-title">Equity Structure</div>
-        <div class="signal-value" id="equityRegime">—</div>
-        <div class="signal-description" id="equityDesc"></div>
-    </div>
-<div class="signal-card"><div class="signal-title">Forced Selling</div><div class="signal-value" id="forcedRegime">—</div><div class="signal-description" id="forcedDesc"></div></div>
-
-</div>
 
 <details class="overview-details dashboard-section" id="compositeUpdatePanel" hidden><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
@@ -849,7 +861,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 
 </details>
-<details class="overview-details"><summary>Current Diagnostic Alerts</summary><section class="control-panel"><h3>Current diagnostic alerts</h3><div id="overviewAlerts" aria-live="polite"></div><p class="table-note">Independent of the selected chart period. Diagnostic watches do not add to the 44-point score.</p><a href="#liquidityDiagnostics">Explore funding and leadership diagnostics</a></section></details>
+
 
 <!-- QUICK PASTE -->
 <details class="overview-details dashboard-section"><summary>History and Risk Charts</summary>
@@ -973,7 +985,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </details>
 <details class="overview-details dashboard-section"><summary>Commercial-Paper (CP) Funding Diagnostics</summary>
 <section class="control-panel" id="liquidityDiagnostics">
-<h2 class="panel-title">Funding spreads &amp; market leadership · diagnostic only</h2>
+<h2 class="panel-title">Funding spreads &amp; market leadership · diagnostic only</h2><h3>CP Diagnostic Alerts</h3><div id="overviewAlerts" aria-live="polite"></div>
 <p class="table-note">Short-term funding costs and relative equity performance add context to the Credit and Equity regimes. They contribute no points to the 44-point score. White numbers are informational, not a low-risk label.</p>
 <p>Commercial-paper spreads compare 90-day AA financial and nonfinancial borrowing rates. A rising financial premium can suggest funding pressure, but a small difference can conceal stress affecting both groups. Spreads over 3-month Treasury bills provide a second reference; Treasury demand, issuer composition and liquidity also affect them. These are discount-basis yield differences, not FRA–OIS or pure default-risk measures.</p>
 <p class="table-note">Sources: <a href="https://fred.stlouisfed.org/series/DCPF3M">Financial CP</a> · <a href="https://fred.stlouisfed.org/series/DCPN3M">Nonfinancial CP</a> · <a href="https://fred.stlouisfed.org/series/DTB3">Treasury bills</a> · <a href="https://www.federalreserve.gov/releases/cp/about.htm">Federal Reserve methodology</a>. <span id="cpDownloadStatus">Embedded source downloaded September 25, 2026.</span> Same-date observations only; missing data stays missing. This downloaded vintage is retrospective and must not be treated as a point-in-time backtest. Quick Paste now includes the CP observation date and three rates. Saving a paste, editing history or loading account data refreshes these diagnostics automatically. Saved rates override embedded rates for their stated observation date; older pastes leave funding data unchanged. Account sync transfers saved inputs; it does not fetch market data.</p>
@@ -981,7 +993,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <label for="liquidityPeriod">Period </label><select id="liquidityPeriod" onchange="renderLiquidityDiagnostics()" style="padding:8px;background:#1e293b;color:white"><option value="current">Current chart window</option><option value="2020">February–April 2020</option><option value="2008">August–October 2008</option><option value="2000">February–April 2000</option></select>
 <p id="liquiditySummary" class="table-note"></p>
 <div class="indicator-intro"><p><strong>Debt and cash-flow checks:</strong> Commercial paper is short-term borrowing used by financial firms and other large companies to meet funding needs. The first three alerts compare those borrowing costs with each other and with US Treasury bills. Rising premiums can indicate funding pressure; a disruption can affect refinancing and markets, but does not by itself establish that a systemic crash will follow.</p></div>
-<div id="liquidityAlerts" class="info-box" role="status" aria-live="polite"></div>
+<div id="liquidityAlerts" class="info-box" role="status" aria-live="polite" hidden></div>
 
 <label for="liquidityRange">Current time range </label><select id="liquidityRange" onchange="setAllChartRanges(this.value)"><option value="1w">1 week</option><option value="1m">1 month</option><option value="3m">3 months</option><option value="6m">6 months</option><option value="9m" selected>9 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option></select>
 <p class="table-note">This selector follows the other current charts. Historical study periods keep their fixed dates. Each graph shows one diagnostic plus S&amp;P 500 (green), Nasdaq Composite (purple dashed) and Nasdaq 100 (gold dotted). Equity indexes share the right-hand scale, rebased to 100 on the first common session; diagnostic values use the left-hand scale.</p>
@@ -1002,15 +1014,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div id="historicalStudies" tabindex="-1"></div>
 </details>
 <details class="overview-details dashboard-section"><summary>Methodology and Indicators</summary>
-<h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2><section class="control-panel"><h3>Composite scoring framework</h3><p class="table-note">Scoring v6.4 · Category limits remain 10 + 11 + 8 + 9 + 6 = 44. Narrow volatility curves, joint oil/yield pressure and conditional breadth deterioration are scored together. MOVE appears only in Volatility. These thresholds are heuristic, not optimized or validated crash probabilities. Historical graphs are recalculated using this same version.</p><h3>Diagnostic watch methodology</h3><details><summary>Watch-alert rules and available-data exceptions · no score contribution</summary><p>Funding: a spread is positive, at or above its preceding-year 90th percentile, and rising versus the last valid observation. Leadership: 20-session relative momentum is negative, at or below its preceding-year 10th percentile, and falling versus the last valid observation. The current observation is excluded from its percentile baseline; the nearest-rank method is used.</p><p>Use the observations available: 60 prior observations and a comparison within seven calendar days are preferences, not requirements. Smaller samples, longer gaps, skipped leadership observations and data older than seven days are explicitly noted beside each result. If no prior-year comparison exists, use available history up to five years and label the fallback. With no earlier valid observation, assessment remains unavailable. No missing values are invented.</p><p>Amber means an exploratory watch, not a calibrated crash probability. Exceptions apply to both watch and no-watch results; a limited-data result does not establish safety. Stale observations describe their stated date, not current conditions. Historical studies use the downloaded vintage and are not point-in-time backtests. Alerts update on this page; no email or push notifications are sent.</p></details><h3>Current diagnostic assessment exceptions</h3><div id="diagnosticExceptions"></div><h3>Scoring exclusions</h3><details><summary>Why these diagnostics do not add risk points</summary><ul>
-<li>FRA–OIS was tied to unsecured LIBOR funding. <a href="https://www.newyorkfed.org/rruc/libor-transition-background">The transition to secured SOFR</a> changes that interpretation; the proposed legacy thresholds cannot simply be reused.</li>
-<li>An advance–decline line can complement existing breadth. It needs a consistent stock universe and complete advances/declines history. A NYSE-wide line compared with the S&amp;P 500 mixes universes. The proposed divergence rule remains a candidate for testing, not an implemented score.</li>
-<li>XLK/BRK.B includes single-company effects; XLY is consumer discretionary, not a value or defensive index. The relative-index diagnostic above is explicitly labelled market leadership.</li>
-<li>Cross-asset correlation should use synchronized returns over a specified window, not price levels. Joint declines do not identify their cause. </li>
-<li>Extra scoring requires historical publication vintages, missing-data rules, independent validation and checks for double-counting existing credit, breadth and volume inputs.</li>
-</ul></details></section>
-<section class="control-panel" aria-labelledby="glossaryHeading">
-<h2 class="panel-title" id="glossaryHeading">Indicator explanations</h2>
+<h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2><section class="control-panel" aria-labelledby="glossaryHeading">
+<h2 class="panel-title" id="glossaryHeading">Indicators Explained</h2>
 <p class="table-note">D means trading days; DMA means daily moving average; bp means basis points (100 bp = 1 percentage point); pp means percentage points.</p>
 <div class="data-table-scroll" tabindex="0" role="region" aria-label="Indicator explanations">
 <table class="glossary-table"><thead><tr><th>Indicator</th><th>Unit</th><th>Explanation</th></tr></thead><tbody><tr><th scope="row">10Y 20D bp change</th><td>bp</td><td>Change in 10-year Treasury yield over twenty trading days. A move from 4.50% to 4.80% is 30 basis points.</td></tr><tr><th scope="row">10Y Yield</th><td>%</td><td>Yield on the 10-year US Treasury. Enter 4.80 for 4.80%. This dashboard assigns more risk points to higher yields.</td></tr><tr><th scope="row">200DMA distance velocity</th><td>5-session change in pp</td><td>Today’s S&amp;P percentage distance from its own 200DMA minus the distance 5 equity sessions earlier. Each moving average uses only information then available. Below the 200DMA, a loss of 3 pp flags watch and 5 pp flags stress. Not proof of forced liquidation and not extra points.</td></tr><tr><th scope="row">BBB OAS</th><td>bp</td><td>Option-adjusted spread for BBB-rated investment-grade corporate bonds. Higher readings indicate more credit risk priced into these bonds.</td></tr><tr><th scope="row">Breadth % &gt;50DMA</th><td>%</td><td>Percentage of S&amp;P 500 constituents above their own 50-day moving averages. Lower values indicate fewer stocks participating in the uptrend.</td></tr><tr><th scope="row">Breadth 20D change</th><td>pp</td><td>Current breadth minus its value 20 trading sessions earlier, in percentage points. Loss ≤−10 pp: 2 points. Otherwise, loss ≤−4 pp with current breadth &lt;65%: 1 point; otherwise 0. This flags deteriorating participation even before an index breaks its trend.</td></tr><tr><th scope="row">Financial / nonfinancial CP spreads</th><td>bp</td><td>Same-date 90-day AA financial minus nonfinancial CP rate × 100; also compare each to 3-month Treasury bills. Diagnostic only. Missing rates are not carried forward. Small sector differences do not rule out broad funding stress.</td></tr><tr><th scope="row">HY OAS</th><td>bp</td><td>High-yield corporate bond option-adjusted spread over a Treasury benchmark, adjusted for embedded options. Wider spreads indicate greater credit stress.</td></tr><tr><th scope="row">HY OAS 20D bp change</th><td>bp</td><td>Current high-yield OAS minus its value twenty trading days ago. Positive values mean spreads widened.</td></tr><tr><th scope="row">HY OAS 5D bp change</th><td>bp</td><td>Current high-yield OAS minus its value five trading days ago. Positive values mean spreads widened.</td></tr><tr><th scope="row">Margin debt / reference month</th><td>USD million / YYYYMM</td><td>Aggregate customer securities-margin debit balances from FINRA. Monthly, not daily; use a published report or the explicitly assumed two-month lag for historical data.</td></tr><tr><th scope="row">Margin debt YoY / 3M change</th><td>%</td><td>(Current debt / debt 12 or 3 months earlier − 1) × 100. Leverage points: maximum of YoY ≥20% → 1, ≥40% → 2; 3M ≤−5% → 1, ≤−10% → 2. Maximum 2, not the sum.</td></tr><tr><th scope="row">Margin leverage</th><td>0–2 points</td><td>Uses FINRA customer margin debt. Buildup: year-over-year growth ≥20% earns 1 point; ≥40% earns 2. Deleveraging: three-month change ≤−5% earns 1; ≤−10% earns 2. Take the higher score, not their sum. Monthly debt does not measure total financial-system leverage. The reference month and debt amount inherit this component’s color; the date or dollar amount alone has no risk threshold.</td></tr><tr><th scope="row">MOVE</th><td>Index</td><td>ICE BofA bond-market implied-volatility index based on US Treasury options. Higher values indicate greater expected interest-rate volatility.</td></tr><tr><th scope="row">Market leadership momentum</th><td>20-session %</td><td>100 × [(Nasdaq 100 / S&amp;P 500) today / the ratio 20 sessions earlier − 1]. Negative means Nasdaq 100 underperformance; not evidence of fund flows or forced liquidation. Requires all 21 sessions, contributes no score.</td></tr><tr><th scope="row">Nasdaq 100 close</th><td>Index</td><td>Closing level of the Nasdaq 100, tracking large non-financial Nasdaq-listed companies. Monitoring only; no added score.</td></tr><tr><th scope="row">Nasdaq Composite close</th><td>Index</td><td>Closing level of the broad Nasdaq Composite. Use the index, not an ETF. Monitoring only; no added score. Both Nasdaq chart lines are rebased to 100 for comparison with the S&amp;P 500.</td></tr><tr><th scope="row">Possible volume exhaustion</th><td>Observation</td><td>At least 2× volume, a new 20-session low, close above the open and in the top 30% of the day’s range. A possible reversal, not a confirmed bottom; adds no separate points.</td></tr><tr><th scope="row">Reported volume / prior 20D average</th><td>Shares</td><td>Yahoo ^GSPC reported-volume proxy. Average the preceding 20 trading sessions, excluding the signal day. Keep the same provider and units.</td></tr><tr><th scope="row">S&P 500 daily change</th><td>%</td><td>(Current closing level / previous trading-session close − 1) × 100. Used to distinguish selling volume from rising-price volume.</td></tr><tr><th scope="row">S&amp;P 500 session high / low</th><td>Index points</td><td>Same-session high and low matching the closing index level. Close location = (close − low) / (high − low). Location ≤0.25 activates selling-volume scoring even on an up day. Missing, invalid or zero-width ranges stay unknown; negative daily returns can still establish selling pressure independently.</td></tr><tr><th scope="row">S&amp;P vs 200DMA</th><td>%</td><td>S&amp;P 500 distance from its 200-day moving average, using the same formula. Negative values indicate weakness versus the longer-term trend.</td></tr><tr><th scope="row">S&amp;P vs 50DMA</th><td>%</td><td>S&amp;P 500 distance from its 50-day moving average: (index / average − 1) × 100. Negative values mean the index is below its average.</td></tr><tr><th scope="row">Selling volume</th><td>0–2 points</td><td>Divide reported S&amp;P volume by the average of the preceding 20 trading sessions, excluding the current day. If the S&amp;P closes below its previous session OR closes in the bottom 25% of its session range: ratio ≥1.5 earns 1 point; ≥2 earns 2. Otherwise 0. Volume, average volume and daily return inherit this component’s color. Heavy volume alone does not confirm forced selling or a market bottom.</td></tr><tr><th scope="row">USDJPY</th><td>JPY/USD</td><td>Japanese yen per US dollar, shown for reference. Currency risk points use the separate three-session percentage change; absolute exchange-rate levels do not score.</td></tr><tr><th scope="row">USDJPY carry-trade stress</th><td>3-session % change · 0–2 points</td><td>(Current USDJPY / close 3 FX trading sessions earlier − 1) × 100. Above −1.5%: 0 points; −1.5% to above −3%: 1; −3% or lower: 2. Yen appreciation means negative USDJPY change. Absolute exchange-rate levels no longer score. This is a heuristic warning of possible carry unwinds, not proof of liquidation or a validated forecast.</td></tr><tr><th scope="row">USDJPY momentum diagnostic</th><td>% over 3 FX sessions</td><td>(USDJPY / value 3 available FX observations earlier − 1) × 100. Negative means yen appreciation. Amber at −1.5%, red at −3%. Replaces the former absolute-level currency score, maximum 2 points.</td></tr><tr><th scope="row">VIX</th><td>Index</td><td>Expected annualized S&amp;P 500 volatility over the next 30 days, derived from options prices. Higher readings indicate greater expected movement, not its direction.</td></tr><tr><th scope="row">VIX 1D %</th><td>%</td><td>Percentage change in VIX from the previous trading day: (current / previous − 1) × 100. This is not the separate VIX1D index.</td></tr><tr><th scope="row">VIX 3M-1M spread</th><td>Index points</td><td>VIX3M minus 30-day VIX, in index points; these are implied-volatility indices, not front-month futures. Negative spread: 2 points. A nonnegative spread &lt;1.0 with VIX 5D change &gt;10% also earns 2. Otherwise spread &lt;1.5 earns 1; ≥1.5 earns 0. Zero is flat, not backwardation. This measures a narrow curve, not its rate of flattening; both inputs should be from the same closing session.</td></tr><tr><th scope="row">VIX 5D %</th><td>%</td><td>Percentage change in VIX over five trading days. A positive value means expected volatility has risen.</td></tr><tr><th scope="row">Volume ratio / selling pressure</th><td>Ratio / 0–2 points</td><td>Volume divided by prior 20D average. On a negative S&amp;P daily return or a close in the bottom 25% of the session range: ratio ≥1.5 adds 1 point; ≥2 adds 2. Otherwise 0. Missing inputs produce a score range.</td></tr><tr><th scope="row">WTI</th><td>USD/barrel</td><td>West Texas Intermediate crude oil price. Use the same spot or futures series for all entries and its 20-day change. This dashboard flags high oil prices as a macro stress signal.</td></tr><tr><th scope="row">WTI 20D %</th><td>%</td><td>Oil momentum: 20-session rise ≥10% earns 1 point; ≥20% earns 2. Add 1 when WTI ≥$90 and 10Y yield ≥4.50%, capped at 2 points for this component. A joint level trigger signals overlapping pressure; it is not a measured correlation. The WTI and yield level components are retained.</td></tr></tbody></table>
@@ -1018,8 +1023,9 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">S&amp;P 500 close: the closing level of the S&amp;P 500 price index; shown for comparison and excluded from the risk score. Context: <a href="https://www.cboe.com/tradable_products/vix/term_structure">Cboe implied-volatility term structure</a> · <a href="https://www.federalreserve.gov/faqs/money_12856.htm">Federal Reserve: borrowing costs and economic activity</a>. Reference definitions: <a href="https://www.cboe.com/tradable_products/vix/term_structure">Cboe volatility indices</a> · <a href="https://developer.ice.com/fixed-income-data-services/catalog/ice-data-indices-move-index">ICE MOVE</a> · <a href="https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf">ICE bond methodology</a>. Risk colors follow this dashboard’s existing scoring rules.</p>
 </section>
 
+<section class="control-panel methodology-note"><h3>Data timestamps and freshness</h3><p>Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.</p><p>Update times use your browser’s local time zone. The CP observation date identifies the rate observation; its checked time is the recorded FRED fetch time. An unavailable timestamp is shown as not recorded, rather than inferred from opening this page.</p></section>
 <section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
-<h2 class="panel-title" id="systemicRiskReferenceHeading">In Depth Explanation of this Advanced Systemic Crash Risk Dashboard</h2>
+<h2 class="panel-title" id="systemicRiskReferenceHeading">Advanced Systemic Crash Risk Dashboard Explained</h2>
 <p class="table-note">Explanatory reference. The illustrative thresholds below do not replace the dashboard’s scoring rules in the Risk Factor Table.</p>
 <h3>Five primary regimes</h3>
 <p>The framework categorizes risk into five primary regimes, tracking specific mechanisms and triggers:</p>
@@ -1817,20 +1823,30 @@ function getStatus(points,maxPoints){
    RENDER TABLE
    ========================================================= */
 
+function displayUpdateTime(value){
+    if(!value||!Number.isFinite(Date.parse(value)))return 'Not recorded';
+    const d=new Date(value),pad=n=>String(n).padStart(2,'0');
+    return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+', '+(d.getHours()%12||12)+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+' '+(d.getHours()<12?'AM':'PM');
+}
+function displayObservationDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value||'')?value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4):'Not available';}
+function renderFreshness(){
+    const host=document.getElementById('overviewFreshness');if(!host)return;
+    const today=localCalendarDate(new Date()),latest=liquidityHistoryRows().filter(r=>r.date<=today&&Number.isFinite(r.sector)).at(-1);
+    const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);
+    const lines=['Last Composite Risk Score Update: '+displayUpdateTime(currentEntryTime),'Last paired CP observation: '+displayObservationDate(latest?.date)+', checked on '+displayUpdateTime(fredLiveData?.fetchedAt),'Last dollar funding update: '+displayUpdateTime(saved)];
+    host.replaceChildren();lines.forEach(text=>{const p=document.createElement('p');p.textContent=text;host.appendChild(p);});
+}
 function renderOpeningOverview(){
     const today=localCalendarDate(new Date());
     const cp=liquidityHistoryRows(),rotation=relativeMomentumRows(),latest=cp.filter(r=>r.date<=today&&Number.isFinite(r.sector)).at(-1);
-    const freshness=document.getElementById('overviewFreshness');
-    freshness.textContent=(currentEntryTime?'Current entry: '+new Date(currentEntryTime).toLocaleString()+'. Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.':'Sample values — no saved current entry. Update data before interpreting this score.')+' '+(latest?'Latest paired CP observation: '+latest.date+'. ':'No paired CP observations. ')+(fredLiveData?'FRED fetched: '+new Date(fredLiveData.fetchedAt).toLocaleString()+'.':'CP data uses embedded history or saved inputs; no live FRED download loaded.');
+    renderFreshness();
     const alerts=document.getElementById('overviewAlerts');alerts.replaceChildren();
-    const exceptions=document.getElementById('diagnosticExceptions');exceptions.replaceChildren();
-    document.getElementById('compositeUpdateTime').textContent=currentEntryTime?'Current entry saved at: '+new Date(currentEntryTime).toLocaleString():'Last update: none — sample values.';
-    document.getElementById('cpUpdateTime').textContent=fredLiveData?'Last FRED fetch: '+new Date(fredLiveData.fetchedAt).toLocaleString():'Last FRED fetch: not recorded on this account.';
-    const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);document.getElementById('dollarUpdateTime').textContent=saved?'Last saved update: '+new Date(saved).toLocaleString():'Last saved update: none — embedded reference history only.';
+    document.getElementById('compositeUpdateTime').textContent=currentEntryTime?'Current entry saved at: '+displayUpdateTime(currentEntryTime):'Last update: none — sample values.';
+    document.getElementById('cpUpdateTime').textContent=fredLiveData?'Last FRED fetch: '+displayUpdateTime(fredLiveData.fetchedAt):'Last FRED fetch: not recorded on this account.';
+    const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);document.getElementById('dollarUpdateTime').textContent=saved?'Last saved update: '+displayUpdateTime(saved):'Last saved update: none — embedded reference history only.';
     [['sector','Financial vs nonfinancial CP',cp,'high'],['financialBill','Financial CP vs Treasury bills',cp,'high'],['nonfinancialBill','Nonfinancial CP vs Treasury bills',cp,'high'],['momentum','Nasdaq leadership',rotation,'low']].forEach(([key,label,rows,direction])=>{
         const r=diagnosticWatch(rows,key,today,direction),p=document.createElement('p');p.className='overview-alert'+(r.state==='watch'?' history-amber':'');
         p.textContent=label+': '+(r.state==='watch'?'WATCH':r.state==='not-triggered'?'No watch triggered — not a low-risk assurance':'Unavailable')+(r.date?' · '+r.date:'')+(r.reason?' · '+r.reason:'');alerts.appendChild(p);
-        const note=document.createElement('p');note.textContent=label+': '+(r.exceptions?.length?r.exceptions.join('; '):'No available-data exceptions.')+(r.date?' · '+r.date:'');exceptions.appendChild(note);
     });
 }
 function generateCpPrompt(){
@@ -2373,7 +2389,7 @@ function loadFredPreferences(){
     const input=document.getElementById('fredApiKey');if(!input)return;input.value='';
     try{if(historyOwner){input.value=localStorage.getItem(fredKeyStorage())||'';const raw=localStorage.getItem(fredDataStorage());if(raw)fredLiveData=validateFredData(JSON.parse(raw));}}
     catch{fredMessage('Saved FRED data or key could not be loaded. Paste your key to fetch again.');return;}
-    fredMessage(fredLiveData?'Saved FRED observations loaded; fetched '+new Date(fredLiveData.fetchedAt).toLocaleString()+'.':input.value?'Key saved on this browser. Select Fetch latest data.':'Paste your FRED key, then select Fetch latest data.');
+    fredMessage(fredLiveData?'Saved FRED observations loaded; fetched '+displayUpdateTime(fredLiveData.fetchedAt)+'.':input.value?'Key saved on this browser. Select Fetch latest data.':'Paste your FRED key, then select Fetch latest data.');
 }
 function saveFredKey(){
     if(!historyOwner){fredMessage('Sign in before saving a key.');return;}
@@ -2467,7 +2483,8 @@ function exportFunding(){const a=document.createElement('a'),url=URL.createObjec
 function fundingPrompt(){document.getElementById('fundingPrompt').value='Research Fed SWPT weekly dollar liquidity swap balances for the past year through today. Return ONLY a JSON array with observationDate (YYYY-MM-DD), publishedAt (exact first-publication timestamp with timezone), balance (USD millions), testBalance (USD millions or null), testEvidence (official URL or empty string), source (official release URL). Preserve separate revisions with their actual publication times. Use original Fed H.4.1 releases or ALFRED vintages and NY Fed operation results. Never use an observation date as a publication date. If exact availability cannot be verified, omit that release and explain outside the JSON. testBalance must include only explicitly identified operational-test transactions outstanding on the observation date, using settlement and maturity dates. Use null unless full reconciliation, including a verified zero, is possible. Do not infer tests from transaction size, invent values, or return risk scores. Review sources before importing.';}
 async function copyFundingPrompt(){try{if(!document.getElementById('fundingPrompt').value)fundingPrompt();await navigator.clipboard.writeText(document.getElementById('fundingPrompt').value);document.getElementById('fundingStatus').textContent='Prompt copied.';}catch{document.getElementById('fundingStatus').textContent='Select and copy the prompt manually; clipboard access is unavailable.';}}
 function renderFunding(){
-    const lastSaved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);const stamp=document.getElementById("dollarUpdateTime");if(stamp)stamp.textContent=lastSaved?"Last saved update: "+new Date(lastSaved).toLocaleString():"Last saved update: none — embedded reference history only.";
+    renderFreshness();
+    const lastSaved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);const stamp=document.getElementById("dollarUpdateTime");if(stamp)stamp.textContent=lastSaved?"Last saved update: "+displayUpdateTime(lastSaved):"Last saved update: none — embedded reference history only.";
     const body=document.getElementById('fundingRows');if(!body)return;
     const fieldHost=document.getElementById('fundingFields');if(!fieldHost.children.length)fundingFields.forEach(([k,label,type])=>{const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.id='funding_'+k;input.type=type;if(type==='number'){input.min='0';input.step='any';}l.appendChild(input);fieldHost.appendChild(l);});
     const time=Date.now();
@@ -2577,15 +2594,15 @@ function diagnosticWatch(rows,key,day,direction){
 }
 function renderDiagnosticAlerts(cp,rotation,end,historical){
     const definitions=[['sector','Financial minus nonfinancial CP','bp','high',cp],['financialBill','Financial CP minus Treasury bills','bp','high',cp],['nonfinancialBill','Nonfinancial CP minus Treasury bills','bp','high',cp],['momentum','Nasdaq leadership momentum','%','low',rotation]];
-    const host=document.getElementById('liquidityAlerts');host.replaceChildren();
+    const host=document.getElementById('liquidityAlerts');host.hidden=!historical;host.replaceChildren();
     const heading=document.createElement('strong');heading.textContent=historical?'Watch conditions at study end · retrospective':'Current diagnostic watch alerts';host.appendChild(heading);
     definitions.forEach(([key,label,unit,direction,rows])=>{const result=diagnosticWatch(rows,key,end,direction),p=document.createElement('p');p.className=result.state==='watch'?'history-amber':'table-note';p.style.margin='8px 0';
         const latestValid=rows.filter(r=>r.date<=end&&Number.isFinite(r[key])).at(-1);const fiveYearCount=latestValid?rows.filter(r=>r.date<latestValid.date&&Date.parse(r.date)>=Date.parse(latestValid.date)-5*365.25*86400000&&Number.isFinite(r[key])).length:0;
-        p.textContent=label+': '+(result.state==='watch'?'WATCH — '+result.value.toFixed(2)+' '+unit+' on '+result.date+'; '+(direction==='high'?'at or above the 90th-percentile boundary and rising':'at or below the 10th-percentile boundary and falling')+' (boundary '+result.threshold.toFixed(2)+' '+unit+', '+result.count+' prior observations).':result.state==='not-triggered'?'No watch condition triggered on '+result.date+'; this does not establish low risk.':result.reason+(result.date?' ('+result.date+')':'')+'; alert unavailable.')+' Five-year context: '+fiveYearCount+' valid prior observations; '+(result.baselineDays===1827?'five-year fallback baseline used.':'alert baseline is the preceding year.')+(result.exceptions?.length?' Assessment exceptions are listed in Methodology.':'');host.appendChild(p);
+        p.textContent=label+': '+(result.state==='watch'?'WATCH — '+result.value.toFixed(2)+' '+unit+' on '+result.date+'; '+(direction==='high'?'at or above the 90th-percentile boundary and rising':'at or below the 10th-percentile boundary and falling')+' (boundary '+result.threshold.toFixed(2)+' '+unit+', '+result.count+' prior observations).':result.state==='not-triggered'?'No watch condition triggered on '+result.date+'; this does not establish low risk.':result.reason+(result.date?' ('+result.date+')':'')+'; alert unavailable.')+' Five-year context: '+fiveYearCount+' valid prior observations; '+(result.baselineDays===1827?'five-year fallback baseline used.':'alert baseline is the preceding year.');host.appendChild(p);
     });
 }
 function renderLiquidityDiagnostics(){
-    const sourceStatus=document.getElementById('cpDownloadStatus');if(sourceStatus){if(!sourceStatus.dataset)sourceStatus.dataset={};if(!sourceStatus.dataset.embedded)sourceStatus.dataset.embedded=sourceStatus.textContent||'Embedded source downloaded September 25, 2026.';sourceStatus.textContent=fredLiveData?'FRED data fetched '+new Date(fredLiveData.fetchedAt).toLocaleString()+'.':sourceStatus.dataset.embedded;}
+    const sourceStatus=document.getElementById('cpDownloadStatus');if(sourceStatus){if(!sourceStatus.dataset)sourceStatus.dataset={};if(!sourceStatus.dataset.embedded)sourceStatus.dataset.embedded=sourceStatus.textContent||'Embedded source downloaded September 25, 2026.';sourceStatus.textContent=fredLiveData?'FRED data fetched '+displayUpdateTime(fredLiveData.fetchedAt)+'.':sourceStatus.dataset.embedded;}
     const host=document.getElementById('liquidityDiagnosticRows');if(!host)return;
     const period=document.getElementById('liquidityPeriod').value;
     const windows={'2020':['2020-02-01','2020-04-30'],'2008':['2008-08-01','2008-10-31'],'2000':['2000-02-01','2000-04-30']};
