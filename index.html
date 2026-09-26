@@ -798,7 +798,7 @@ button.secondary {
 
 
 </details>
-<details class="overview-details dashboard-section" name="dashboard-panels" id="compositeUpdatePanel" hidden><summary>Update Data</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels" id="compositeUpdatePanel"><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
 <p class="table-note">Paste researched market values. Saved numbers can be edited in History. <a href="#fundingQuickHeading">Update dollar funding data</a>.</p>
 
@@ -990,7 +990,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Embedded reference history: 40 weekly observations, December 24, 2025–September 23, 2026, including the preceding-week baseline for the nine-month window. Newest observations appear first. Reference rows are read-only and do not overwrite your account entries; a saved entry for the same week takes precedence. Historical publication timestamps and operational-test balances are unverified. Data is embedded in this file and does not refresh automatically.</p>
 <p id="fundingStatus" class="table-note" role="status"></p>
 <div class="data-table-scroll"><table class="history-table"><thead><tr><th>Delete</th><th>Edit</th><th>Saved at</th><th>Observation</th><th>Publication time (UTC) / status</th><th>Balance (USD m)</th><th>Weekly change (USD m)</th><th>Tests outstanding (USD m)</th><th>Adjusted balance (USD m)</th><th>Adjustment status</th><th>Evidence</th><th>S&amp;P 500 close</th><th>Nasdaq Composite close</th><th>Nasdaq 100 close</th></tr></thead><tbody id="fundingRows"></tbody></table></div>
-<details><summary>Original releases and correction audit</summary><pre id="fundingAudit" style="max-height:240px;overflow:auto;white-space:pre-wrap"></pre></details>
+
 <label for="fundingRange">Time range</label> <select id="fundingRange" onchange="setAllChartRanges(this.value)"><option value="1w">1 week</option><option value="1m">1 month</option><option value="3m">3 months</option><option value="6m">6 months</option><option value="9m" selected>9 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option></select>
 <p class="table-note">Blue stepped line: weekly raw balance by Wednesday observation date, using the latest available version for each week. Amber bars below: weekly dollar change, only when the preceding weekly observation is available. This is a retrospective observation-date chart, not a reconstruction of information available to traders at the time. Publication times remain visible when verified. A line stops when data becomes stale. Hover or focus on marks for values.</p>
 <div style="overflow-x:auto"><svg id="fundingChart" viewBox="0 0 960 455" style="width:100%;min-width:580px" role="img" aria-label="Dollar swap balances and weekly changes by observation date"></svg></div>
@@ -2536,7 +2536,7 @@ function renderFunding(){
         const edit=document.createElement('button');edit.textContent='Edit';edit.onclick=()=>editFunding(r);if(r.reference)cell('Read-only');else cell('').appendChild(edit);
         [r.savedAt,r.observationDate,r.publishedAt||'Unverified · reference vintage',fundingNumber(r.balance),fundingNumber(fundingChange(r,records,time)),fundingNumber(r.testBalance),fundingNumber(r.testBalance===null?null:r.balance-r.testBalance),r.testBalance===null?'Unverified':'Evidence supplied'].forEach(cell);
         const sources=cell('');[r.source,r.testEvidence].filter(Boolean).forEach(url=>{const a=document.createElement('a');a.href=url;a.textContent=url===r.source?' Release ':' Tests ';a.target='_blank';a.rel='noopener';sources.appendChild(a);});cell(fundingNumber(sp500ForDate(r.observationDate)?.close));marketColumns.forEach(([key])=>cell(fundingNumber(marketForDate(key,r.observationDate)?.close)));body.appendChild(tr);
-    });document.getElementById('fundingAudit').textContent=JSON.stringify(records,null,2);renderFundingChart(time);
+    });renderFundingChart(time);
 }
 function renderFundingChart(time){
     const svg=document.getElementById('fundingChart');svg.replaceChildren();const {start,end}=chartWindow(document.getElementById('fundingRange').value||'3m',new Date(time));
