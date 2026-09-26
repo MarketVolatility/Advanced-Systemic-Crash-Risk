@@ -557,10 +557,10 @@ button.secondary {
 .overview-details>summary{cursor:pointer;font-weight:600;font-size:17px;padding:6px;line-height:1.5}
 .overview-details>summary:focus-visible{outline:2px solid #947454;outline-offset:4px}
 .overview-details[open]>summary{margin-bottom:18px}
-.overview-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}.overview-grid .control-panel{margin:0}
+.overview-grid{display:grid;grid-template-columns:1fr;gap:20px}.overview-grid .control-panel{margin:0}
 .overview-grid h3{margin-top:0}.overview-alert{padding:10px 0;border-bottom:1px solid var(--border);line-height:1.5}
 @media(max-width:700px){.overview-grid{grid-template-columns:1fr}.summary-grid{grid-template-columns:1fr}}
-</style></head>
+</style><style>.dashboard-nav a[aria-current="location"]{color:#facc15;background:#322d16}.free-key{color:#b5bd56}.summary-grid{grid-template-columns:1fr}</style></head>
 
 <body>
 
@@ -637,9 +637,7 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<nav class="dashboard-nav" aria-label="Dashboard sections">
-<a href="#dashboardOverview">Overview</a><a href="#dashboardUpdate">Update Data</a><a href="#dashboardHistory">History</a><a href="#historicalStudies">Examples of Past Crashes</a><a href="#dashboardMethodology">Methodology</a>
-</nav>
+<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a></nav>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
 <p class="table-note">A summary of the dashboard’s heuristic stress signals. The score is not a crash probability or confirmation of forced selling.</p>
 
@@ -663,6 +661,7 @@ button.secondary {
         </div>
     </div>
 
+</div>
     <details class="scale-card overview-details"><summary>Score bands and interpretation</summary>
         <div class="scale-title">
             📊 Systemic Risk Regime Matrix — Maximum 44 Points
@@ -720,13 +719,7 @@ button.secondary {
         </div>
     </details>
 
-</div>
-<div class="overview-grid"><section class="control-panel"><h3>Major score contributors</h3><div id="overviewContributors"></div><p class="table-note">Highest category contributions; missing inputs remain ranges.</p></section><section class="control-panel"><h3>Data freshness</h3><div id="overviewFreshness"></div><a href="#dashboardUpdate">Update data</a></section></div>
-<section class="control-panel"><h3>Current diagnostic alerts</h3><div id="overviewAlerts" aria-live="polite"></div><p class="table-note">Independent of the selected chart period. Diagnostic watches do not add to the 44-point score.</p><a href="#liquidityDiagnostics">Explore funding and leadership diagnostics</a></section>
-<details class="overview-details"><summary>Category breakdown and all risk factors</summary>
-<p class="table-note">Scoring v6.4 · Category limits remain 10 + 11 + 8 + 9 + 6 = 44. Narrow volatility curves, joint oil/yield pressure and conditional breadth deterioration are scored together. MOVE appears only in Volatility. These thresholds are heuristic, not optimized or validated crash probabilities. Historical graphs are recalculated using this same version.</p>
-<!-- REGIME SIGNALS -->
-
+<div class="overview-grid"><section class="control-panel"><h3>Data freshness</h3><div id="overviewFreshness"></div><a href="#dashboardUpdate">Update data</a></section></div>
 <div class="signal-grid">
 
     <div class="signal-card">
@@ -756,27 +749,7 @@ button.secondary {
 
 </div>
 
-<div class="data-table-scroll" tabindex="0" role="region" aria-label="Risk factors; scroll to review all rows">
-<table>
-
-<thead>
-<tr>
-    <th>Risk Factor</th>
-    <th>Current Reading</th>
-    <th>Status</th>
-    <th>Points</th>
-</tr>
-</thead>
-
-<tbody id="metricTableBody"></tbody>
-
-</table>
-</div>
-
-
-</details>
-<!-- QUICK PASTE -->
-<details class="overview-details dashboard-section"><summary>Update Data</summary>
+<details class="overview-details dashboard-section" id="compositeUpdatePanel" hidden><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
 <p class="table-note">Paste researched market values. Saved numbers can be edited in History. <a href="#fundingQuickHeading">Update dollar funding data</a>.</p>
 
@@ -786,7 +759,7 @@ button.secondary {
     ⚡ Quick Paste Update- copy and paste this to your AI
 </div>
 
-<div class="info-box" id="quickPastePrompt">
+<p class="table-note" id="compositeUpdateTime"></p><div class="info-box" id="quickPastePrompt">
     Generate a paste-ready line of exactly 35 comma-separated numeric values in the following order. Start with the latest completed trading session and the latest published FINRA debt month; if a series is delayed or inaccessible, follow the verified-data fallback rules below. For USDJPY momentum use (latest FX session close / close 3 FX trading sessions earlier − 1) × 100, from one consistent source. Use reported ^GSPC volume consistently; average the preceding 20 sessions excluding the current session. Debt changes compare the same series with 12 and 3 months earlier. Do not invent unavailable values, use the latest data:
     <br><br>
     <strong>
@@ -853,7 +826,33 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </div>
 
 </details>
-<details class="overview-details dashboard-section"><summary>History and risk charts</summary>
+<details class="overview-details"><summary>Risk Factors</summary>
+
+<!-- REGIME SIGNALS -->
+
+<div class="data-table-scroll" tabindex="0" role="region" aria-label="Risk factors; scroll to review all rows">
+<table>
+
+<thead>
+<tr>
+    <th>Risk Factor</th>
+    <th>Current Reading</th>
+    <th>Status</th>
+    <th>Points</th>
+</tr>
+</thead>
+
+<tbody id="metricTableBody"></tbody>
+
+</table>
+</div>
+
+
+</details>
+<details class="overview-details"><summary>Current Diagnostic Alerts</summary><section class="control-panel"><h3>Current diagnostic alerts</h3><div id="overviewAlerts" aria-live="polite"></div><p class="table-note">Independent of the selected chart period. Diagnostic watches do not add to the 44-point score.</p><a href="#liquidityDiagnostics">Explore funding and leadership diagnostics</a></section></details>
+
+<!-- QUICK PASTE -->
+<details class="overview-details dashboard-section"><summary>History and Risk Charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
 <p class="table-note">Review market entries and linked charts. <a href="#fundingHeading">Dollar funding history</a>.</p>
 <section class="control-panel" aria-labelledby="historyHeading">
@@ -933,18 +932,18 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 </details>
-<details class="overview-details dashboard-section"><summary>Forced selling and funding diagnostics</summary>
+<details class="overview-details dashboard-section"><summary>Forced Selling and Funding Diagnostics</summary>
 <h2 class="section-heading" id="forcedSellingHeading">Risk Factors for Force Selling</h2>
 <div id="forcedSelling"></div>
 <section class="control-panel" id="fundingPanel" aria-labelledby="fundingHeading">
 <h2 class="panel-title" id="fundingHeading">Dollar funding stress · diagnostic only</h2>
-<div class="funding-purpose"><p><strong>What this USD amount represents:</strong> SWPT measures the Federal Reserve’s aggregate outstanding US-dollar liquidity swaps with foreign central banks—a form of dollar lending through central-bank swap lines. Those central banks can lend the dollars onward to institutions in their jurisdictions and remain responsible for repayment to the Federal Reserve. The figure is the balance outstanding on each Wednesday, in <strong>USD millions</strong>, rather than the amount newly lent during that week.</p><p><strong>Whose account is it?</strong> This is an aggregate Federal Reserve balance-sheet item. <a href="https://www.federalreserve.gov/monetarypolicy/bst_liquidityswaps.htm" target="_blank" rel="noopener">Federal Reserve explanation of liquidity swaps</a>.</p><p>Tracking dollar funding stress can help identify <strong>institutional liquidity shortages</strong> that may increase the risk of asset sales and wider market disruption.</p><p>When short-term dollar borrowing becomes unavailable or expensive, institutions still facing margin calls or cash obligations may need to sell assets, draw reserves or obtain other funding.</p><ul><li><strong>Indiscriminate selling:</strong> Under severe funding pressure, investors may sell liquid holdings—including stocks, gold and corporate debt—because buyers are available, even when those assets’ fundamentals have not deteriorated.</li><li><strong>The signal:</strong> Funding indicators can flag conditions associated with forced selling. They do not establish that such selling or a crash is imminent; weekly swap balances also reflect liquidity support intended to ease pressure.</li></ul></div>
+<div class="funding-purpose"><p><strong>What this USD amount represents:</strong> SWPT measures the Federal Reserve’s aggregate outstanding US-dollar liquidity swaps with foreign central banks—a form of dollar lending through central-bank swap lines. Those central banks can lend the dollars onward to institutions in their jurisdictions and remain responsible for repayment to the Federal Reserve. The figure is the balance outstanding on each Wednesday, in <strong>USD millions</strong>, rather than the amount newly lent during that week.</p><p><strong>Whose account is it?</strong> This is an aggregate Federal Reserve balance-sheet item.</p><p>Tracking dollar funding stress can help identify <strong>institutional liquidity shortages</strong> that may increase the risk of asset sales and wider market disruption.</p><p>When short-term dollar borrowing becomes unavailable or expensive, institutions still facing margin calls or cash obligations may need to sell assets, draw reserves or obtain other funding.</p><ul><li><strong>Indiscriminate selling:</strong> Under severe funding pressure, investors may sell liquid holdings—including stocks, gold and corporate debt—because buyers are available, even when those assets’ fundamentals have not deteriorated.</li><li><strong>The signal:</strong> Funding indicators can flag conditions associated with forced selling. They do not establish that such selling or a crash is imminent; weekly swap balances also reflect liquidity support intended to ease pressure.</li></ul></div>
 <p class="table-note">Fed central-bank liquidity swaps (SWPT), USD millions. Weekly outstanding balances are not gross drawdowns or proof of yen-carry liquidation. No contribution to the 44-point score. White figures are informational, not a low-risk classification.</p>
 <p id="fundingSummary" role="status"></p>
 <h3>Current and past dollar funding entries</h3>
 <p class="table-note">Add a weekly release below or paste researched JSON. Edit a row to append a correction while retaining its original version. The red × deletes a release and its corrections after confirmation. Saved locally per account and included in the existing eight-minute sync and Sync now. Export before deleting if you need a permanent audit copy.</p>
 <div class="history-repair" aria-labelledby="fundingQuickHeading">
-<h3 id="fundingQuickHeading">Quick Paste Update · dollar funding</h3>
+<h3 id="fundingQuickHeading">Quick Paste Update · dollar funding</h3><p class="table-note" id="dollarUpdateTime"></p>
 <p class="table-note">Copy the prompt to your AI, paste its JSON response below, then select Fill entry boxes. Review the source and select Save funding entry to add it to history. This updates the dollar funding fields only.</p>
 <button type="button" onclick="generateFundingQuickPrompt()">Generate latest-data prompt</button> <button type="button" onclick="copyFundingQuickPrompt()">Copy prompt</button>
 <textarea id="fundingQuickPrompt" class="paste-box" rows="5" readonly aria-label="AI prompt for latest dollar funding release"></textarea>
@@ -971,17 +970,19 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note"><a href="https://fred.stlouisfed.org/series/SWPT" target="_blank" rel="noopener">Fed / FRED SWPT</a> · <a href="https://www.newyorkfed.org/markets/desk-operations/central-bank-liquidity-swap-operations" target="_blank" rel="noopener">NY Fed operations and tests</a>. Manual research/import is available now. Automatic source collection requires the separately documented server setup; account sync does not download market data.</p>
 </section>
 
+</details>
+<details class="overview-details dashboard-section"><summary>Commercial-Paper (CP) Funding Diagnostics</summary>
 <section class="control-panel" id="liquidityDiagnostics">
 <h2 class="panel-title">Funding spreads &amp; market leadership · diagnostic only</h2>
 <p class="table-note">Short-term funding costs and relative equity performance add context to the Credit and Equity regimes. They contribute no points to the 44-point score. White numbers are informational, not a low-risk label.</p>
 <p>Commercial-paper spreads compare 90-day AA financial and nonfinancial borrowing rates. A rising financial premium can suggest funding pressure, but a small difference can conceal stress affecting both groups. Spreads over 3-month Treasury bills provide a second reference; Treasury demand, issuer composition and liquidity also affect them. These are discount-basis yield differences, not FRA–OIS or pure default-risk measures.</p>
 <p class="table-note">Sources: <a href="https://fred.stlouisfed.org/series/DCPF3M">Financial CP</a> · <a href="https://fred.stlouisfed.org/series/DCPN3M">Nonfinancial CP</a> · <a href="https://fred.stlouisfed.org/series/DTB3">Treasury bills</a> · <a href="https://www.federalreserve.gov/releases/cp/about.htm">Federal Reserve methodology</a>. <span id="cpDownloadStatus">Embedded source downloaded September 25, 2026.</span> Same-date observations only; missing data stays missing. This downloaded vintage is retrospective and must not be treated as a point-in-time backtest. Quick Paste now includes the CP observation date and three rates. Saving a paste, editing history or loading account data refreshes these diagnostics automatically. Saved rates override embedded rates for their stated observation date; older pastes leave funding data unchanged. Account sync transfers saved inputs; it does not fetch market data.</p>
-<div class="fred-live-panel"><h3>Fetch latest FRED funding data</h3><p class="table-note">Fetch the latest published financial CP, nonfinancial CP and Treasury-bill rates. These are daily releases, not real-time quotes. The charts and diagnostic alerts update after a successful fetch.</p><div class="fred-key-row"><label for="fredApiKey">FRED API key <a href="https://fredaccount.stlouisfed.org/apikeys" target="_blank" rel="noopener noreferrer">(get a free key)</a></label><input id="fredApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your FRED API key" aria-label="FRED API key"><button type="button" onclick="saveFredKey()">Save key</button><button type="button" onclick="forgetFredKey()">Forget key</button><button type="button" id="fredFetchButton" onclick="fetchFredLiveData()">Fetch latest data</button></div><p class="table-note">Save key remembers it only on this browser for your account. Fetch sends it over HTTPS through your Supabase project to FRED. The connector does not store it, and account sync excludes it. Downloaded rates are cached and included in normal account sync; your manually saved rates retain precedence.</p><p id="fredFetchStatus" role="status" aria-live="polite" class="table-note">Paste your key to fetch. A one-time Supabase connector deployment is required.</p><details><summary>One-time FRED connector setup</summary><p>The site owner must deploy the supplied <strong>fred-cp</strong> Edge Function in Supabase project <strong>epwuciybscjrteteneur</strong>. Open <a href="https://supabase.com/dashboard/project/epwuciybscjrteteneur/functions" target="_blank" rel="noopener">Supabase Edge Functions</a>. The supplied setup guide explains deployment; keep user authentication enabled. This step is needed because FRED does not provide the browser-access headers used by this GitHub Pages app. No Python installation is needed for visitors.</p></details></div>
+<div class="fred-live-panel" id="cpUpdate"><p class="table-note" id="cpUpdateTime"></p><h3>Update CP Funding Data</h3><details id="cpPromptDetails"><summary>AI-assisted CP update</summary><p class="table-note">Copy the prompt, research the four values, then paste them below. Applying saves a new dashboard entry with only its CP fields replaced.</p><button type="button" onclick="copyCpPrompt()">Copy CP prompt</button><textarea id="cpAiPrompt" class="paste-box" readonly aria-label="CP research prompt"></textarea><textarea id="cpAiResponse" class="paste-box" aria-label="CP response" placeholder="YYYYMMDD,financial CP %,nonfinancial CP %,Treasury bill %"></textarea><button type="button" onclick="applyCpResponse()">Apply CP update</button><p id="cpAiStatus" role="status"></p></details><h3>Fetch latest FRED funding data</h3><p class="table-note">Fetch the latest published financial CP, nonfinancial CP and Treasury-bill rates. These are daily releases, not real-time quotes. The charts and diagnostic alerts update after a successful fetch.</p><div class="fred-key-row"><label for="fredApiKey">FRED API key <a href="https://fredaccount.stlouisfed.org/apikeys" target="_blank" rel="noopener noreferrer"><span class="free-key">(get a free key)</span></a></label><input id="fredApiKey" type="password" autocomplete="off" spellcheck="false" placeholder="Paste your FRED API key" aria-label="FRED API key"><button type="button" onclick="saveFredKey()">Save key</button><button type="button" onclick="forgetFredKey()">Forget key</button><button type="button" id="fredFetchButton" onclick="fetchFredLiveData()">Fetch latest data</button></div><p class="table-note">Save key remembers it only on this browser for your account. Fetch sends it over HTTPS through your Supabase project to FRED. The connector does not store it, and account sync excludes it. Downloaded rates are cached and included in normal account sync; your manually saved rates retain precedence.</p><p id="fredFetchStatus" role="status" aria-live="polite" class="table-note">Paste your key to fetch. A one-time Supabase connector deployment is required.</p><details><summary>One-time FRED connector setup</summary><p>The site owner must deploy the supplied <strong>fred-cp</strong> Edge Function in Supabase project <strong>epwuciybscjrteteneur</strong>. Open <a href="https://supabase.com/dashboard/project/epwuciybscjrteteneur/functions" target="_blank" rel="noopener">Supabase Edge Functions</a>. The supplied setup guide explains deployment; keep user authentication enabled. This step is needed because FRED does not provide the browser-access headers used by this GitHub Pages app. No Python installation is needed for visitors.</p></details></div>
 <label for="liquidityPeriod">Period </label><select id="liquidityPeriod" onchange="renderLiquidityDiagnostics()" style="padding:8px;background:#1e293b;color:white"><option value="current">Current chart window</option><option value="2020">February–April 2020</option><option value="2008">August–October 2008</option><option value="2000">February–April 2000</option></select>
 <p id="liquiditySummary" class="table-note"></p>
 <div class="indicator-intro"><p><strong>Debt and cash-flow checks:</strong> Commercial paper is short-term borrowing used by financial firms and other large companies to meet funding needs. The first three alerts compare those borrowing costs with each other and with US Treasury bills. Rising premiums can indicate funding pressure; a disruption can affect refinancing and markets, but does not by itself establish that a systemic crash will follow.</p></div>
 <div id="liquidityAlerts" class="info-box" role="status" aria-live="polite"></div>
-<details><summary>Watch-alert rules and available-data exceptions · no score contribution</summary><p>Funding: a spread is positive, at or above its preceding-year 90th percentile, and rising versus the last valid observation. Leadership: 20-session relative momentum is negative, at or below its preceding-year 10th percentile, and falling versus the last valid observation. The current observation is excluded from its percentile baseline; the nearest-rank method is used.</p><p>Use the observations available: 60 prior observations and a comparison within seven calendar days are preferences, not requirements. Smaller samples, longer gaps, skipped leadership observations and data older than seven days are explicitly noted beside each result. If no prior-year comparison exists, use available history up to five years and label the fallback. With no earlier valid observation, assessment remains unavailable. No missing values are invented.</p><p>Amber means an exploratory watch, not a calibrated crash probability. Exceptions apply to both watch and no-watch results; a limited-data result does not establish safety. Stale observations describe their stated date, not current conditions. Historical studies use the downloaded vintage and are not point-in-time backtests. Alerts update on this page; no email or push notifications are sent.</p></details>
+
 <label for="liquidityRange">Current time range </label><select id="liquidityRange" onchange="setAllChartRanges(this.value)"><option value="1w">1 week</option><option value="1m">1 month</option><option value="3m">3 months</option><option value="6m">6 months</option><option value="9m" selected>9 months</option><option value="1y">1 year</option><option value="2y">2 years</option><option value="3y">3 years</option><option value="4y">4 years</option><option value="5y">5 years</option></select>
 <p class="table-note">This selector follows the other current charts. Historical study periods keep their fixed dates. Each graph shows one diagnostic plus S&amp;P 500 (green), Nasdaq Composite (purple dashed) and Nasdaq 100 (gold dotted). Equity indexes share the right-hand scale, rebased to 100 on the first common session; diagnostic values use the left-hand scale.</p>
 <h3>Financial minus nonfinancial CP · basis points</h3><p class="indicator-intro">Compares 90-day AA borrowing rates for financial firms, including banks, with those for nonfinancial companies. A widening positive spread means financial firms face a larger borrowing premium relative to the corporate comparison group.</p><p class="table-note">Blue line · Relative funding cost of AA financial issuers versus AA nonfinancial issuers.</p>
@@ -994,20 +995,20 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">100 × [(Nasdaq 100 / S&amp;P 500) today ÷ the ratio 20 equity sessions earlier − 1]. Positive means Nasdaq 100 outperformance; negative means underperformance. This measures market leadership, not a pure technology/value rotation, fund flows or forced selling. Uses price indexes, excluding dividends, and requires all 21 sessions to be present. Quick Paste equity closes feed the calculation. After the embedded calendar ends, missing weekday observations—including unconfirmed holidays—keep the result unavailable rather than shortening the 20-session window.</p>
 <div style="overflow-x:auto"><svg id="rotationDiagnosticChart" viewBox="0 0 960 380" style="width:100%;min-width:580px" role="img" aria-label="Nasdaq 100 relative momentum"></svg></div>
 <div class="data-table-scroll" tabindex="0"><table class="history-table"><thead><tr><th>Date</th><th>Financial CP %</th><th>Nonfinancial CP %</th><th>Treasury bill %</th><th>Financial − nonfinancial bp</th><th>Financial − Treasury bp</th><th>Nonfinancial − Treasury bp</th><th>Nasdaq 100 / S&amp;P 500 20-session %</th><th>S&amp;P 500 close</th><th>Nasdaq Composite close</th><th>Nasdaq 100 close</th></tr></thead><tbody id="liquidityDiagnosticRows"></tbody></table></div>
-<details><summary>Why these diagnostics do not add risk points</summary><ul>
+</section>
+
+</details>
+<details class="overview-details dashboard-section"><summary>Examples of Past Crashes</summary>
+<div id="historicalStudies" tabindex="-1"></div>
+</details>
+<details class="overview-details dashboard-section"><summary>Methodology and Indicators</summary>
+<h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2><section class="control-panel"><h3>Composite scoring framework</h3><p class="table-note">Scoring v6.4 · Category limits remain 10 + 11 + 8 + 9 + 6 = 44. Narrow volatility curves, joint oil/yield pressure and conditional breadth deterioration are scored together. MOVE appears only in Volatility. These thresholds are heuristic, not optimized or validated crash probabilities. Historical graphs are recalculated using this same version.</p><h3>Diagnostic watch methodology</h3><details><summary>Watch-alert rules and available-data exceptions · no score contribution</summary><p>Funding: a spread is positive, at or above its preceding-year 90th percentile, and rising versus the last valid observation. Leadership: 20-session relative momentum is negative, at or below its preceding-year 10th percentile, and falling versus the last valid observation. The current observation is excluded from its percentile baseline; the nearest-rank method is used.</p><p>Use the observations available: 60 prior observations and a comparison within seven calendar days are preferences, not requirements. Smaller samples, longer gaps, skipped leadership observations and data older than seven days are explicitly noted beside each result. If no prior-year comparison exists, use available history up to five years and label the fallback. With no earlier valid observation, assessment remains unavailable. No missing values are invented.</p><p>Amber means an exploratory watch, not a calibrated crash probability. Exceptions apply to both watch and no-watch results; a limited-data result does not establish safety. Stale observations describe their stated date, not current conditions. Historical studies use the downloaded vintage and are not point-in-time backtests. Alerts update on this page; no email or push notifications are sent.</p></details><h3>Current diagnostic assessment exceptions</h3><div id="diagnosticExceptions"></div><h3>Scoring exclusions</h3><details><summary>Why these diagnostics do not add risk points</summary><ul>
 <li>FRA–OIS was tied to unsecured LIBOR funding. <a href="https://www.newyorkfed.org/rruc/libor-transition-background">The transition to secured SOFR</a> changes that interpretation; the proposed legacy thresholds cannot simply be reused.</li>
 <li>An advance–decline line can complement existing breadth. It needs a consistent stock universe and complete advances/declines history. A NYSE-wide line compared with the S&amp;P 500 mixes universes. The proposed divergence rule remains a candidate for testing, not an implemented score.</li>
 <li>XLK/BRK.B includes single-company effects; XLY is consumer discretionary, not a value or defensive index. The relative-index diagnostic above is explicitly labelled market leadership.</li>
 <li>Cross-asset correlation should use synchronized returns over a specified window, not price levels. Joint declines do not identify their cause. </li>
 <li>Extra scoring requires historical publication vintages, missing-data rules, independent validation and checks for double-counting existing credit, breadth and volume inputs.</li>
 </ul></details></section>
-
-</details>
-<details class="overview-details dashboard-section"><summary>Examples of Past Crashes</summary>
-<div id="historicalStudies" tabindex="-1"></div>
-</details>
-<details class="overview-details dashboard-section"><summary>Methodology and indicator explanations</summary>
-<h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2>
 <section class="control-panel" aria-labelledby="glossaryHeading">
 <h2 class="panel-title" id="glossaryHeading">Indicator explanations</h2>
 <p class="table-note">D means trading days; DMA means daily moving average; bp means basis points (100 bp = 1 percentage point); pp means percentage points.</p>
@@ -1817,24 +1818,39 @@ function getStatus(points,maxPoints){
    ========================================================= */
 
 function renderOpeningOverview(){
-    const host=document.getElementById('overviewContributors');if(!host)return;
-    const today=localCalendarDate(new Date()),day=currentEntryTime?localCalendarDate(new Date(currentEntryTime)):today;
-    const names=['Volatility','Credit','Macro shock','Equity structure','Forced selling'];
-    const ranked=Object.values(regimeCharts).map((c,i)=>({name:names[i],max:c.maximum,...(c.forced?forcedCategoryRange(currentData,day):historicalScoreRange(currentData,c.keys,day))})).sort((a,b)=>b.low-a.low||b.high-a.high);
-    host.innerHTML=ranked.slice(0,3).map(r=>'<p><strong>'+r.name+'</strong> · '+r.low+(r.high!==r.low?'–'+r.high:'')+' / '+r.max+'</p>').join('');
+    const today=localCalendarDate(new Date());
     const cp=liquidityHistoryRows(),rotation=relativeMomentumRows(),latest=cp.filter(r=>r.date<=today&&Number.isFinite(r.sector)).at(-1);
     const freshness=document.getElementById('overviewFreshness');
     freshness.textContent=(currentEntryTime?'Current entry: '+new Date(currentEntryTime).toLocaleString()+'. Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.':'Sample values — no saved current entry. Update data before interpreting this score.')+' '+(latest?'Latest paired CP observation: '+latest.date+'. ':'No paired CP observations. ')+(fredLiveData?'FRED fetched: '+new Date(fredLiveData.fetchedAt).toLocaleString()+'.':'CP data uses embedded history or saved inputs; no live FRED download loaded.');
     const alerts=document.getElementById('overviewAlerts');alerts.replaceChildren();
+    const exceptions=document.getElementById('diagnosticExceptions');exceptions.replaceChildren();
+    document.getElementById('compositeUpdateTime').textContent=currentEntryTime?'Current entry saved at: '+new Date(currentEntryTime).toLocaleString():'Last update: none — sample values.';
+    document.getElementById('cpUpdateTime').textContent=fredLiveData?'Last FRED fetch: '+new Date(fredLiveData.fetchedAt).toLocaleString():'Last FRED fetch: not recorded on this account.';
+    const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);document.getElementById('dollarUpdateTime').textContent=saved?'Last saved update: '+new Date(saved).toLocaleString():'Last saved update: none — embedded reference history only.';
     [['sector','Financial vs nonfinancial CP',cp,'high'],['financialBill','Financial CP vs Treasury bills',cp,'high'],['nonfinancialBill','Nonfinancial CP vs Treasury bills',cp,'high'],['momentum','Nasdaq leadership',rotation,'low']].forEach(([key,label,rows,direction])=>{
         const r=diagnosticWatch(rows,key,today,direction),p=document.createElement('p');p.className='overview-alert'+(r.state==='watch'?' history-amber':'');
-        p.textContent=label+': '+(r.state==='watch'?'WATCH':r.state==='not-triggered'?'No watch triggered — not a low-risk assurance':'Unavailable')+(r.date?' · '+r.date:'')+(r.reason?' · '+r.reason:'')+(r.exceptions?.length?' · '+r.exceptions.join('; '):'');alerts.appendChild(p);
+        p.textContent=label+': '+(r.state==='watch'?'WATCH':r.state==='not-triggered'?'No watch triggered — not a low-risk assurance':'Unavailable')+(r.date?' · '+r.date:'')+(r.reason?' · '+r.reason:'');alerts.appendChild(p);
+        const note=document.createElement('p');note.textContent=label+': '+(r.exceptions?.length?r.exceptions.join('; '):'No available-data exceptions.')+(r.date?' · '+r.date:'');exceptions.appendChild(note);
     });
 }
+function generateCpPrompt(){
+    document.getElementById('cpAiPrompt').value='Research the latest common observation date available as of '+new Date().toISOString()+' for FRED DCPF3M (90-day AA financial CP), DCPN3M (90-day AA nonfinancial CP), and DTB3 (3-month Treasury bills). Use https://fred.stlouisfed.org/series/DCPF3M , https://fred.stlouisfed.org/series/DCPN3M and https://fred.stlouisfed.org/series/DTB3 . Return exactly four comma-separated numbers: YYYYMMDD, financial CP rate in percent, nonfinancial CP rate in percent, Treasury bill rate in percent. All rates must share that date. Use an older verified common date if necessary, never fill missing rates or mix dates. If any cannot be verified, explain instead of inventing numbers.';
+}
+async function copyCpPrompt(){generateCpPrompt();try{await navigator.clipboard.writeText(document.getElementById('cpAiPrompt').value);document.getElementById('cpAiStatus').textContent='Prompt copied.';}catch{document.getElementById('cpAiPrompt').select();document.getElementById('cpAiStatus').textContent='Select and copy the prompt manually.';}}
+function applyCpResponse(){
+    if(!historyOwner||!currentEntryTime){document.getElementById("cpAiStatus").textContent="Sign in and save a researched composite entry first, or use Fetch latest data to update CP history independently.";return;}
+    const raw=document.getElementById('cpAiResponse').value.trim().split(',');const nums=raw.map(x=>Number(x.trim()));
+    if(raw.length!==4||raw.some(x=>!x.trim())||!nums.every(Number.isFinite)){document.getElementById('cpAiStatus').textContent='Use exactly four numeric fields: date and three rates.';return;}
+    const values={...currentData,cp_date:nums[0],cp_financial:nums[1],cp_nonfinancial:nums[2],cp_treasury:nums[3]};const error=validateLiquidityInputs(values);
+    if(error){document.getElementById('cpAiStatus').textContent=error;return;}const inputError=validateForcedInputs(values);if(inputError){document.getElementById('cpAiStatus').textContent=inputError;return;}commitEntry(values);document.getElementById('cpAiStatus').textContent='CP rates saved; other dashboard inputs retained.';
+}
 function revealDashboardTarget(){
-    const id=decodeURIComponent(location.hash.slice(1));if(!id)return;
+    const id=decodeURIComponent(location.hash.slice(1))||'dashboardOverview';
     const target=document.getElementById(id);if(!target)return;
-    let node=target.parentElement;while(node){if(node.tagName==='DETAILS')node.open=true;node=node.parentElement;}
+    let node=target.parentElement;while(node){if(node.tagName==='DETAILS'){node.hidden=false;node.open=true;}node=node.parentElement;}
+    document.querySelectorAll('.dashboard-nav a').forEach(a=>{if(a.getAttribute('href')==='#'+id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});
+    if(id==='fundingQuickHeading')generateFundingQuickPrompt();
+    if(id==='cpUpdate'){generateCpPrompt();document.getElementById('cpPromptDetails').open=true;}
     target.scrollIntoView({block:'start'});
 }
 document.addEventListener('DOMContentLoaded',()=>{
@@ -2451,6 +2467,7 @@ function exportFunding(){const a=document.createElement('a'),url=URL.createObjec
 function fundingPrompt(){document.getElementById('fundingPrompt').value='Research Fed SWPT weekly dollar liquidity swap balances for the past year through today. Return ONLY a JSON array with observationDate (YYYY-MM-DD), publishedAt (exact first-publication timestamp with timezone), balance (USD millions), testBalance (USD millions or null), testEvidence (official URL or empty string), source (official release URL). Preserve separate revisions with their actual publication times. Use original Fed H.4.1 releases or ALFRED vintages and NY Fed operation results. Never use an observation date as a publication date. If exact availability cannot be verified, omit that release and explain outside the JSON. testBalance must include only explicitly identified operational-test transactions outstanding on the observation date, using settlement and maturity dates. Use null unless full reconciliation, including a verified zero, is possible. Do not infer tests from transaction size, invent values, or return risk scores. Review sources before importing.';}
 async function copyFundingPrompt(){try{if(!document.getElementById('fundingPrompt').value)fundingPrompt();await navigator.clipboard.writeText(document.getElementById('fundingPrompt').value);document.getElementById('fundingStatus').textContent='Prompt copied.';}catch{document.getElementById('fundingStatus').textContent='Select and copy the prompt manually; clipboard access is unavailable.';}}
 function renderFunding(){
+    const lastSaved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);const stamp=document.getElementById("dollarUpdateTime");if(stamp)stamp.textContent=lastSaved?"Last saved update: "+new Date(lastSaved).toLocaleString():"Last saved update: none — embedded reference history only.";
     const body=document.getElementById('fundingRows');if(!body)return;
     const fieldHost=document.getElementById('fundingFields');if(!fieldHost.children.length)fundingFields.forEach(([k,label,type])=>{const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.id='funding_'+k;input.type=type;if(type==='number'){input.min='0';input.step='any';}l.appendChild(input);fieldHost.appendChild(l);});
     const time=Date.now();
@@ -2564,7 +2581,7 @@ function renderDiagnosticAlerts(cp,rotation,end,historical){
     const heading=document.createElement('strong');heading.textContent=historical?'Watch conditions at study end · retrospective':'Current diagnostic watch alerts';host.appendChild(heading);
     definitions.forEach(([key,label,unit,direction,rows])=>{const result=diagnosticWatch(rows,key,end,direction),p=document.createElement('p');p.className=result.state==='watch'?'history-amber':'table-note';p.style.margin='8px 0';
         const latestValid=rows.filter(r=>r.date<=end&&Number.isFinite(r[key])).at(-1);const fiveYearCount=latestValid?rows.filter(r=>r.date<latestValid.date&&Date.parse(r.date)>=Date.parse(latestValid.date)-5*365.25*86400000&&Number.isFinite(r[key])).length:0;
-        p.textContent=label+': '+(result.state==='watch'?'WATCH — '+result.value.toFixed(2)+' '+unit+' on '+result.date+'; '+(direction==='high'?'at or above the 90th-percentile boundary and rising':'at or below the 10th-percentile boundary and falling')+' (boundary '+result.threshold.toFixed(2)+' '+unit+', '+result.count+' prior observations).':result.state==='not-triggered'?'No watch condition triggered on '+result.date+'; this does not establish low risk.':result.reason+(result.date?' ('+result.date+')':'')+'; alert unavailable.')+' Five-year context: '+fiveYearCount+' valid prior observations; '+(result.baselineDays===1827?'five-year fallback baseline used.':'alert baseline is the preceding year.')+(result.exceptions?.length?' Exceptions: '+result.exceptions.join('; ')+'.':'');host.appendChild(p);
+        p.textContent=label+': '+(result.state==='watch'?'WATCH — '+result.value.toFixed(2)+' '+unit+' on '+result.date+'; '+(direction==='high'?'at or above the 90th-percentile boundary and rising':'at or below the 10th-percentile boundary and falling')+' (boundary '+result.threshold.toFixed(2)+' '+unit+', '+result.count+' prior observations).':result.state==='not-triggered'?'No watch condition triggered on '+result.date+'; this does not establish low risk.':result.reason+(result.date?' ('+result.date+')':'')+'; alert unavailable.')+' Five-year context: '+fiveYearCount+' valid prior observations; '+(result.baselineDays===1827?'five-year fallback baseline used.':'alert baseline is the preceding year.')+(result.exceptions?.length?' Assessment exceptions are listed in Methodology.':'');host.appendChild(p);
     });
 }
 function renderLiquidityDiagnostics(){
