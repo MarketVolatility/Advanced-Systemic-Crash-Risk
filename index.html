@@ -640,7 +640,7 @@ button.secondary {
 <strong id="disclaimerTitle">⚠ Not financial advice.</strong>
 <ul>
 <li>This dashboard is an educational market-monitoring tool, not professional investment research or a recommendation to buy or sell.</li>
-<li>Data may come from FRED downloads, historical sources, manual entries or AI-assisted research. Figures can be delayed, incomplete or drawn from different observation dates.</li>
+<li>Data may come from FRED downloads, historical sources, manual entries or AI-assisted research. Figures can be delayed, incomplete or drawn from different observation dates. Local update times record saves or checks, not market observation times.</li>
 <li>The 44-point score, risk colours and diagnostic alerts use heuristic rules. They are not calibrated crash probabilities and do not confirm forced selling or guarantee safety.</li>
 <li>Verify all figures, dates and sources independently before making investment decisions.</li>
 </ul>
@@ -717,7 +717,7 @@ button.secondary {
 
 </div>
 
-    <details class="scale-card overview-details"><summary>Score Bands</summary>
+    <details class="scale-card overview-details" name="dashboard-panels"><summary>Score Bands</summary>
         <div class="scale-title">
             📊 Systemic Risk Regime Matrix — Maximum 44 Points
         </div>
@@ -775,7 +775,7 @@ button.secondary {
     </details>
 
 
-<details class="overview-details"><summary>Risk Factors</summary>
+<details class="overview-details" name="dashboard-panels"><summary>Risk Factors</summary>
 
 <!-- REGIME SIGNALS -->
 
@@ -798,7 +798,7 @@ button.secondary {
 
 
 </details>
-<details class="overview-details dashboard-section" id="compositeUpdatePanel" hidden><summary>Update Data</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels" id="compositeUpdatePanel" hidden><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
 <p class="table-note">Paste researched market values. Saved numbers can be edited in History. <a href="#fundingQuickHeading">Update dollar funding data</a>.</p>
 
@@ -879,7 +879,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 
 <!-- QUICK PASTE -->
-<details class="overview-details dashboard-section"><summary>History and Risk Charts</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>History and Risk Charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
 <p class="table-note">Review market entries and linked charts. <a href="#fundingHeading">Dollar funding history</a>.</p>
 <section class="control-panel" aria-labelledby="historyHeading">
@@ -959,7 +959,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 </details>
-<details class="overview-details dashboard-section"><summary>Forced Selling and Funding Diagnostics</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>Forced Selling and Funding Diagnostics</summary>
 <h2 class="section-heading" id="forcedSellingHeading">Risk Factors for Force Selling</h2>
 <div id="forcedSelling"></div>
 <section class="control-panel" id="fundingPanel" aria-labelledby="fundingHeading">
@@ -998,7 +998,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 </details>
-<details class="overview-details dashboard-section"><summary>Commercial-Paper (CP) Funding Diagnostics</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>Commercial-Paper (CP) Funding Diagnostics</summary>
 <section class="control-panel" id="liquidityDiagnostics">
 <h2 class="panel-title">Funding spreads &amp; market leadership · diagnostic only</h2><h3>CP Diagnostic Alerts</h3><div id="overviewAlerts" aria-live="polite"></div>
 <p class="table-note">Short-term funding costs and relative equity performance add context to the Credit and Equity regimes. They contribute no points to the 44-point score. White numbers are informational, not a low-risk label.</p>
@@ -1025,10 +1025,10 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 </details>
-<details class="overview-details dashboard-section"><summary>Examples of Past Crashes</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>Examples of Past Crashes</summary>
 <div id="historicalStudies" tabindex="-1"></div>
 </details>
-<details class="overview-details dashboard-section"><summary>Methodology and Indicators</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>Methodology and Indicators</summary>
 <div id="dashboardMethodology" tabindex="-1"></div><section class="control-panel" aria-labelledby="glossaryHeading">
 <h2 class="panel-title" id="glossaryHeading">Indicators Explained</h2>
 <p class="table-note">D means trading days; DMA means daily moving average; bp means basis points (100 bp = 1 percentage point); pp means percentage points.</p>
@@ -1132,7 +1132,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 </details>
 
-<section class="control-panel methodology-note"><h3>Data timestamps and freshness</h3><p>Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.</p><p>Update times use your browser’s local time zone. The CP observation date identifies the rate observation; its checked time is the latest successful FRED fetch or validated CP paste update. Re-entering the same verified rates refreshes this check time without changing their observation date. An unavailable timestamp is shown as not recorded, rather than inferred from opening this page.</p></section>
+<footer class="dashboard-disclaimer copyright-notice">© 2026 Advanced Systemic Crash Risk Dashboard. All rights reserved. Third-party data belongs to its respective owners.</footer>
 
 </div>
 </div>
@@ -1882,9 +1882,24 @@ function applyCpResponse(){
     const values={...currentData,cp_date:nums[0],cp_financial:nums[1],cp_nonfinancial:nums[2],cp_treasury:nums[3]};const error=validateLiquidityInputs(values);
     if(error){document.getElementById('cpAiStatus').textContent=error;return;}const inputError=validateForcedInputs(values);if(inputError){document.getElementById('cpAiStatus').textContent=inputError;return;}commitEntry(values);document.getElementById('cpAiStatus').textContent='CP rates saved and check time refreshed; the observation date changes only when newer common-date rates are supplied.';
 }
+function closeOtherDashboardPanels(selected){
+    document.querySelectorAll('details.overview-details').forEach(panel=>{if(panel!==selected)panel.open=false;});
+}
+function handleDashboardToggle(event){
+    const panel=event.target;
+    if(panel.tagName!=='DETAILS'||!panel.open)return;
+    if(panel.classList.contains('overview-details'))closeOtherDashboardPanels(panel);
+    else {
+        // Keep ancestors open; only sibling disclosures compete within a section.
+        const siblings=panel.parentElement?.children||[];
+        for(const sibling of siblings)if(sibling!==panel&&sibling.tagName==='DETAILS')sibling.open=false;
+    }
+}
 function revealDashboardTarget(){
     const id=decodeURIComponent(location.hash.slice(1))||'dashboardOverview';
     const target=document.getElementById(id);if(!target)return;
+    const selected=target.closest?target.closest('details.overview-details'):null;
+    closeOtherDashboardPanels(selected);
     let node=target.parentElement;while(node){if(node.tagName==='DETAILS'){node.hidden=false;node.open=true;}node=node.parentElement;}
     document.querySelectorAll('.dashboard-nav a').forEach(a=>{if(a.getAttribute('href')==='#'+id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});
     if(id==='fundingQuickHeading')generateFundingQuickPrompt();
@@ -1892,6 +1907,7 @@ function revealDashboardTarget(){
     target.scrollIntoView({block:'start'});
 }
 document.addEventListener('DOMContentLoaded',()=>{
+    document.addEventListener('toggle',handleDashboardToggle,true);
     window.addEventListener('hashchange',revealDashboardTarget);
     document.querySelectorAll('#appShell a[href^="#"]').forEach(a=>a.addEventListener('click',()=>setTimeout(revealDashboardTarget,0)));
     revealDashboardTarget();
