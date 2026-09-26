@@ -571,6 +571,10 @@ button.secondary {
 .dashboard-section:has(#dashboardMethodology) li{margin:8px 0}
 .dashboard-section:has(#dashboardMethodology) table{font-size:13px;line-height:1.6}
 @media(max-width:600px){.dashboard-section:has(#dashboardMethodology) .control-panel{padding:16px}.freshness-strip{padding:10px;font-size:11px}}
+</style><style>
+.dashboard-disclaimer{color:#a9cfff;background:#101d31;border:1px solid #304966;border-radius:10px;padding:16px 20px;margin:0 0 24px;font-size:13px;line-height:1.65}
+.dashboard-disclaimer strong{color:#b8d9ff;font-size:14px}.dashboard-disclaimer ul{margin:8px 0 0;padding-left:20px}.dashboard-disclaimer li{margin:5px 0}
+.methodology-note{color:#cbd5e1;font-size:14px;line-height:1.7}.methodology-note h3{font-size:17px;color:#dbe2ec}
 </style></head>
 
 <body>
@@ -631,6 +635,16 @@ button.secondary {
 
 <div id="appShell">
 <div class="container">
+
+<aside class="dashboard-disclaimer" aria-labelledby="disclaimerTitle">
+<strong id="disclaimerTitle">⚠ Not financial advice.</strong>
+<ul>
+<li>This dashboard is an educational market-monitoring tool, not professional investment research or a recommendation to buy or sell.</li>
+<li>Data may come from FRED downloads, historical sources, manual entries or AI-assisted research. Figures can be delayed, incomplete or drawn from different observation dates.</li>
+<li>The 44-point score, risk colours and diagnostic alerts use heuristic rules. They are not calibrated crash probabilities and do not confirm forced selling or guarantee safety.</li>
+<li>Verify all figures, dates and sources independently before making investment decisions.</li>
+</ul>
+</aside>
 
 <header>
     <div>
@@ -1014,7 +1028,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <div id="historicalStudies" tabindex="-1"></div>
 </details>
 <details class="overview-details dashboard-section"><summary>Methodology and Indicators</summary>
-<h2 class="section-heading" id="dashboardMethodology" tabindex="-1">Methodology</h2><section class="control-panel" aria-labelledby="glossaryHeading">
+<div id="dashboardMethodology" tabindex="-1"></div><section class="control-panel" aria-labelledby="glossaryHeading">
 <h2 class="panel-title" id="glossaryHeading">Indicators Explained</h2>
 <p class="table-note">D means trading days; DMA means daily moving average; bp means basis points (100 bp = 1 percentage point); pp means percentage points.</p>
 <div class="data-table-scroll" tabindex="0" role="region" aria-label="Indicator explanations">
@@ -1023,7 +1037,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">S&amp;P 500 close: the closing level of the S&amp;P 500 price index; shown for comparison and excluded from the risk score. Context: <a href="https://www.cboe.com/tradable_products/vix/term_structure">Cboe implied-volatility term structure</a> · <a href="https://www.federalreserve.gov/faqs/money_12856.htm">Federal Reserve: borrowing costs and economic activity</a>. Reference definitions: <a href="https://www.cboe.com/tradable_products/vix/term_structure">Cboe volatility indices</a> · <a href="https://developer.ice.com/fixed-income-data-services/catalog/ice-data-indices-move-index">ICE MOVE</a> · <a href="https://www.ice.com/publicdocs/data/Bond_Index_Methodologies.pdf">ICE bond methodology</a>. Risk colors follow this dashboard’s existing scoring rules.</p>
 </section>
 
-<section class="control-panel methodology-note"><h3>Data timestamps and freshness</h3><p>Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.</p><p>Update times use your browser’s local time zone. The CP observation date identifies the rate observation; its checked time is the recorded FRED fetch time. An unavailable timestamp is shown as not recorded, rather than inferred from opening this page.</p></section>
+
 <section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
 <h2 class="panel-title" id="systemicRiskReferenceHeading">Advanced Systemic Crash Risk Dashboard Explained</h2>
 <p class="table-note">Explanatory reference. The illustrative thresholds below do not replace the dashboard’s scoring rules in the Risk Factor Table.</p>
@@ -1116,6 +1130,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </tbody><tfoot><tr><th scope="row" colspan="4">Total Forced Selling category maximum</th><td><strong>6 points</strong></td></tr></tfoot></table></div>
 </section>
 </details>
+
+<section class="control-panel methodology-note"><h3>Data timestamps and freshness</h3><p>Entry time is not a verified market observation time. Individual indicator dates are not recorded; freshness is unverified and inputs may mix dates.</p><p>Update times use your browser’s local time zone. The CP observation date identifies the rate observation; its checked time is the latest successful FRED fetch or validated CP paste update. Re-entering the same verified rates refreshes this check time without changing their observation date. An unavailable timestamp is shown as not recorded, rather than inferred from opening this page.</p></section>
 
 </div>
 </div>
@@ -1557,11 +1573,11 @@ function loadEntryHistory(userId){
     } catch(error){ historyStorageError = 'Saved history could not be loaded. New entries will remain in memory until browser storage is available.'; }
     
 }
-function saveEntry(observationDate=null){
+function saveEntry(observationDate=null,cpCheckedAt=null){
     historyPreviewHidden = false;
     if(!historyOwner || !validSnapshot(currentData)) return;
     currentEntryTime = observationDate ? new Date(observationDate+'T12:00:00').toISOString() : new Date().toISOString();
-    entryHistory.unshift({savedAt:currentEntryTime, values:{...currentData}});
+    entryHistory.unshift({savedAt:currentEntryTime, values:{...currentData},...(cpCheckedAt?{cpCheckedAt}: {})});
     try { localStorage.setItem(historyKey(),JSON.stringify(entryHistory)); historyStorageError = ''; }
     catch(error){ historyStorageError = 'This update is visible but could not be saved to browser storage. Keep this page open to retain it.'; }
 }
@@ -1829,11 +1845,16 @@ function displayUpdateTime(value){
     return pad(d.getDate())+'/'+pad(d.getMonth()+1)+'/'+d.getFullYear()+', '+(d.getHours()%12||12)+':'+pad(d.getMinutes())+':'+pad(d.getSeconds())+' '+(d.getHours()<12?'AM':'PM');
 }
 function displayObservationDate(value){return /^\d{4}-\d{2}-\d{2}$/.test(value||'')?value.slice(8,10)+'/'+value.slice(5,7)+'/'+value.slice(0,4):'Not available';}
+function latestCpCheckTime(){
+    // Entry timestamps may be edited; only explicit successful CP checks count.
+    const times=[fredLiveData?.fetchedAt,...entryHistory.map(r=>r.cpCheckedAt)].filter(t=>t&&Number.isFinite(Date.parse(t)));
+    return times.sort((a,b)=>Date.parse(a)-Date.parse(b)).at(-1);
+}
 function renderFreshness(){
     const host=document.getElementById('overviewFreshness');if(!host)return;
     const today=localCalendarDate(new Date()),latest=liquidityHistoryRows().filter(r=>r.date<=today&&Number.isFinite(r.sector)).at(-1);
     const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);
-    const lines=['Last Composite Risk Score Update: '+displayUpdateTime(currentEntryTime),'Last paired CP observation: '+displayObservationDate(latest?.date)+', checked on '+displayUpdateTime(fredLiveData?.fetchedAt),'Last dollar funding update: '+displayUpdateTime(saved)];
+    const lines=['Last Composite Risk Score Update: '+displayUpdateTime(currentEntryTime),'Last paired CP observation: '+displayObservationDate(latest?.date)+', checked on '+displayUpdateTime(latestCpCheckTime()),'Last dollar funding update: '+displayUpdateTime(saved)];
     host.replaceChildren();lines.forEach(text=>{const p=document.createElement('p');p.textContent=text;host.appendChild(p);});
 }
 function renderOpeningOverview(){
@@ -1842,7 +1863,7 @@ function renderOpeningOverview(){
     renderFreshness();
     const alerts=document.getElementById('overviewAlerts');alerts.replaceChildren();
     document.getElementById('compositeUpdateTime').textContent=currentEntryTime?'Current entry saved at: '+displayUpdateTime(currentEntryTime):'Last update: none — sample values.';
-    document.getElementById('cpUpdateTime').textContent=fredLiveData?'Last FRED fetch: '+displayUpdateTime(fredLiveData.fetchedAt):'Last FRED fetch: not recorded on this account.';
+    document.getElementById('cpUpdateTime').textContent='Last successful CP check / update: '+displayUpdateTime(latestCpCheckTime());
     const saved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);document.getElementById('dollarUpdateTime').textContent=saved?'Last saved update: '+displayUpdateTime(saved):'Last saved update: none — embedded reference history only.';
     [['sector','Financial vs nonfinancial CP',cp,'high'],['financialBill','Financial CP vs Treasury bills',cp,'high'],['nonfinancialBill','Nonfinancial CP vs Treasury bills',cp,'high'],['momentum','Nasdaq leadership',rotation,'low']].forEach(([key,label,rows,direction])=>{
         const r=diagnosticWatch(rows,key,today,direction),p=document.createElement('p');p.className='overview-alert'+(r.state==='watch'?' history-amber':'');
@@ -1858,7 +1879,7 @@ function applyCpResponse(){
     const raw=document.getElementById('cpAiResponse').value.trim().split(',');const nums=raw.map(x=>Number(x.trim()));
     if(raw.length!==4||raw.some(x=>!x.trim())||!nums.every(Number.isFinite)){document.getElementById('cpAiStatus').textContent='Use exactly four numeric fields: date and three rates.';return;}
     const values={...currentData,cp_date:nums[0],cp_financial:nums[1],cp_nonfinancial:nums[2],cp_treasury:nums[3]};const error=validateLiquidityInputs(values);
-    if(error){document.getElementById('cpAiStatus').textContent=error;return;}const inputError=validateForcedInputs(values);if(inputError){document.getElementById('cpAiStatus').textContent=inputError;return;}commitEntry(values);document.getElementById('cpAiStatus').textContent='CP rates saved; other dashboard inputs retained.';
+    if(error){document.getElementById('cpAiStatus').textContent=error;return;}const inputError=validateForcedInputs(values);if(inputError){document.getElementById('cpAiStatus').textContent=inputError;return;}commitEntry(values);document.getElementById('cpAiStatus').textContent='CP rates saved and check time refreshed; the observation date changes only when newer common-date rates are supplied.';
 }
 function revealDashboardTarget(){
     const id=decodeURIComponent(location.hash.slice(1))||'dashboardOverview';
@@ -2029,7 +2050,8 @@ function commitEntry(values,observationDate=null){
     const error=validateForcedInputs(values);if(error){alert(error);return;}
     currentData = values;
     
-    saveEntry(observationDate);
+    const cpCheckedAt=Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?new Date().toISOString():null;
+    saveEntry(observationDate,cpCheckedAt);
     const period=document.getElementById('forcedPeriod');if(period)period.value='current';
     renderDashboard();
 }
