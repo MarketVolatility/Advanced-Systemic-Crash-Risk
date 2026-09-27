@@ -577,9 +577,10 @@ button.secondary {
 .methodology-note{color:#cbd5e1;font-size:14px;line-height:1.7}.methodology-note h3{font-size:17px;color:#dbe2ec}
 </style><style>.analysis-delete{margin-left:8px;padding:4px 8px;min-width:28px;min-height:28px;font-size:18px;line-height:1;color:#fca5a5}.analysis-delete:hover{background:#7f1d1d}.analysis-delete:focus-visible{outline:2px solid #fca5a5;outline-offset:2px}</style>
 <style>
-.analysis-document{background:#fff;color:#172337;border:1px solid #cbd5e1;border-radius:8px;padding:24px;max-height:65vh;overflow:auto;line-height:1.6;overflow-wrap:anywhere;font-family:Calibri,Arial,sans-serif;font-size:15px}
-.analysis-document p{margin:0 0 12px}.analysis-document table{border-collapse:collapse;width:100%;margin:16px 0}.analysis-document td,.analysis-document th{border:1px solid #cbd5e1;padding:8px;vertical-align:top}.analysis-document h1,.analysis-document h2,.analysis-document h3{color:#172337;margin:20px 0 12px}
-#analysisHistoryBody .analysis-risk-low{background:#153f32;color:#bbf7d0}#analysisHistoryBody .analysis-risk-watch{background:#543a12;color:#fde68a}#analysisHistoryBody .analysis-risk-high{background:#59232a;color:#fecaca}#analysisHistoryBody .analysis-risk-range{outline:1px dashed #94a3b8;outline-offset:-3px}#analysisHistoryBody input{padding:7px;background:#172337;color:#fff;border:1px solid #94a3b8;border-radius:4px}#analysisHistoryBody button{margin:3px}
+ .analysis-document{background:#000;color:#fff;border:1px solid var(--border);border-radius:8px;padding:24px;max-height:65vh;overflow:auto;line-height:1.6;overflow-wrap:anywhere;font-family:Calibri,Arial,sans-serif;font-size:15px}
+.analysis-document *{color:#fff!important;background-color:transparent!important}
+.analysis-document p{margin:0 0 12px}.analysis-document table{border-collapse:collapse;width:100%;margin:16px 0}.analysis-document td,.analysis-document th{border:1px solid #64748b;padding:8px;vertical-align:top}.analysis-document h1,.analysis-document h2,.analysis-document h3{margin:20px 0 12px}
+#analysisHistoryBody button{margin:3px}#analysisHistoryBody .history-value-input{width:85px}#analysisHistoryBody .history-date-input{max-width:210px}
 </style></head>
 
 <body>
@@ -722,7 +723,7 @@ button.secondary {
 
 </div>
 
-<details class="overview-details dashboard-section" name="dashboard-panels" id="analysisPanel"><summary id="lastAnalysisTitle">Last analysis — none saved yet</summary>
+<details class="overview-details dashboard-section" name="dashboard-panels" id="analysisPanel"><summary><span id="lastAnalysisTitle">Last analysis — none saved yet</span> <button type="button" class="secondary history-date-save" id="lastAnalysisDownload" hidden onclick="event.preventDefault();event.stopPropagation();downloadLatestAnalysis()">Download as Word</button></summary>
 <section aria-labelledby="lastAnalysisHeading"><h3 id="lastAnalysisHeading">Latest saved analysis</h3><p id="lastAnalysisMeta" class="table-note"></p><div id="lastAnalysisResponse" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:65vh;overflow:auto;line-height:1.65" tabindex="0">No response saved yet. Generate a prompt below to start.</div></section>
 <div class="history-repair">
 <p>1. Edit your questions and generate a prompt from the current dashboard entry. 2. Copy it into any AI assistant. 3. Paste the response below and save it. Each request keeps its original score snapshot.</p>
@@ -735,7 +736,7 @@ button.secondary {
 <button type="button" class="secondary" onclick="exportAnalysisWord()">Export to Word</button>
 <button type="button" class="secondary" onclick="document.getElementById('analysisWordFile').click()">Import Word</button>
 <input type="file" id="analysisWordFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onchange="importAnalysisWord(this.files[0])">
-<p class="table-note">Export includes the displayed prompt and response. Import preserves Word text formatting and tables for saved viewing; review it and select Save response. The original file is retained for download. Browser layout may differ from Word pagination.</p>
+<p class="table-note">Export downloads the original imported Word file when present; otherwise it includes the displayed prompt and response. Import preserves Word text formatting and tables for saved viewing; review it and select Save response. The original file is retained for download. Browser layout may differ from Word pagination.</p>
 <p id="analysisSnapshotLabel" class="table-note"></p>
 <label for="analysisPrompt">Prompt to paste into your AI assistant (editable)</label><textarea class="paste-box" id="analysisPrompt" rows="12"></textarea>
 <h3>Response preview</h3><div id="analysisResponsePreview" class="analysis-document" tabindex="0"></div><p class="table-note">Imported Word formatting is kept when you save. Editing the plain text below replaces that formatting; import the Word file again to restore it.</p>
@@ -743,8 +744,8 @@ button.secondary {
 <button type="button" onclick="saveAnalysisResponse()">Save response</button>
 <p id="analysisStatus" role="status" aria-live="polite"></p>
 </div>
-<h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Use × to delete a request and its response. Use Edit to change any date, time or score cell; totals must equal category sums. Green: low; amber: watch; red: stressed, using dashboard thresholds. Dashed outlines indicate ranges, coloured by the upper bound. Edited rows are marked; original prompts retain their original snapshots.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th>Actions</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
+<h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Use × to delete a request and its response. Edit values directly, then click Save on that row, as in History. Totals must equal category sums. Risk numbers only: white = below watch threshold or incomplete range, amber = watch, red = stressed. Headers stay fixed while scrolling. Original prompts retain their original snapshots; edited rows show their edit time on hover.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th scope="col">Actions</th><th scope="col">Download</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
 </details>
 
     <details class="scale-card overview-details" name="dashboard-panels"><summary>Score Bands</summary>
@@ -1283,21 +1284,22 @@ function refreshAnalysisPreview(){
     renderWordAnalysis(document.getElementById('analysisResponsePreview'),analysisWordDraft,text||'No response yet.');
 }
 function downloadAnalysisOriginal(id){
-    const r=analysisRecords.find(r=>r.id===id);if(!r?.word?.base64)return;
-    const bytes=Uint8Array.from(atob(r.word.base64),c=>c.charCodeAt(0)),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}));
-    const a=document.createElement('a');a.href=url;a.download=r.word.name||'Analysis.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    const r=analysisRecords.find(r=>r.id===id);if(!r)return;
+    const blob=r.word?.base64?new Blob([Uint8Array.from(atob(r.word.base64),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}):analysisWordBlob(r.prompt,r.response);
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');a.href=url;a.download=r.word?.name||'Analysis-'+r.day+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 function analysisCellColor(range,maximum){
-    const level=n=>n>=(maximum===50?16:maximum*.67)?'analysis-risk-high':n>=(maximum===50?5:maximum*.34)?'analysis-risk-watch':'analysis-risk-low';
-    return level(range.high)+(range.low!==range.high?' analysis-risk-range':'');
+    if(range.low!==range.high)return 'history-normal';
+    return range.low>=(maximum===50?16:maximum*.67)?'history-red':range.low>=(maximum===50?5:maximum*.34)?'history-amber':'history-normal';
 }
 function editAnalysisRow(id,tr){
     const row=analysisRecords.find(r=>r.id===id);if(!row)return;
     const localTime=stamp=>{if(!stamp)return '';const d=new Date(stamp);return new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,19);};
     const values=[localTime(row.createdAt),row.day,analysisRange(row.total),...row.categories.map(analysisRange),localTime(row.responseSavedAt)],inputs=[];
-    [...tr.children].slice(0,9).forEach((td,i)=>{td.replaceChildren();const input=document.createElement('input');input.type=i===0||i===8?'datetime-local':i===1?'date':'text';input.value=values[i];input.step='1';input.setAttribute('aria-label',['Request time','Entry date','Total score',...analysisNames,'Response saved time'][i]);input.style.width=i>1&&i<8?'85px':'190px';td.appendChild(input);inputs.push(input);});
-    const actions=tr.children[9];actions.replaceChildren();
-    const save=document.createElement('button');save.textContent='Save';save.type='button';save.onclick=()=>{
+    [...tr.children].slice(0,9).forEach((td,i)=>{td.replaceChildren();const input=document.createElement('input');input.type=i===0||i===8?'datetime-local':i===1?'date':'text';input.value=values[i];input.step='1';input.setAttribute('aria-label',['Request time','Entry date','Total score',...analysisNames,'Response saved time'][i]);input.className=i>1&&i<8?'history-value-input '+analysisCellColor(i===2?row.total:row.categories[i-3],i===2?50:[10,14,8,12,6][i-3]):'history-date-input';input.title=i>1&&i<8?'Score or range; incomplete ranges stay white.':'Edit and click Save on this row.';td.appendChild(input);inputs.push(input);});
+    const actions=tr.children[9];
+    const save=document.createElement('button');save.textContent='Save';save.type='button';save.className='history-date-save';save.onclick=()=>{
         try{
             const parse=(value,max)=>{const match=value.trim().match(/^(\d+)(?:\s*[–-]\s*(\d+))?$/);if(!match)throw Error('Scores must be whole numbers or ranges such as 2–4.');const low=Number(match[1]),high=Number(match[2]??match[1]);if(low>high||high>max)throw Error('Score is outside its category maximum.');return {low,high};};
             const total=parse(inputs[2].value,50),categories=row.categories.map((c,i)=>({...c,...parse(inputs[i+3].value,[10,14,8,12,6][i])}));
@@ -1308,7 +1310,7 @@ function editAnalysisRow(id,tr){
             if(persistAnalyses(analysisRecords.map(r=>r.id===id?updated:r)))analysisMessage('History row updated. Original prompt and market inputs are retained; table edits do not recalculate the dashboard.');
         }catch(e){analysisMessage(e.message);}
     };
-    const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.type='button';cancel.onclick=renderAnalysisHistory;actions.appendChild(save);actions.appendChild(cancel);
+    actions.appendChild(save);
 }
 
 function analysisKey(){return 'crash-risk-analysis-v1:'+historyOwner;}
@@ -1373,7 +1375,7 @@ function analysisWordBlob(prompt,response){
 function exportAnalysisWord(){
     const prompt=document.getElementById('analysisPrompt').value,response=document.getElementById('analysisResponse').value;
     if(!prompt.trim()&&!response.trim()){analysisMessage('Generate a prompt or paste a response before exporting.');return;}
-    const url=URL.createObjectURL(analysisWordBlob(prompt,response)),a=document.createElement('a');a.href=url;a.download='AI-analysis-'+new Date().toISOString().slice(0,10)+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);analysisMessage('Word document exported with the displayed prompt and response.');
+    const original=analysisWordDraft?.text===response&&analysisWordDraft?.base64;const blob=original?new Blob([Uint8Array.from(atob(original),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}):analysisWordBlob(prompt,response);const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=original?analysisWordDraft.name:'AI-analysis-'+new Date().toISOString().slice(0,10)+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);analysisMessage(original?'Original Word document downloaded with its formatting unchanged.':'Word document exported with the displayed prompt and response.');
 }
 async function analysisDocxXml(buffer,entryName='word/document.xml'){
     const bytes=new Uint8Array(buffer),v=new DataView(buffer),decoder=new TextDecoder();let end=-1;
@@ -1450,8 +1452,10 @@ function deleteAnalysis(id){
     }
     analysisMessage('Analysis deleted in this browser. Use Sync now to update cloud storage immediately, or wait for automatic sync.');
 }
+function downloadLatestAnalysis(){const latest=analysisRecords.filter(r=>r.response.trim()).sort((a,b)=>Date.parse(b.responseSavedAt||b.createdAt)-Date.parse(a.responseSavedAt||a.createdAt))[0];if(latest)downloadAnalysisOriginal(latest.id);}
 function renderLatestAnalysis(){
     const latest=analysisRecords.filter(r=>r.response.trim()).sort((a,b)=>Date.parse(b.responseSavedAt||b.createdAt)-Date.parse(a.responseSavedAt||a.createdAt))[0];
+    document.getElementById('lastAnalysisDownload').hidden=!latest;
     document.getElementById('lastAnalysisTitle').textContent=latest?'Last analysis on '+new Date(latest.responseSavedAt||latest.createdAt).toLocaleString():'Last analysis — none saved yet';
     document.getElementById('lastAnalysisMeta').textContent=latest?'Entry: '+latest.day+' · Total: '+analysisRange(latest.total)+' / 50 · '+latest.categories.map((r,i)=>analysisNames[i]+': '+analysisRange(r)+' / '+r.maximum).join(' · '):'';
     renderWordAnalysis(document.getElementById('lastAnalysisResponse'),latest?.word,latest?latest.response:'No response saved yet. Generate a prompt below to start.');
@@ -1462,15 +1466,14 @@ function renderAnalysisHistory(){
     for(const r of [...analysisRecords].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))){
         const tr=document.createElement('tr');
         for(const text of [new Date(r.createdAt).toLocaleString(),r.day,analysisRange(r.total),...r.categories.map(analysisRange),r.responseSavedAt?new Date(r.responseSavedAt).toLocaleString():'Pending']){const td=document.createElement('td');td.textContent=text;tr.appendChild(td);}
-        [...tr.children].forEach((td,i)=>{const range=i>=3&&i<=7?r.categories[i-3]:r.total;td.className=analysisCellColor(range,i>=3&&i<=7?[10,14,8,12,6][i-3]:50);});
         if(r.editedAt){tr.children[0].textContent+=' · Edited';tr.children[0].title='Edited '+new Date(r.editedAt).toLocaleString()+'. Original snapshot retained.';}
         const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='View';button.setAttribute('aria-label','View analysis from '+new Date(r.createdAt).toLocaleString());button.onclick=()=>openAnalysis(r.id);td.appendChild(button);
-        const remove=document.createElement('button');remove.type='button';remove.className='secondary analysis-delete';remove.textContent='×';remove.title='Delete analysis';remove.setAttribute('aria-label','Delete analysis from '+new Date(r.createdAt).toLocaleString());remove.onclick=()=>deleteAnalysis(r.id);td.appendChild(remove);
-        const edit=document.createElement('button');edit.type='button';edit.className='secondary';edit.textContent='Edit';edit.onclick=()=>editAnalysisRow(r.id,tr);td.appendChild(edit);
-        if(r.word?.base64){const download=document.createElement('button');download.type='button';download.className='secondary';download.textContent='Word';download.title='Download original Word file';download.onclick=()=>downloadAnalysisOriginal(r.id);td.appendChild(download);}
-        tr.appendChild(td);body.appendChild(tr);
+        const remove=document.createElement('button');remove.type='button';remove.className='history-delete';remove.textContent='×';remove.title='Delete analysis';remove.setAttribute('aria-label','Delete analysis from '+new Date(r.createdAt).toLocaleString());remove.onclick=()=>deleteAnalysis(r.id);td.appendChild(remove);
+        tr.appendChild(td);
+        const downloadCell=document.createElement('td'),download=document.createElement('button');download.type='button';download.className='secondary history-date-save';download.textContent='Word';download.title=r.word?.base64?'Download original Word file':'Download analysis as Word';download.onclick=()=>downloadAnalysisOriginal(r.id);downloadCell.appendChild(download);tr.appendChild(downloadCell);
+        editAnalysisRow(r.id,tr);body.appendChild(tr);
     }
-    if(!analysisRecords.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=10;td.textContent='No analysis requests yet. Generate a prompt to start.';tr.appendChild(td);body.appendChild(tr);}
+    if(!analysisRecords.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=11;td.textContent='No analysis requests yet. Generate a prompt to start.';tr.appendChild(td);body.appendChild(tr);}
 }
 document.addEventListener('DOMContentLoaded',()=>window.addEventListener('beforeunload',event=>{if(analysisHasEdits()){event.preventDefault();event.returnValue='';}}));
 
