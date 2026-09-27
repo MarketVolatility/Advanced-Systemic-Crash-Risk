@@ -662,7 +662,7 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a></nav>
+<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPanel">AI Analysis</a></nav>
 <aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
 <p class="table-note">A summary of the dashboard’s heuristic stress signals. The score is not a crash probability or confirmation of forced selling.</p>
@@ -880,6 +880,23 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 
 <!-- QUICK PASTE -->
+<details class="overview-details dashboard-section" name="dashboard-panels" id="analysisPanel"><summary>AI Analysis · Prompts and Saved Responses</summary>
+<div class="history-repair">
+<p>1. Edit your questions and generate a prompt from the current dashboard entry. 2. Copy it into any AI assistant. 3. Paste the response below and save it. Each request keeps its original score snapshot.</p>
+<p class="table-note">Saved for your signed-in account in this browser and included in Sync now / automatic cloud sync. Times display in your local timezone. Generating a prompt does not fetch new market data.</p>
+<label for="analysisQuestions">Questions for the AI (editable)</label><textarea class="paste-box" id="analysisQuestions" rows="5"></textarea>
+<button type="button" onclick="generateAnalysisPrompt()">Generate / refresh prompt with current score</button>
+<button type="button" class="secondary" onclick="copyAnalysisPrompt()">Copy prompt</button>
+<p id="analysisSnapshotLabel" class="table-note"></p>
+<label for="analysisPrompt">Prompt to paste into your AI assistant (editable)</label><textarea class="paste-box" id="analysisPrompt" rows="12"></textarea>
+<label for="analysisResponse">Paste AI response</label><textarea class="paste-box" id="analysisResponse" rows="12" placeholder="Paste the full response here, then save."></textarea>
+<button type="button" onclick="saveAnalysisResponse()">Save response</button>
+<p id="analysisStatus" role="status" aria-live="polite"></p>
+</div>
+<h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Scores remain as calculated when the prompt was generated.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th>View</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
+</details>
+
 <details class="overview-details dashboard-section" name="dashboard-panels"><summary>History and Risk Charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
 <p class="table-note">Review market entries and linked charts. <a href="#fundingHeading">Dollar funding history</a>.</p>
@@ -1183,6 +1200,76 @@ function getAuthClient(){
     return authClient;
 }
 
+
+// Analysis scores are immutable snapshots, not recalculated when history changes.
+let analysisRecords=[], activeAnalysisId=null, analysisLoadError=false;
+const analysisNames=['Volatility','Credit','Macro','Equity Structure','Forced Selling'];
+const analysisDefaultQuestions='1. What does the total score and each category imply about current systemic stress?\n2. Which indicators drive the risk, and which signals contradict one another?\n3. What plausible scenarios would worsen or ease conditions, and which indicators should I monitor?\n4. What missing or stale data could change this assessment?\n5. Summarize the findings in plain language with a category table and a prioritized monitoring checklist.';
+function analysisKey(){return 'crash-risk-analysis-v1:'+historyOwner;}
+function analysisMessage(text){document.getElementById('analysisStatus').textContent=text;}
+function analysisRange(r){return r.low===r.high?String(r.low):r.low+'–'+r.high;}
+function validateAnalysisHistory(rows){
+    const validRange=(r,max)=>r&&Number.isFinite(r.low)&&Number.isFinite(r.high)&&r.low>=0&&r.high>=r.low&&r.high<=max;
+    if(!Array.isArray(rows)||rows.some(r=>!r||typeof r.id!=='string'||!Number.isFinite(Date.parse(r.createdAt))||typeof r.day!=='string'||typeof r.prompt!=='string'||typeof r.questions!=='string'||typeof r.response!=='string'||!validRange(r.total,50)||!Array.isArray(r.categories)||r.categories.length!==5||r.categories.some((c,i)=>!validRange(c,[10,14,8,12,6][i]))))throw Error('Invalid analysis history');
+    return rows;
+}
+function loadAnalyses(){
+    analysisRecords=[];activeAnalysisId=null;analysisLoadError=false;
+    for(const id of ['analysisPrompt','analysisResponse'])document.getElementById(id).value='';
+    document.getElementById('analysisQuestions').value=analysisDefaultQuestions;
+    document.getElementById('analysisSnapshotLabel').textContent='';analysisMessage('');
+    try{analysisRecords=validateAnalysisHistory(JSON.parse(localStorage.getItem(analysisKey())||'[]'));}
+    catch{analysisLoadError=true;analysisMessage('Stored analyses could not be loaded. Saving is disabled to protect the existing data.');}
+    renderAnalysisHistory();
+}
+function persistAnalyses(next){
+    if(!historyOwner||analysisLoadError){analysisMessage('Sign in with readable analysis storage before saving.');return false;}
+    try{localStorage.setItem(analysisKey(),JSON.stringify(next));analysisRecords=next;renderAnalysisHistory();return true;}
+    catch{analysisMessage('Browser storage could not save this analysis. Your text is still here; copy it before leaving.');return false;}
+}
+function analysisHasEdits(){const r=analysisRecords.find(r=>r.id===activeAnalysisId);return r&&(document.getElementById('analysisPrompt').value!==r.prompt||document.getElementById('analysisResponse').value!==r.response);}
+function generateAnalysisPrompt(){
+    if(!historyOwner){analysisMessage('Sign in before generating an analysis.');return;}
+    if(analysisHasEdits()&&!window.confirm('Replace unsaved prompt or response edits with a new request?'))return;
+    const createdAt=new Date().toISOString(),day=currentEntryTime?localCalendarDate(new Date(currentEntryTime)):localCalendarDate(new Date());
+    const values=JSON.parse(JSON.stringify(currentData)),total=compositeRange(values,day);
+    const categories=Object.values(regimeCharts).map((c,i)=>({name:analysisNames[i],maximum:c.maximum,...(c.forced?forcedCategoryRange(values,day):historicalScoreRange(values,c.keys,day))}));
+    const questions=document.getElementById('analysisQuestions').value.trim()||analysisDefaultQuestions;
+    const factors=Object.values(regimeCharts).flatMap(c=>c.keys.map(k=>({indicator:metricConfig[k].name,...metricPointRange(k,values,day),maximum:metricConfig[k].maxPoints})));
+    const prompt=`Analyze this Crash Risk Dashboard snapshot. Request generated: ${createdAt}. Entry scoring date: ${day}. Entry timestamp: ${currentEntryTime||'UNSAVED SAMPLE VALUES — illustrative only'}. These timestamps do not establish observation dates for every input.\n\nTotal score: ${analysisRange(total)} / 50\n${categories.map(c=>c.name+': '+analysisRange(c)+' / '+c.maximum).join('\n')}\n\nUse these supplied scores as the dashboard snapshot, including all missing-data ranges. This is a heuristic stress score, not a calibrated crash probability. Bands: 0–4, 5–9, 10–15, 16–22, 23–30, 31–50. Do not invent missing observations, infer that a low score guarantees safety, or treat signals as proof of forced liquidation. CP and Nasdaq leadership are scored; dollar swaps and 200DMA distance velocity are unscored context. Distinguish facts, interpretations and scenarios. If browsing is available, verify relevant current context with dated primary-source links; keep it separate from this snapshot. Otherwise disclose that current information was not verified. Do not silently substitute newer figures or change the supplied scores.\n\nScored indicator contributions:\n${JSON.stringify(factors,null,2)}\nForced-selling components (in addition to USDJPY):\n${JSON.stringify(forcedPoints(values,day),null,2)}\nRaw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent and cp_date YYYYMMDD):\n${JSON.stringify(values,null,2)}\nDerived CP and Nasdaq inputs:\n${JSON.stringify(model50Inputs(values,day),null,2)}\n\nQuestions and requested output:\n${questions}\n\nBegin with the snapshot date and overall assessment. Include a total/category score table, key drivers, conflicting evidence, scenarios, data limitations, and a monitoring checklist. Avoid unsupported numerical crash forecasts.`;
+    const row={id:createdAt+'-'+Math.random().toString(36).slice(2),createdAt,day,entryTime:currentEntryTime,total,categories,values,questions,prompt,response:'',responseSavedAt:null};
+    if(persistAnalyses([row,...analysisRecords])){openAnalysis(row.id,true);analysisMessage('Prompt generated and request saved. Copy it into your AI assistant, then paste the response here.');}
+}
+async function copyAnalysisPrompt(){
+    const el=document.getElementById('analysisPrompt');if(!el.value.trim()){analysisMessage('Generate a prompt first.');return;}
+    try{await navigator.clipboard.writeText(el.value);analysisMessage('Prompt copied.');}catch{el.focus();el.select();analysisMessage('Automatic copy unavailable. The prompt is selected; copy it manually.');}
+}
+function saveAnalysisResponse(){
+    const r=analysisRecords.find(r=>r.id===activeAnalysisId),response=document.getElementById('analysisResponse').value;
+    if(!r){analysisMessage('Generate or view a request first so the response has a score snapshot.');return;}
+    if(!response.trim()){analysisMessage('Paste an AI response before saving.');return;}
+    const updated={...r,response,prompt:document.getElementById('analysisPrompt').value,questions:document.getElementById('analysisQuestions').value,responseSavedAt:new Date().toISOString()};
+    if(persistAnalyses(analysisRecords.map(x=>x.id===r.id?updated:x)))analysisMessage('Response saved in this browser. Use Sync now to upload immediately, or wait for automatic sync.');
+}
+function openAnalysis(id,skipConfirm=false){
+    if(!skipConfirm&&analysisHasEdits()&&!window.confirm('Discard unsaved edits and view this saved analysis?'))return;
+    const r=analysisRecords.find(r=>r.id===id);if(!r)return;activeAnalysisId=id;
+    for(const [field,key] of [['analysisQuestions','questions'],['analysisPrompt','prompt'],['analysisResponse','response']])document.getElementById(field).value=r[key];
+    document.getElementById('analysisSnapshotLabel').textContent='Request: '+new Date(r.createdAt).toLocaleString()+' · Entry: '+r.day+' · Total: '+analysisRange(r.total)+' / 50'+(!r.entryTime?' · Sample values':'');
+    analysisMessage(r.responseSavedAt?'Viewing saved response. Edits require Save response.':'Pending response — paste and save when ready.');
+    document.getElementById('analysisSnapshotLabel').scrollIntoView({block:'nearest'});
+}
+function renderAnalysisHistory(){
+    const body=document.getElementById('analysisHistoryBody');body.replaceChildren();
+    for(const r of [...analysisRecords].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))){
+        const tr=document.createElement('tr');
+        for(const text of [new Date(r.createdAt).toLocaleString(),r.day,analysisRange(r.total),...r.categories.map(analysisRange),r.responseSavedAt?new Date(r.responseSavedAt).toLocaleString():'Pending']){const td=document.createElement('td');td.textContent=text;tr.appendChild(td);}
+        const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='View';button.setAttribute('aria-label','View analysis from '+new Date(r.createdAt).toLocaleString());button.onclick=()=>openAnalysis(r.id);td.appendChild(button);tr.appendChild(td);body.appendChild(tr);
+    }
+    if(!analysisRecords.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=10;td.textContent='No analysis requests yet. Generate a prompt to start.';tr.appendChild(td);body.appendChild(tr);}
+}
+document.addEventListener('DOMContentLoaded',()=>window.addEventListener('beforeunload',event=>{if(analysisHasEdits()){event.preventDefault();event.returnValue='';}}));
+
 // --- Cross-device sync ---
 // Market entryHistory and dollar funding release history are kept in localStorage
 // under historyKey() (which itself is scoped per user id). Syncing just means
@@ -1200,7 +1287,7 @@ async function pushSnapshotToCloud(){
     const raw = localStorage.getItem(historyKey()) || '[]';
     const {error} = await client
         .from('user_app_data')
-        .upsert({user_id:user.id, data:{entryHistory: raw, fundingHistory:localStorage.getItem(fundingKey()) || '[]',fredHistory:localStorage.getItem(fredDataStorage()) || null}, updated_at:new Date().toISOString()});
+        .upsert({user_id:user.id, data:{entryHistory: raw, fundingHistory:localStorage.getItem(fundingKey()) || '[]',fredHistory:localStorage.getItem(fredDataStorage()) || null,analysisHistory:localStorage.getItem(analysisKey()) || '[]'}, updated_at:new Date().toISOString()});
     if(error) return {ok:false, reason:error.message};
     return {ok:true};
 }
@@ -1220,6 +1307,7 @@ async function pullSnapshotFromCloud(){
     if(data && data.data && data.data.entryHistory !== undefined){
         if(data.data.fundingHistory !== undefined){ const f=JSON.parse(data.data.fundingHistory); if(!Array.isArray(f))throw Error('Invalid cloud funding history'); f.forEach(validateFunding); localStorage.setItem(fundingKey(), JSON.stringify(f)); }
         if(data.data.fredHistory){const rates=validateFredData(JSON.parse(data.data.fredHistory));localStorage.setItem(fredDataStorage(),JSON.stringify(rates));}
+        if(data.data.analysisHistory !== undefined){const analyses=validateAnalysisHistory(JSON.parse(data.data.analysisHistory));localStorage.setItem(analysisKey(),JSON.stringify(analyses));}
         localStorage.setItem(historyKey(), data.data.entryHistory);
         return {ok:true, found:true};
     }
@@ -1582,6 +1670,7 @@ function validSnapshot(values){
 function loadEntryHistory(userId){
     historyPreviewHidden = false;
     historyOwner = userId;
+    loadAnalyses();
     loadFredPreferences();
     loadFunding();
     entryHistory = [];
