@@ -575,7 +575,8 @@ button.secondary {
 .dashboard-disclaimer{color:#a9cfff;background:#101d31;border:1px solid #304966;border-radius:10px;padding:16px 20px;margin:0 0 24px;font-size:13px;line-height:1.65}
 .dashboard-disclaimer strong{color:#b8d9ff;font-size:14px}.dashboard-disclaimer ul{margin:8px 0 0;padding-left:20px}.dashboard-disclaimer li{margin:5px 0}
 .methodology-note{color:#cbd5e1;font-size:14px;line-height:1.7}.methodology-note h3{font-size:17px;color:#dbe2ec}
-</style></head>
+</style><style>.analysis-delete{margin-left:8px;padding:4px 8px;min-width:28px;min-height:28px;font-size:18px;line-height:1;color:#fca5a5}.analysis-delete:hover{background:#7f1d1d}.analysis-delete:focus-visible{outline:2px solid #fca5a5;outline-offset:2px}</style>
+</head>
 
 <body>
 
@@ -662,7 +663,7 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPanel">AI Analysis</a></nav>
+<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPromptControls">AI Analysis</a></nav>
 <aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
 <p class="table-note">A summary of the dashboard’s heuristic stress signals. The score is not a crash probability or confirmation of forced selling.</p>
@@ -716,6 +717,26 @@ button.secondary {
 <div class="signal-card"><div class="signal-title">Forced Selling</div><div class="signal-value" id="forcedRegime">—</div><div class="signal-description" id="forcedDesc"></div></div>
 
 </div>
+
+<details class="overview-details dashboard-section" name="dashboard-panels" id="analysisPanel"><summary id="lastAnalysisTitle">Last analysis — none saved yet</summary>
+<section aria-labelledby="lastAnalysisHeading"><h3 id="lastAnalysisHeading">Latest saved analysis</h3><p id="lastAnalysisMeta" class="table-note"></p><div id="lastAnalysisResponse" style="white-space:pre-wrap;overflow-wrap:anywhere;max-height:65vh;overflow:auto;line-height:1.65" tabindex="0">No response saved yet. Generate a prompt below to start.</div></section>
+<div class="history-repair">
+<p>1. Edit your questions and generate a prompt from the current dashboard entry. 2. Copy it into any AI assistant. 3. Paste the response below and save it. Each request keeps its original score snapshot.</p>
+<p class="table-note">Saved for your signed-in account in this browser and included in Sync now / automatic cloud sync. Times display in your local timezone. Generating a prompt does not fetch new market data.</p>
+<p class="table-note">New prompts include the full example from “analysis to add.docx”, its indicator-by-indicator format, and guidance to improve definitions and risk interpretation using the latest snapshot.</p>
+<div id="analysisPromptControls" tabindex="-1"></div>
+<label for="analysisQuestions">Questions for the AI (editable)</label><textarea class="paste-box" id="analysisQuestions" rows="12"></textarea>
+<button type="button" onclick="generateAnalysisPrompt()">Generate / refresh prompt with current score</button>
+<button type="button" class="secondary" onclick="copyAnalysisPrompt()">Copy prompt</button>
+<p id="analysisSnapshotLabel" class="table-note"></p>
+<label for="analysisPrompt">Prompt to paste into your AI assistant (editable)</label><textarea class="paste-box" id="analysisPrompt" rows="12"></textarea>
+<label for="analysisResponse">Paste AI response</label><textarea class="paste-box" id="analysisResponse" rows="12" placeholder="Paste the full response here, then save."></textarea>
+<button type="button" onclick="saveAnalysisResponse()">Save response</button>
+<p id="analysisStatus" role="status" aria-live="polite"></p>
+</div>
+<h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Use × to delete a request and its response. Scores remain as calculated when the prompt was generated.</p>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th>Actions</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
+</details>
 
     <details class="scale-card overview-details" name="dashboard-panels"><summary>Score Bands</summary>
         <div class="scale-title">
@@ -880,23 +901,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 
 <!-- QUICK PASTE -->
-<details class="overview-details dashboard-section" name="dashboard-panels" id="analysisPanel"><summary>AI Analysis · Prompts and Saved Responses</summary>
-<div class="history-repair">
-<p>1. Edit your questions and generate a prompt from the current dashboard entry. 2. Copy it into any AI assistant. 3. Paste the response below and save it. Each request keeps its original score snapshot.</p>
-<p class="table-note">Saved for your signed-in account in this browser and included in Sync now / automatic cloud sync. Times display in your local timezone. Generating a prompt does not fetch new market data.</p>
-<p class="table-note">New prompts include the full example from “analysis to add.docx”, its indicator-by-indicator format, and guidance to improve definitions and risk interpretation using the latest snapshot.</p>
-<label for="analysisQuestions">Questions for the AI (editable)</label><textarea class="paste-box" id="analysisQuestions" rows="12"></textarea>
-<button type="button" onclick="generateAnalysisPrompt()">Generate / refresh prompt with current score</button>
-<button type="button" class="secondary" onclick="copyAnalysisPrompt()">Copy prompt</button>
-<p id="analysisSnapshotLabel" class="table-note"></p>
-<label for="analysisPrompt">Prompt to paste into your AI assistant (editable)</label><textarea class="paste-box" id="analysisPrompt" rows="12"></textarea>
-<label for="analysisResponse">Paste AI response</label><textarea class="paste-box" id="analysisResponse" rows="12" placeholder="Paste the full response here, then save."></textarea>
-<button type="button" onclick="saveAnalysisResponse()">Save response</button>
-<p id="analysisStatus" role="status" aria-live="polite"></p>
-</div>
-<h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Scores remain as calculated when the prompt was generated.</p>
-<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th>View</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
-</details>
+
 
 <details class="overview-details dashboard-section" name="dashboard-panels"><summary>History and Risk Charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
@@ -1262,12 +1267,34 @@ function openAnalysis(id,skipConfirm=false){
     analysisMessage(r.responseSavedAt?'Viewing saved response. Edits require Save response.':'Pending response — paste and save when ready.');
     document.getElementById('analysisSnapshotLabel').scrollIntoView({block:'nearest'});
 }
+function deleteAnalysis(id){
+    const record=analysisRecords.find(r=>r.id===id);if(!record)return;
+    if(!window.confirm('Delete analysis from '+new Date(record.createdAt).toLocaleString()+' and its saved response?'+(id===activeAnalysisId&&analysisHasEdits()?' Unsaved edits to this analysis will also be discarded.':'')+' This cannot be undone.'))return;
+    if(!persistAnalyses(analysisRecords.filter(r=>r.id!==id)))return;
+    if(activeAnalysisId===id){
+        activeAnalysisId=null;
+        document.getElementById('analysisPrompt').value='';
+        document.getElementById('analysisResponse').value='';
+        document.getElementById('analysisSnapshotLabel').textContent='';
+        document.getElementById('analysisQuestions').value=analysisDefaultQuestions;
+    }
+    analysisMessage('Analysis deleted in this browser. Use Sync now to update cloud storage immediately, or wait for automatic sync.');
+}
+function renderLatestAnalysis(){
+    const latest=analysisRecords.filter(r=>r.response.trim()).sort((a,b)=>Date.parse(b.responseSavedAt||b.createdAt)-Date.parse(a.responseSavedAt||a.createdAt))[0];
+    document.getElementById('lastAnalysisTitle').textContent=latest?'Last analysis on '+new Date(latest.responseSavedAt||latest.createdAt).toLocaleString():'Last analysis — none saved yet';
+    document.getElementById('lastAnalysisMeta').textContent=latest?'Entry: '+latest.day+' · Total: '+analysisRange(latest.total)+' / 50 · '+latest.categories.map((r,i)=>analysisNames[i]+': '+analysisRange(r)+' / '+r.maximum).join(' · '):'';
+    document.getElementById('lastAnalysisResponse').textContent=latest?latest.response:'No response saved yet. Generate a prompt below to start.';
+}
 function renderAnalysisHistory(){
+    renderLatestAnalysis();
     const body=document.getElementById('analysisHistoryBody');body.replaceChildren();
     for(const r of [...analysisRecords].sort((a,b)=>Date.parse(b.createdAt)-Date.parse(a.createdAt))){
         const tr=document.createElement('tr');
         for(const text of [new Date(r.createdAt).toLocaleString(),r.day,analysisRange(r.total),...r.categories.map(analysisRange),r.responseSavedAt?new Date(r.responseSavedAt).toLocaleString():'Pending']){const td=document.createElement('td');td.textContent=text;tr.appendChild(td);}
-        const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='View';button.setAttribute('aria-label','View analysis from '+new Date(r.createdAt).toLocaleString());button.onclick=()=>openAnalysis(r.id);td.appendChild(button);tr.appendChild(td);body.appendChild(tr);
+        const td=document.createElement('td'),button=document.createElement('button');button.type='button';button.className='secondary';button.textContent='View';button.setAttribute('aria-label','View analysis from '+new Date(r.createdAt).toLocaleString());button.onclick=()=>openAnalysis(r.id);td.appendChild(button);
+        const remove=document.createElement('button');remove.type='button';remove.className='secondary analysis-delete';remove.textContent='×';remove.title='Delete analysis';remove.setAttribute('aria-label','Delete analysis from '+new Date(r.createdAt).toLocaleString());remove.onclick=()=>deleteAnalysis(r.id);td.appendChild(remove);
+        tr.appendChild(td);body.appendChild(tr);
     }
     if(!analysisRecords.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=10;td.textContent='No analysis requests yet. Generate a prompt to start.';tr.appendChild(td);body.appendChild(tr);}
 }
@@ -2027,11 +2054,13 @@ function revealDashboardTarget(){
     const target=document.getElementById(id);if(!target)return;
     const selected=target.closest?target.closest('details.overview-details'):null;
     closeOtherDashboardPanels(selected);
+    if(selected){selected.hidden=false;selected.open=true;}
     let node=target.parentElement;while(node){if(node.tagName==='DETAILS'){node.hidden=false;node.open=true;}node=node.parentElement;}
     document.querySelectorAll('.dashboard-nav a').forEach(a=>{if(a.getAttribute('href')==='#'+id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});
     if(id==='fundingQuickHeading')generateFundingQuickPrompt();
     if(id==='cpUpdate'){generateCpPrompt();document.getElementById('cpPromptDetails').open=true;}
     target.scrollIntoView({block:'start'});
+    if(id==='analysisPromptControls')document.getElementById('analysisQuestions').focus({preventScroll:true});
 }
 document.addEventListener('DOMContentLoaded',()=>{
     document.addEventListener('toggle',handleDashboardToggle,true);
