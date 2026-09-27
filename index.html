@@ -728,6 +728,10 @@ button.secondary {
 <label for="analysisQuestions">Questions for the AI (editable)</label><textarea class="paste-box" id="analysisQuestions" rows="12"></textarea>
 <button type="button" onclick="generateAnalysisPrompt()">Generate / refresh prompt with current score</button>
 <button type="button" class="secondary" onclick="copyAnalysisPrompt()">Copy prompt</button>
+<button type="button" class="secondary" onclick="exportAnalysisWord()">Export to Word</button>
+<button type="button" class="secondary" onclick="document.getElementById('analysisWordFile').click()">Import Word</button>
+<input type="file" id="analysisWordFile" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden onchange="importAnalysisWord(this.files[0])">
+<p class="table-note">Export includes the displayed prompt and response. Import loads text from a .docx into the response box; review it and select Save response.</p>
 <p id="analysisSnapshotLabel" class="table-note"></p>
 <label for="analysisPrompt">Prompt to paste into your AI assistant (editable)</label><textarea class="paste-box" id="analysisPrompt" rows="12"></textarea>
 <label for="analysisResponse">Paste AI response</label><textarea class="paste-box" id="analysisResponse" rows="12" placeholder="Paste the full response here, then save."></textarea>
@@ -1252,6 +1256,72 @@ async function copyAnalysisPrompt(){
     const el=document.getElementById('analysisPrompt');if(!el.value.trim()){analysisMessage('Generate a prompt first.');return;}
     try{await navigator.clipboard.writeText(el.value);analysisMessage('Prompt copied.');}catch{el.focus();el.select();analysisMessage('Automatic copy unavailable. The prompt is selected; copy it manually.');}
 }
+// Minimal OOXML export; no network dependency. Import reads document text, never macros or HTML.
+function analysisWordBlob(prompt,response){
+    const enc=new TextEncoder(),xml=s=>s.replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    const paragraphs=(title,text)=>'<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>'+title+'</w:t></w:r></w:p>'+text.split(/\r?\n/).map(line=>'<w:p><w:r><w:t xml:space="preserve">'+xml(line)+'</w:t></w:r></w:p>').join('');
+    const files={
+        '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
+        '_rels/.rels':'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
+        'word/document.xml':'<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paragraphs('AI Analysis Prompt',prompt)+(response.trim()?'<w:sdt><w:sdtPr><w:tag w:val="crash-risk-response"/></w:sdtPr><w:sdtContent>'+paragraphs('AI Analysis Response',response)+'</w:sdtContent></w:sdt>':'')+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>'
+    };
+    const parts=[],central=[];let offset=0;
+    for(const [name,text] of Object.entries(files)){
+        const n=enc.encode(name),data=enc.encode(text);let crc=0xffffffff;
+        for(const b of data){crc^=b;for(let i=0;i<8;i++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}crc=(crc^0xffffffff)>>>0;
+        const header=new Uint8Array(30+n.length),v=new DataView(header.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint32(14,crc,true);v.setUint32(18,data.length,true);v.setUint32(22,data.length,true);v.setUint16(26,n.length,true);header.set(n,30);
+        const dir=new Uint8Array(46+n.length),d=new DataView(dir.buffer);d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint32(16,crc,true);d.setUint32(20,data.length,true);d.setUint32(24,data.length,true);d.setUint16(28,n.length,true);d.setUint32(42,offset,true);dir.set(n,46);central.push(dir);parts.push(header,data);offset+=header.length+data.length;
+    }
+    const end=new Uint8Array(22),e=new DataView(end.buffer);e.setUint32(0,0x06054b50,true);e.setUint16(8,central.length,true);e.setUint16(10,central.length,true);e.setUint32(12,central.reduce((n,c)=>n+c.length,0),true);e.setUint32(16,offset,true);
+    return new Blob([...parts,...central,end],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'});
+}
+function exportAnalysisWord(){
+    const prompt=document.getElementById('analysisPrompt').value,response=document.getElementById('analysisResponse').value;
+    if(!prompt.trim()&&!response.trim()){analysisMessage('Generate a prompt or paste a response before exporting.');return;}
+    const url=URL.createObjectURL(analysisWordBlob(prompt,response)),a=document.createElement('a');a.href=url;a.download='AI-analysis-'+new Date().toISOString().slice(0,10)+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);analysisMessage('Word document exported with the displayed prompt and response.');
+}
+async function analysisDocxXml(buffer){
+    const bytes=new Uint8Array(buffer),v=new DataView(buffer),decoder=new TextDecoder();let end=-1;
+    for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--)if(v.getUint32(i,true)===0x06054b50){end=i;break;}
+    if(end<0)throw Error('This is not a valid .docx file.');
+    let pos=v.getUint32(end+16,true);const count=v.getUint16(end+10,true);
+    for(let i=0;i<count;i++){
+        if(v.getUint32(pos,true)!==0x02014b50)throw Error('Invalid Word archive.');
+        const flags=v.getUint16(pos+8,true),method=v.getUint16(pos+10,true),size=v.getUint32(pos+20,true),expanded=v.getUint32(pos+24,true),len=v.getUint16(pos+28,true),extra=v.getUint16(pos+30,true),comment=v.getUint16(pos+32,true),local=v.getUint32(pos+42,true);
+        const name=decoder.decode(bytes.subarray(pos+46,pos+46+len));pos+=46+len+extra+comment;
+        if(name!=='word/document.xml')continue;
+        if(flags&1)throw Error('Password-protected files are not supported.');
+        if(expanded>5*1024*1024)throw Error('Document text exceeds the 5 MB import limit.');
+        if(v.getUint32(local,true)!==0x04034b50)throw Error('Invalid Word document entry.');
+        const start=local+30+v.getUint16(local+26,true)+v.getUint16(local+28,true);if(start+size>bytes.length)throw Error('Incomplete Word file.');
+        const data=bytes.subarray(start,start+size);if(method===0)return decoder.decode(data);
+        if(method!==8)throw Error('Unsupported Word compression.');
+        const reader=new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw')).getReader(),chunks=[];let total=0;
+        while(true){const {done,value}=await reader.read();if(done)break;total+=value.length;if(total>5*1024*1024){await reader.cancel();throw Error('Document text exceeds the 5 MB import limit.');}chunks.push(value);}
+        return await new Blob(chunks).text();
+    }
+    throw Error('No Word document text was found.');
+}
+async function importAnalysisWord(file){
+    if(!file)return;const owner=historyOwner,id=activeAnalysisId,previous=document.getElementById('analysisResponse').value;
+    try{
+        if(!id)throw Error('Generate or view an analysis request before importing its response.');
+        if(!/\.docx$/i.test(file.name))throw Error('Choose a .docx file. Save older .doc files as .docx in Word first.');
+        if(file.size>10*1024*1024)throw Error('Choose a Word file smaller than 10 MB.');
+        const xml=await analysisDocxXml(await file.arrayBuffer()),doc=new DOMParser().parseFromString(xml,'application/xml');
+        if(doc.getElementsByTagName('parsererror').length)throw Error('The Word document could not be read.');
+        const ns='http://schemas.openxmlformats.org/wordprocessingml/2006/main';
+        const tagged=[...doc.getElementsByTagNameNS(ns,'sdt')].find(el=>[...el.getElementsByTagNameNS(ns,'tag')].some(t=>t.getAttributeNS(ns,'val')==='crash-risk-response'));
+        const paras=[...(tagged||doc).getElementsByTagNameNS(ns,'p')];
+        const text=paras.map(p=>[...p.getElementsByTagNameNS(ns,'r')].map(r=>[...r.childNodes].map(n=>n.localName==='t'?n.textContent:n.localName==='tab'?'\t':['br','cr'].includes(n.localName)?'\n':'').join('')).join('')).slice(tagged?1:0).join('\n').trim();
+        if(!text)throw Error('No text found. Scanned images are not supported.');
+        if(owner!==historyOwner||id!==activeAnalysisId||previous!==document.getElementById('analysisResponse').value)throw Error('The selected analysis or response changed during import. Please import again.');
+        if(previous.trim()&&!window.confirm('Replace the response currently displayed with text from this Word document?'))return;
+        document.getElementById('analysisResponse').value=text;document.getElementById('analysisResponse').focus();analysisMessage('Word text imported. Review it, then click Save response. Formatting and images are not imported.');
+    }catch(error){analysisMessage('Import failed: '+error.message);}
+    finally{document.getElementById('analysisWordFile').value='';}
+}
+
 function saveAnalysisResponse(){
     const r=analysisRecords.find(r=>r.id===activeAnalysisId),response=document.getElementById('analysisResponse').value;
     if(!r){analysisMessage('Generate or view a request first so the response has a score snapshot.');return;}
