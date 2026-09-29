@@ -921,7 +921,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Saved when you select Parse &amp; Update; edit saved dates and numbers directly in this table. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Edit a saved row’s date, time or indicator values, then select Save. Its composite score is calculated from the existing market indicators plus margin leverage, volume pressure, CP funding stress and Nasdaq relative momentum (50 points maximum). Rows are reordered by date; the newest saved row supplies the current dashboard values. Unavailable added inputs display as a score range, never as assumed zero. Dates default to entry time and can be changed to your observation time, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
 <p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–4, amber 5–15, red 16–50. Hover over a value for its score.</p>
 <p class="table-note">S&amp;P 500 closes are matched to the displayed entry date, using the previous session for weekends, holidays, or a session not yet closed. Hover over a price for its actual session date. All charts compare S&amp;P 500 (green), Nasdaq Composite (purple) and Nasdaq 100 (gold), rebased to 100 on the first common session of the displayed period. Hover for actual closes. Nasdaq source: <a href="https://fred.stlouisfed.org/series/NASDAQCOM">FRED NASDAQCOM</a> and <a href="https://fred.stlouisfed.org/series/NASDAQ100">NASDAQ100</a>, embedded through September 24, 2026. These are monitoring series and do not add risk points. S&amp;P source data is embedded through September 23, 2026; later unavailable dates are blank unless entered by you; this embedded dataset does not refresh automatically. <a href="https://finance.yahoo.com/quote/%5EGSPC/history/">Source: Yahoo Finance S&amp;P 500</a>. Quick Paste accepts 29 values, including the margin-debt and volume fields listed above. You can also enter or edit the price manually; it is saved and synced with the entry. The latest saved price for a date overrides its sourced price on your six current-history graphs. Prices do not affect risk scores.</p>
-<p class="table-note">Five-year reference backfill: 1,254 trading sessions, September 27, 2021–September 24, 2026. Newest entries first. Reference rows are read-only; your saved entries take precedence for their date. Charts include both. Missing inputs produce score ranges. Dates identify daily observations, not publication times. This is retrospective analysis, not a point-in-time backtest.</p><details class="table-note"><summary>Backfill sources and assumptions</summary><p>FRED supplies credit spreads, yields, WTI, USDJPY and Nasdaq indexes; Cboe supplies VIX; Yahoo supplies S&amp;P OHLC/volume, MOVE and VIX3M; TheTrading.Tools supplies S&amp;P breadth using current constituents; FINRA supplies margin debt. Debt uses a conservative reference-month +2 months availability assumption. Calculations use full session windows, never shortened for missing data. FX momentum stays unavailable if a required weekday is missing. Downloaded vintages and current constituents limit historical interpretation. Reference data does not refresh automatically. HY and BBB spread history before September 2023 is unavailable from the downloaded FRED series and remains blank; affected composite scores show ranges.</p></details>
+<p class="table-note">Five-year reference backfill: 1,254 trading sessions, September 27, 2021–September 24, 2026. Newest entries first. Editing and saving a reference row creates a personal copy; your saved entries take precedence for their date. Charts include both. Missing inputs produce score ranges. Dates identify daily observations, not publication times. This is retrospective analysis, not a point-in-time backtest.</p><details class="table-note"><summary>Backfill sources and assumptions</summary><p>FRED supplies credit spreads, yields, WTI, USDJPY and Nasdaq indexes; Cboe supplies VIX; Yahoo supplies S&amp;P OHLC/volume, MOVE and VIX3M; TheTrading.Tools supplies S&amp;P breadth using current constituents; FINRA supplies margin debt. Debt uses a conservative reference-month +2 months availability assumption. Calculations use full session windows, never shortened for missing data. FX momentum stays unavailable if a required weekday is missing. Downloaded vintages and current constituents limit historical interpretation. Reference data does not refresh automatically. HY and BBB spread history before September 2023 is unavailable from the downloaded FRED series and remains blank; affected composite scores show ranges.</p></details>
+<p class="table-note">All history data fields are editable, including the total, scored CP date, CP points, Nasdaq relative momentum and Nasdaq points. Edit then Save. Changes to those five calculated fields are manual history-table overrides, stored and synced with the entry; hover to see whether a value is manual. Clear an override to restore calculation. Dashboard charts, category scores and AI trend calculations continue to use raw inputs and model rules. Saving a reference row creates a personal copy.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
@@ -1959,10 +1960,42 @@ function deleteHistoryEntry(entry){
     }
     renderDashboard();
 }
-function updateEntryDateTime(entry,dateText,timeText,values=entry.values){
+const historyOverrideFields=[['composite','Composite Crash Risk Score',50],['scoredCpDate','Scored CP date',null],['cpPoints','CP added points',3],['nasdaqMomentum','Nasdaq 100 relative momentum',null],['nasdaqPoints','Nasdaq added points',3]];
+function parseHistoryOverrides(inputs,existing,day){
+    const result={...existing};
+    for(const [key,label,max] of historyOverrideFields){
+        const input=inputs[key],raw=input.value.trim();
+        if(!raw){delete result[key];continue;}
+        if(raw===input.defaultValue&&!Object.hasOwn(result,key))continue;
+        if(key==='scoredCpDate'){
+            const d=new Date(raw+'T12:00:00');
+            if(!/^\d{4}-\d{2}-\d{2}$/.test(raw)||!Number.isFinite(d.getTime())||localCalendarDate(d)!==raw||raw>day)throw Error('Scored CP date must be a valid date no later than the entry date.');
+            result[key]=raw;
+        }else if(max!==null){
+            const m=raw.match(/^(\d+)(?:\s*[–-]\s*(\d+))?$/);
+            if(!m||Number(m[1])>Number(m[2]??m[1])||Number(m[2]??m[1])>max)throw Error(label+' must be a whole number or range from 0 to '+max+'.');
+            result[key]={low:Number(m[1]),high:Number(m[2]??m[1])};
+        }else{const n=Number(raw);if(!Number.isFinite(n))throw Error(label+' must be a finite number.');result[key]=n;}
+    }
+    return result;
+}
+function historyOverrideInput(key,label,computed,entry,host,inputs,max){
+    const override=entry.historyOverrides?.[key];
+    const display=override===undefined?computed:(typeof override==='object'?analysisRange(override):String(override));
+    host.replaceChildren();const input=document.createElement('input');input.type=key==='scoredCpDate'?'date':'text';
+    input.value=display==='—'?'':display;input.defaultValue=input.value;
+    let color='history-normal';
+    if(max!==null){const m=input.value.match(/^(\d+)$/);if(m){const n=Number(m[1]);color=max===50?(n>=16?'history-red':n>=5?'history-amber':'history-normal'):(n>=3?'history-red':n>0?'history-amber':'history-normal');}}
+    input.className=(key==='scoredCpDate'?'history-date-input':'history-value-input')+' '+color;
+    input.setAttribute('aria-label',label+' for '+(entry.savedAt||'unsaved entry'));
+    input.title=(override===undefined?'Calculated value.':'Manual history-table override.')+' Edit then Save; clear to restore automatic calculation. Dashboard/chart scores still use the model.';
+    host.title=input.title;host.appendChild(input);inputs[key]=input;
+}
+
+function updateEntryDateTime(entry,dateText,timeText,values=entry.values,historyOverrides=entry.historyOverrides||{},entryLabel=entry.entryLabel){
     if(validateForcedInputs(values)){alert(validateForcedInputs(values));return false;}
     if(!validSnapshot(values)){ alert("Use a number or null for every indicator."); return false; }
-    if(!historyOwner || !entryHistory.includes(entry)) return false;
+    if(!historyOwner || (!entryHistory.includes(entry)&&!entry.reference&&entry.savedAt)) return false;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(dateText) || !/^\d{2}:\d{2}(?::\d{2})?$/.test(timeText)){
         alert('Enter a complete date and time.'); return false;
     }
@@ -1973,13 +2006,14 @@ function updateEntryDateTime(entry,dateText,timeText,values=entry.values){
     if(year<1 || !Number.isFinite(date.getTime()) || date.getFullYear()!==year || date.getMonth()!==month-1 || date.getDate()!==day || date.getHours()!==hour || date.getMinutes()!==minute || date.getSeconds()!==second){
         alert('Enter a valid local date and time.'); return false;
     }
-    const updated=entryHistory.map(row=>row===entry ? {...row,savedAt:date.toISOString(),values:{...values}} : row)
-        .sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
+    const replacement={...entry,savedAt:date.toISOString(),values:{...values},historyOverrides,entryLabel};
+    if(entry.reference){replacement.sourceReferenceDate=entry.observationDate;delete replacement.reference;delete replacement.observationDate;delete replacement.id;}
+    const updated=(entryHistory.includes(entry)?entryHistory.map(row=>row===entry?replacement:row):[replacement,...entryHistory]).sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
     try { localStorage.setItem(historyKey(),JSON.stringify(updated)); }
     catch(error){ alert('The entry could not be saved to browser storage. The original entry has been kept.'); return false; }
     entryHistory=updated;
     historyStorageError='';
-    if(currentEntryTime){
+    if(entryHistory.length){
         currentEntryTime=entryHistory[0].savedAt;
         currentData={...entryHistory[0].values};
         
@@ -2107,15 +2141,15 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
         deleteButton.title=deleteLabel; deleteButton.setAttribute('aria-label',deleteLabel);
         deleteButton.onclick=()=>deleteHistoryEntry(entry);
         if(entry.reference){deleteCell.textContent='Reference';}else deleteCell.appendChild(deleteButton); tr.appendChild(deleteCell);
-        const date=entry.savedAt ? new Date(entry.savedAt) : null;
+        const date=entry.savedAt ? new Date(entry.savedAt) : new Date();
         const dateText=entry.reference?entry.observationDate:date ? [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-') : '—';
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
         const entryCell=document.createElement('td');
         entryCell.textContent=entry.reference?'Historical reference':isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past';
-        tr.appendChild(entryCell);
-        const numberInputs={};
+        const labelInput=document.createElement('input');labelInput.type='text';labelInput.className='history-date-input';labelInput.value=entry.entryLabel??entryCell.textContent;labelInput.setAttribute('aria-label','Entry label');entryCell.replaceChildren();entryCell.appendChild(labelInput);tr.appendChild(entryCell);
+        const numberInputs={},overrideInputs={};
         const dateCell=document.createElement('td'),timeCell=document.createElement('td');
-        if(date&&!entry.reference){
+        if(date){
             const dateInput=document.createElement('input');
             dateInput.type='date'; dateInput.value=dateText; dateInput.min='0001-01-01'; dateInput.max='9999-12-31';
             dateInput.className='history-date-input'; dateInput.setAttribute('aria-label','Entry date for '+dateText+' '+timeText);
@@ -2138,7 +2172,8 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
                 values.sp500 = dateInput.value!==dateText && spRaw===numberInputs.sp500.defaultValue ? sp500ForDate(dateInput.value)?.close ?? null : spRaw ? Number(spRaw) : null;
                 for(const [key,label] of marketColumns){const raw=numberInputs[key].value.trim();if(raw&&(!Number.isFinite(Number(raw))||Number(raw)<=0)){alert(label+' must be positive.');return;}values[key]=dateInput.value!==dateText&&raw===numberInputs[key].defaultValue?marketForDate(key,dateInput.value)?.close??null:raw?Number(raw):null;}
                 for(const [key] of liquidityColumns){const raw=numberInputs[key].value.trim();values[key]=raw===''?null:Number(raw);}
-                updateEntryDateTime(entry,dateInput.value,timeInput.value,values);
+                let overrides;try{overrides=parseHistoryOverrides(overrideInputs,entry.historyOverrides||{},dateInput.value);}catch(error){alert(error.message);return;}
+                updateEntryDateTime(entry,dateInput.value,timeInput.value,values,overrides,labelInput.value.trim());
             };
             dateCell.appendChild(dateInput); timeCell.appendChild(timeInput); timeCell.appendChild(saveButton);
         } else { dateCell.textContent=entry.reference?dateText:'—'; timeCell.textContent=entry.reference?'Daily close':'—'; }
@@ -2149,24 +2184,25 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
         scoreCell.textContent = bounds.low===bounds.high ? String(bounds.low) : bounds.low+'–'+bounds.high;
         scoreCell.className = bounds.low!==bounds.high ? 'history-normal' : score >= (isRegime ? maximum*0.67 : 16) ? 'history-red' : score >= (isRegime ? maximum*0.34 : 5) ? 'history-amber' : 'history-normal';
         scoreCell.title = 'Score out of 50. A range means new inputs are unavailable.';
+        historyOverrideInput('composite','Composite Crash Risk Score',scoreCell.textContent,entry,scoreCell,overrideInputs,50);
         tr.appendChild(scoreCell);
-        model50Cells(entry.values,date?dateText:localCalendarDate(new Date())).forEach(cell=>{const td=document.createElement('td');td.textContent=cell.text;td.className=cell.className;td.title='Recalculated using the 50-point model; a range means unavailable inputs.';tr.appendChild(td);});
+        model50Cells(entry.values,date?dateText:localCalendarDate(new Date())).forEach((cell,i)=>{const td=document.createElement('td');const [key,label,max]=historyOverrideFields[i+1];historyOverrideInput(key,label,cell.text,entry,td,overrideInputs,max);tr.appendChild(td);});
         const spCell=document.createElement('td');spCell.className='history-normal';
         const sp=Number.isFinite(entry.values.sp500) ? {date:dateText,close:entry.values.sp500,manual:!entry.reference} : entry.reference?null:sp500ForDate(date ? dateText : localCalendarDate(new Date()));
-        if(date&&!entry.reference){const input=document.createElement('input');input.type='number';input.step='.01';input.min='.01';input.value=sp ? sp.close.toFixed(2) : '';input.defaultValue=input.value;input.className='history-value-input history-normal';input.setAttribute('aria-label','S&P 500 close for '+dateText);numberInputs.sp500=input;spCell.appendChild(input);}
+        if(date){const input=document.createElement('input');input.type='number';input.step='.01';input.min='.01';input.value=sp ? sp.close.toFixed(2) : '';input.defaultValue=input.value;input.className='history-value-input history-normal';input.setAttribute('aria-label','S&P 500 close for '+dateText);numberInputs.sp500=input;spCell.appendChild(input);}
         else spCell.textContent=sp ? sp.close.toFixed(2) : '';
         spCell.title=sp ? (sp.manual ? 'User-entered S&P 500 close for ' : 'Sourced S&P 500 close for ')+sp.date : 'S&P 500 unavailable; enter a closing level if known';
         tr.appendChild(spCell);
         for(const [key,label] of marketColumns){
             const td=document.createElement('td');td.className='history-normal';const quote=marketForDate(key,date?dateText:localCalendarDate(new Date()),entry.values);
             td.title=quote?label+' · session '+quote.date:'Unavailable';
-            if(date&&!entry.reference){const input=document.createElement('input');input.type='number';input.step='.01';input.min='.01';input.className='history-value-input history-normal';input.value=quote?quote.close.toFixed(2):'';input.defaultValue=input.value;input.setAttribute('aria-label',label+' for '+dateText);numberInputs[key]=input;td.appendChild(input);}else td.textContent=quote?quote.close.toFixed(2):'';
+            if(date){const input=document.createElement('input');input.type='number';input.step='.01';input.min='.01';input.className='history-value-input history-normal';input.value=quote?quote.close.toFixed(2):'';input.defaultValue=input.value;input.setAttribute('aria-label',label+' for '+dateText);numberInputs[key]=input;td.appendChild(input);}else td.textContent=quote?quote.close.toFixed(2):'';
             tr.appendChild(td);
         }
-        for(const [key,label] of liquidityColumns){const td=document.createElement('td');const input=document.createElement('input');input.type='number';input.step=key==='cp_date'?'1':'any';input.className='history-value-input history-normal';input.value=entry.values[key]??'';input.setAttribute('aria-label',label+' for '+dateText);numberInputs[key]=input;if(entry.reference)td.textContent=entry.values[key]??'—';else td.appendChild(input);tr.appendChild(td);}
+        for(const [key,label] of liquidityColumns){const td=document.createElement('td');const input=document.createElement('input');input.type='number';input.step=key==='cp_date'?'1':'any';input.className='history-value-input history-normal';input.value=entry.values[key]??'';input.setAttribute('aria-label',label+' for '+dateText);numberInputs[key]=input;td.appendChild(input);tr.appendChild(td);}
         columns.forEach(([key])=>{
             const value=entry.values[key], risk=historyRisk(key,value,entry.values),td=document.createElement('td');
-            if(date&&!entry.reference){
+            if(date){
                 const input=document.createElement('input'); input.type='number'; input.step='any'; input.value=Number.isFinite(value)?String(value):'';
                 input.className='history-value-input '+risk.className;
                 input.setAttribute('aria-label',key+' for '+dateText+' '+timeText);
@@ -2179,7 +2215,7 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
             td.title=key==='jpy'?'USDJPY level is reference only. Risk comes from the separate 3-session change.':risk.points+' / '+risk.max+' risk points'; tr.appendChild(td);
         });
         const inferred=forcedInputsForDate(date ? dateText : localCalendarDate(new Date()));
-        forcedColumns.forEach(([key,label])=>{const td=document.createElement('td');const value=entry.reference?entry.values[key]:entry.values[key]??inferred[key];if(date&&!entry.reference){const input=document.createElement('input');input.type='number';input.step='any';input.value=Number.isFinite(value)?String(value):'';input.defaultValue=input.value;input.className='history-value-input '+forcedFieldRisk(key,{...inferred,...entry.values},dateText);input.setAttribute('aria-label',label+' for '+dateText);input.oninput=()=>{const values={...inferred,...entry.values};forcedColumns.forEach(([k])=>{const raw=numberInputs[k]?.value.trim();values[k]=raw?Number(raw):null;});forcedColumns.forEach(([k])=>{numberInputs[k].className='history-value-input '+forcedFieldRisk(k,values,dateText);});};numberInputs[key]=input;td.appendChild(input);}else {td.textContent=Number.isFinite(value)?String(value):'';td.className=forcedFieldRisk(key,{...inferred,...entry.values},date?dateText:localCalendarDate(new Date()));}td.title='Color follows the related currency-momentum, margin or selling-volume risk rule; missing data stays white.';tr.appendChild(td);});
+        forcedColumns.forEach(([key,label])=>{const td=document.createElement('td');const value=entry.reference?entry.values[key]:entry.values[key]??inferred[key];if(date){const input=document.createElement('input');input.type='number';input.step='any';input.value=Number.isFinite(value)?String(value):'';input.defaultValue=input.value;input.className='history-value-input '+forcedFieldRisk(key,{...inferred,...entry.values},dateText);input.setAttribute('aria-label',label+' for '+dateText);input.oninput=()=>{const values={...inferred,...entry.values};forcedColumns.forEach(([k])=>{const raw=numberInputs[k]?.value.trim();values[k]=raw?Number(raw):null;});forcedColumns.forEach(([k])=>{numberInputs[k].className='history-value-input '+forcedFieldRisk(k,values,dateText);});};numberInputs[key]=input;td.appendChild(input);}else {td.textContent=Number.isFinite(value)?String(value):'';td.className=forcedFieldRisk(key,{...inferred,...entry.values},date?dateText:localCalendarDate(new Date()));}td.title='Color follows the related currency-momentum, margin or selling-volume risk rule; missing data stays white.';tr.appendChild(td);});
         body.appendChild(tr);
     });
 }
