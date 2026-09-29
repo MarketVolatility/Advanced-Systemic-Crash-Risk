@@ -831,6 +831,7 @@ button.secondary {
 </details>
 <details class="overview-details dashboard-section" name="dashboard-panels" id="compositeUpdatePanel"><summary>Update Data</summary>
 <h2 class="section-heading" id="dashboardUpdate" tabindex="-1">Update Data</h2>
+<p id="compositeReconcileStatus" class="table-note" role="status" aria-live="polite"></p>
 <p class="table-note">Paste researched market values. Saved numbers can be edited in History. <a href="#fundingQuickHeading">Update dollar funding data</a>.</p>
 
 <div class="control-panel">
@@ -922,7 +923,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note"><span class="history-normal">White: no risk points</span> · <span class="history-amber">Amber: intermediate risk points</span> · <span class="history-red">Red: maximum risk points</span>. Composite score colors: white 0–4, amber 5–15, red 16–50. Hover over a value for its score.</p>
 <p class="table-note">S&amp;P 500 closes are matched to the displayed entry date, using the previous session for weekends, holidays, or a session not yet closed. Hover over a price for its actual session date. All charts compare S&amp;P 500 (green), Nasdaq Composite (purple) and Nasdaq 100 (gold), rebased to 100 on the first common session of the displayed period. Hover for actual closes. Nasdaq source: <a href="https://fred.stlouisfed.org/series/NASDAQCOM">FRED NASDAQCOM</a> and <a href="https://fred.stlouisfed.org/series/NASDAQ100">NASDAQ100</a>, embedded through September 24, 2026. These are monitoring series and do not add risk points. S&amp;P source data is embedded through September 23, 2026; later unavailable dates are blank unless entered by you; this embedded dataset does not refresh automatically. <a href="https://finance.yahoo.com/quote/%5EGSPC/history/">Source: Yahoo Finance S&amp;P 500</a>. Quick Paste accepts 29 values, including the margin-debt and volume fields listed above. You can also enter or edit the price manually; it is saved and synced with the entry. The latest saved price for a date overrides its sourced price on your six current-history graphs. Prices do not affect risk scores.</p>
 <p class="table-note">Five-year reference backfill: 1,254 trading sessions, September 27, 2021–September 24, 2026. Newest entries first. Editing and saving a reference row creates a personal copy; your saved entries take precedence for their date. Charts include both. Missing inputs produce score ranges. Dates identify daily observations, not publication times. This is retrospective analysis, not a point-in-time backtest.</p><details class="table-note"><summary>Backfill sources and assumptions</summary><p>FRED supplies credit spreads, yields, WTI, USDJPY and Nasdaq indexes; Cboe supplies VIX; Yahoo supplies S&amp;P OHLC/volume, MOVE and VIX3M; TheTrading.Tools supplies S&amp;P breadth using current constituents; FINRA supplies margin debt. Debt uses a conservative reference-month +2 months availability assumption. Calculations use full session windows, never shortened for missing data. FX momentum stays unavailable if a required weekday is missing. Downloaded vintages and current constituents limit historical interpretation. Reference data does not refresh automatically. HY and BBB spread history before September 2023 is unavailable from the downloaded FRED series and remains blank; affected composite scores show ranges.</p></details>
-<p class="table-note">All history data fields are editable, including the total, scored CP date, CP points, Nasdaq relative momentum and Nasdaq points. Edit then Save. Changes to those five calculated fields are manual history-table overrides, stored and synced with the entry; hover to see whether a value is manual. Clear an override to restore calculation. Dashboard charts, category scores and AI trend calculations continue to use raw inputs and model rules. Saving a reference row creates a personal copy.</p>
+<p class="table-note">All history data fields are editable, including the total, scored CP date, CP points, Nasdaq relative momentum and Nasdaq points. Edit then Save. Changes to those five calculated fields are manual history-table overrides, stored and synced with the entry; hover to see whether a value is manual. Clear an override to restore calculation. Dashboard charts, category scores and AI trend calculations continue to use raw inputs and model rules. Updating the composite reconciles same-date CP/index observations across saved rows and resets these manual calculated-field overrides. Saving a reference row creates a personal copy.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
@@ -1898,7 +1899,9 @@ let historyPreviewHidden = false;
 let historyStorageError = '';
 function historyDisplayEntries(){
     const savedDays=new Set(entryHistory.map(r=>localCalendarDate(new Date(r.savedAt))));
-    return [...entryHistory,...marketHistoryReference.filter(r=>!savedDays.has(r.observationDate))].sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
+    const rates=new Map(liquidityHistoryRows().filter(r=>[r.financial,r.nonfinancial,r.treasury].every(Number.isFinite)).map(r=>[r.date,r]));
+    const references=marketHistoryReference.filter(r=>!savedDays.has(r.observationDate)).map(r=>{const cp=rates.get(liquidityDate(r.values.cp_date));return cp?{...r,values:{...r.values,cp_financial:cp.financial,cp_nonfinancial:cp.nonfinancial,cp_treasury:cp.treasury}}:r;});
+    return [...entryHistory,...references].sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
 }
 function historyKey(){ return 'crash-risk-history-v1:' + historyOwner; }
 function validSnapshot(values){
@@ -1988,7 +1991,7 @@ function historyOverrideInput(key,label,computed,entry,host,inputs,max){
     if(max!==null){const m=input.value.match(/^(\d+)$/);if(m){const n=Number(m[1]);color=max===50?(n>=16?'history-red':n>=5?'history-amber':'history-normal'):(n>=3?'history-red':n>0?'history-amber':'history-normal');}}
     input.className=(key==='scoredCpDate'?'history-date-input':'history-value-input')+' '+color;
     input.setAttribute('aria-label',label+' for '+(entry.savedAt||'unsaved entry'));
-    input.title=(override===undefined?'Calculated value.':'Manual history-table override.')+' Edit then Save; clear to restore automatic calculation. Dashboard/chart scores still use the model.';
+    input.title=(entry.values.equitySessionDate?'Equity observation session: '+entry.values.equitySessionDate+'. ':'')+(override===undefined?'Calculated value.':'Manual history-table override.')+' Edit then Save; clear to restore automatic calculation. Dashboard/chart scores still use the model.';
     host.title=input.title;host.appendChild(input);inputs[key]=input;
 }
 
@@ -2006,7 +2009,7 @@ function updateEntryDateTime(entry,dateText,timeText,values=entry.values,history
     if(year<1 || !Number.isFinite(date.getTime()) || date.getFullYear()!==year || date.getMonth()!==month-1 || date.getDate()!==day || date.getHours()!==hour || date.getMinutes()!==minute || date.getSeconds()!==second){
         alert('Enter a valid local date and time.'); return false;
     }
-    const replacement={...entry,savedAt:date.toISOString(),values:{...values},historyOverrides,entryLabel};
+    const replacement={...entry,savedAt:date.toISOString(),updatedAt:new Date().toISOString(),values:{...values},historyOverrides,entryLabel};
     if(entry.reference){replacement.sourceReferenceDate=entry.observationDate;delete replacement.reference;delete replacement.observationDate;delete replacement.id;}
     const updated=(entryHistory.includes(entry)?entryHistory.map(row=>row===entry?replacement:row):[replacement,...entryHistory]).sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
     try { localStorage.setItem(historyKey(),JSON.stringify(updated)); }
@@ -2460,16 +2463,78 @@ function setRegime(
    MANUAL UPDATE
    ========================================================= */
 
+function entryEquityDay(row){return row.values.equitySessionDate||row.observationDate||localCalendarDate(new Date(row.savedAt));}
+let appEquityCache=null;
+function appEquityRows(entries=entryHistory){
+    if(entries===entryHistory&&appEquityCache?.entries===entries&&appEquityCache.count===entries.length)return appEquityCache.rows;
+    const rows=new Map();
+    for(const [day,close] of sp500Daily)rows.set(day,{date:day,sp500:close});
+    for(const [key,series] of [['nasdaq',nasdaqDaily.nasdaq],['nasdaq100',nasdaqDaily.nasdaq100]])for(const [day,close] of series){const row=rows.get(day)||{date:day};row[key]=close;rows.set(day,row);}
+    for(const row of marketHistoryReference){const day=entryEquityDay(row);rows.set(day,{...rows.get(day),...row.values,date:day});}
+    for(const row of [...entries].sort((a,b)=>Date.parse(a.updatedAt||a.savedAt)-Date.parse(b.updatedAt||b.savedAt))){
+        const day=entryEquityDay(row),old=rows.get(day)||{date:day};const next={...old};
+        for(const key of ['sp500','nasdaq','nasdaq100','sp_high','sp_low','volume','volume_avg','sp500_chg','dma50','dma200'])if(Number.isFinite(row.values[key]))next[key]=row.values[key];
+        rows.set(day,next);
+    }
+    const result=[...rows.values()].sort((a,b)=>a.date.localeCompare(b.date));
+    if(entries===entryHistory)appEquityCache={entries,count:entries.length,rows:result};
+    return result;
+}
+function prepareCompositeUpdate(values,day,now){
+    const next={...values},notices=[],equities=appEquityRows().filter(r=>r.date<=day);
+    const supplied=['sp500','nasdaq','nasdaq100'].filter(k=>Number.isFinite(next[k]));
+    // Fill missing indexes only from a matching dated group, never unrelated sessions.
+    const match=equities.filter(r=>supplied.every(k=>Number.isFinite(r[k])&&Math.abs(r[k]-next[k])<.011)&&['sp500','nasdaq','nasdaq100'].every(k=>Number.isFinite(r[k]))).at(-1);
+    const sameDay=equities.find(r=>r.date===day);
+    const source=match||(sameDay&&supplied.every(k=>!Number.isFinite(sameDay[k])||Math.abs(sameDay[k]-next[k])<.011)?sameDay:null);
+    if(source&&supplied.length<3){
+        for(const k of ['sp500','nasdaq','nasdaq100'])if(!Number.isFinite(next[k]))next[k]=source[k]??null;
+        next.equitySessionDate=source.date;
+        if(!supplied.length)for(const k of ['sp_high','sp_low','volume','volume_avg','sp500_chg','dma50','dma200'])next[k]=source[k]??null;
+        notices.push('Equity fields refreshed from '+source.date+'.');
+    }
+    for(const k of ['sp500','nasdaq','nasdaq100'])if(!Number.isFinite(next[k]))next[k]=null;
+    const candidate={savedAt:now,cpCheckedAt:now,values:next};
+    const cp=liquidityHistoryRows([...entryHistory,candidate]).filter(r=>r.date<=day&&[r.financial,r.nonfinancial,r.treasury].every(Number.isFinite)).at(-1);
+    if(cp){Object.assign(next,{cp_date:Number(cp.date.replaceAll('-','')),cp_financial:cp.financial,cp_nonfinancial:cp.nonfinancial,cp_treasury:cp.treasury});notices.push('Matched CP rates refreshed from '+cp.date+'.');}
+    else for(const [k] of liquidityColumns)next[k]=null;
+    return {values:next,notices};
+}
+function reconcileCompositeEntries(entries){
+    const cp=new Map(liquidityHistoryRows(entries).map(r=>[r.date,r]));
+    const equities=new Map(appEquityRows(entries).map(r=>[r.date,r]));let corrected=0,cleared=0;
+    const rows=entries.map(row=>{
+        const values={...row.values},overrides={...row.historyOverrides};let changed=false;
+        const rate=cp.get(liquidityDate(values.cp_date));
+        if(rate&&[rate.financial,rate.nonfinancial,rate.treasury].every(Number.isFinite))for(const [k,n] of [['cp_financial',rate.financial],['cp_nonfinancial',rate.nonfinancial],['cp_treasury',rate.treasury]])if(values[k]!==n){values[k]=n;changed=true;}
+        const quote=equities.get(entryEquityDay(row));
+        if(quote)for(const k of ['sp500','nasdaq','nasdaq100','sp_high','sp_low','volume','volume_avg','sp500_chg','dma50','dma200'])if(Number.isFinite(quote[k])&&values[k]!==quote[k]){values[k]=quote[k];changed=true;}
+        for(const [key] of historyOverrideFields)if(Object.hasOwn(overrides,key)){delete overrides[key];cleared++;changed=true;}
+        if(!changed)return row;
+        corrected++;
+        return {...row,values,historyOverrides:overrides,reconciledAt:new Date().toISOString()};
+    });
+    return {rows,corrected,cleared};
+}
+
 function commitEntry(values,observationDate=null){
     if(!historyOwner){ alert('Please sign in before saving an entry.'); return; }
     const error=validateForcedInputs(values);if(error){alert(error);return;}
-    currentData = values;
-    
-    const cpCheckedAt=Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?new Date().toISOString():null;
-    saveEntry(observationDate,cpCheckedAt);
+    const now=new Date().toISOString(),day=observationDate||localCalendarDate(new Date(now));
+    const prepared=prepareCompositeUpdate(values,day,now);
+    const finalError=validateForcedInputs(prepared.values);if(finalError||!validSnapshot(prepared.values)){alert(finalError||'Invalid composite inputs.');return;}
+    const savedAt=observationDate?new Date(observationDate+'T12:00:00').toISOString():now;
+    const candidate={savedAt,updatedAt:now,values:prepared.values,...(Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?{cpCheckedAt:now}:{})};
+    const reconciled=reconcileCompositeEntries([candidate,...entryHistory]);
+    try{localStorage.setItem(historyKey(),JSON.stringify(reconciled.rows));}
+    catch(error){alert('Update could not be saved. Existing history has been kept; check browser storage and try again.');return;}
+    entryHistory=reconciled.rows;currentEntryTime=savedAt;currentData={...entryHistory[0].values};model50Cache=null;historyPreviewHidden=false;historyStorageError='';
     const period=document.getElementById('forcedPeriod');if(period)period.value='current';
     renderDashboard();
+    const status=document.getElementById('compositeReconcileStatus');
+    if(status)status.textContent=prepared.notices.join(' ')+' Checked History against CP Funding & Leadership: '+reconciled.corrected+' rows reconciled; '+reconciled.cleared+' manual calculated-field overrides reset. Missing source data or incomplete 21-session windows remain unavailable.';
 }
+
 function parseQuickPaste(){
     const items=document.getElementById('quickPasteInput').value.trim().replace(/^\[|\]$/g,'').split(',').map(v=>v.trim());
     if(items.length!==inputColumns.length && items.length!==26 && items.length!==27 && items.length!==29 && items.length!==31){alert('Provide exactly 35 comma-separated values in the listed order. Use null for unavailable new fields.');return;}
@@ -2552,7 +2617,7 @@ function marketForDate(key,day,values){
     const r=rows[lo-1];return r&&Date.parse(day)-Date.parse(r[0])<=4*86400000?{date:r[0],close:r[1]}:null;
 }
 function marketCells(day,values){return marketColumns.map(([key])=>{const q=marketForDate(key,day,values);return '<td class="history-normal" title="'+(q?'Session '+q.date:'Unavailable')+'">'+(q?q.close.toFixed(2):'—')+'</td>';}).join('');}
-function marketValuesForDay(day){const r=[...entryHistory].filter(r=>localCalendarDate(new Date(r.savedAt))===day).sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt))[0];return r?.values;}
+function marketValuesForDay(day){return appEquityRows().find(r=>r.date===day);}
 
 function sp500ForDate(day){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(day) || day>localCalendarDate(new Date()))return null;
@@ -2589,7 +2654,7 @@ function sp500ChartPoints(start,end){
     // The most recent saved entry for a calendar date overrides that day's sourced close.
     historyDisplayEntries().sort((a,b)=>Date.parse(a.savedAt)-Date.parse(b.savedAt)).forEach(row=>{
         if(Date.parse(row.savedAt)>end.getTime())return;
-        const date=localCalendarDate(new Date(row.savedAt));
+        const date=entryEquityDay(row);
         byDate.set(date,{date,close:Number.isFinite(row.values.sp500)&&row.values.sp500>0?row.values.sp500:byDate.get(date)?.close??null,time:new Date(date+'T00:00:00').getTime(),manual:true});
     });
     return [...byDate.values()].filter(p=>p.time>=start.getTime()&&p.time<=end.getTime()).sort((a,b)=>a.time-b.time);
@@ -2749,8 +2814,7 @@ let model50Cache=null;
 function model50Sources(){
     if(model50Cache&&model50Cache.entries===entryHistory&&model50Cache.count===entryHistory.length&&model50Cache.fred===fredLiveData)return model50Cache;
     const cp=liquidityHistoryRows().filter(r=>Number.isFinite(r.sector)&&Number.isFinite(r.financialBill)),momentum=relativeMomentumRows();
-    const sp=new Map(sp500Daily),nd=new Map(nasdaqDaily.nasdaq100);
-    historyDisplayEntries().sort((a,b)=>Date.parse(a.savedAt)-Date.parse(b.savedAt)).forEach(r=>{const d=localCalendarDate(new Date(r.savedAt));if(Number.isFinite(r.values.sp500))sp.set(d,r.values.sp500);if(Number.isFinite(r.values.nasdaq100))nd.set(d,r.values.nasdaq100);});
+    const quotes=appEquityRows(),sp=new Map(quotes.map(r=>[r.date,r.sp500])),nd=new Map(quotes.map(r=>[r.date,r.nasdaq100]));
     model50Cache={entries:entryHistory,count:entryHistory.length,fred:fredLiveData,cp,momentum,sp,nd,studySessions:new Map(historicalMonths.flatMap(m=>m.rows.map(r=>[r.date,r.observationDate]))),indices:new Map(momentum.map((r,i)=>[r.date,i]))};return model50Cache;
 }
 function cpStressPoints(sector,bill){return sector>=50||bill>=100?3:sector>=25||bill>=50?2:0;}
@@ -2762,7 +2826,7 @@ function model50Inputs(values,day=localCalendarDate(new Date())){
     let cp=explicit?manual:src.cp[left-1];
     if(cp&&(cp.date>day||Date.parse(day)-Date.parse(cp.date)>7*86400000))cp=null;
     const studySession=src.studySessions.get(day);
-    let i=src.indices.get(studySession||day);
+    let i=src.indices.get(values.equitySessionDate||studySession||day);
     // Weekend historical snapshots use the most recent session, never a future session.
     if(i===undefined){const d=new Date(day+'T12:00:00Z');if(d.getUTCDay()===0||d.getUTCDay()===6)i=src.momentum.findLastIndex(r=>r.date<=day);}
     let momentum=null,session=null;
@@ -3035,15 +3099,14 @@ function validateLiquidityInputs(v){
     if(!liquidityColumns.slice(1).every(([k])=>Number.isFinite(v[k])&&v[k]>=-10&&v[k]<=100))return 'Supply all three same-date CP/Treasury rates in percent (not basis points), or omit all four funding fields.';
     return null;
 }
-function liquidityHistoryRows(){
+function liquidityHistoryRows(entries=entryHistory){
     const byDate=new Map(commercialPaperDaily.map(r=>[r[0],cpSpreads(r)]));
     if(fredLiveData)fredLiveData.rows.forEach(r=>byDate.set(r[0],{...cpSpreads(r),live:true}));
-    [...entryHistory].sort((a,b)=>Date.parse(a.savedAt)-Date.parse(b.savedAt)).forEach(r=>{const v=r.values;if(v.cp_date==null||validateLiquidityInputs(v))return;const date=liquidityDate(v.cp_date);byDate.set(date,{...cpSpreads([date,v.cp_financial,v.cp_nonfinancial,v.cp_treasury]),manual:true});});
+    [...entries].sort((a,b)=>Date.parse(a.cpCheckedAt||a.updatedAt||a.savedAt)-Date.parse(b.cpCheckedAt||b.updatedAt||b.savedAt)).forEach(r=>{const v=r.values;if(v.cp_date==null||validateLiquidityInputs(v))return;const date=liquidityDate(v.cp_date),existing=byDate.get(date);if(existing?.live&&[existing.financial,existing.nonfinancial,existing.treasury].every(Number.isFinite)&&Date.parse(fredLiveData.fetchedAt)>Date.parse(r.cpCheckedAt||r.updatedAt||r.savedAt))return;byDate.set(date,{...cpSpreads([date,v.cp_financial,v.cp_nonfinancial,v.cp_treasury]),manual:true});});
     return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
 }
 function relativeMomentumRows(){
-    const sp=new Map(sp500Daily),ndx=new Map(nasdaqDaily.nasdaq100);
-    historyDisplayEntries().sort((a,b)=>Date.parse(a.savedAt)-Date.parse(b.savedAt)).forEach(r=>{const d=localCalendarDate(new Date(r.savedAt));if(Number.isFinite(r.values.sp500)&&r.values.sp500>0)sp.set(d,r.values.sp500);if(Number.isFinite(r.values.nasdaq100)&&r.values.nasdaq100>0)ndx.set(d,r.values.nasdaq100);});
+    const quotes=appEquityRows(),sp=new Map(quotes.map(r=>[r.date,r.sp500])),ndx=new Map(quotes.map(r=>[r.date,r.nasdaq100]));
     // Nasdaq session dates define the calendar; do not shorten the lag around missing S&P observations.
     const days=[...nasdaqDaily.nasdaq100.map(r=>r[0])];
     const latest=[...sp.keys(),...ndx.keys()].filter(d=>d<=localCalendarDate(new Date())).sort().at(-1);const cursor=new Date(days.at(-1)+'T00:00:00Z');
