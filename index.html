@@ -745,6 +745,7 @@ button.secondary {
 <p id="analysisStatus" role="status" aria-live="polite"></p>
 </div>
 <h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Use × to delete a request and its response. Edit values directly, then click Save on that row, as in History. Totals must equal category sums. Risk numbers only: white = below watch threshold or incomplete range, amber = watch, red = stressed. Headers stay fixed while scrolling. Original prompts retain their original snapshots; edited rows show their edit time on hover.</p>
+<div id="historyPager" class="table-note" aria-label="History pages"></div>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th scope="col">Actions</th><th scope="col">Download</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
 </details>
 
@@ -2125,6 +2126,8 @@ function model50Cells(values,day){
         {text:points(nd),className:color(nd)}];
 }
 const model50Headers=['Scored CP date','CP added points (0–3)','Nasdaq 100 relative momentum (%)','Nasdaq added points (0–3)'];
+const historyPageSize=50;
+const historyPages=Object.create(null);
 function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
     const head = document.getElementById(prefix+'Head'); head.replaceChildren();
     const heading = document.createElement('tr');
@@ -2134,7 +2137,25 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
     const body = document.getElementById(prefix+'Body'); body.replaceChildren();
     const newestEntries = historyDisplayEntries();
     const entries = currentEntryTime || historyPreviewHidden ? newestEntries : [{savedAt:null,values:currentData},...newestEntries];
-    entries.forEach((entry,index)=>{
+    const state=historyPages[prefix]||(historyPages[prefix]={page:0});
+    if(state.owner!==historyOwner || state.current!==currentEntryTime){state.page=0;state.owner=historyOwner;state.current=currentEntryTime;}
+    const pages=Math.max(1,Math.ceil(entries.length/historyPageSize));
+    state.page=Math.max(0,Math.min(state.page,pages-1));
+    const start=state.page*historyPageSize;
+    const pager=document.getElementById(prefix+'Pager');
+    if(pager){
+        pager.replaceChildren();
+        const go=page=>{if(state.dirty&&!confirm('Discard unsaved edits on this history page?'))return;state.page=page;renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime);};
+        for(const [label,page] of [['Newest',0],['Previous',state.page-1],['Next',state.page+1],['Oldest',pages-1]]){
+            const button=document.createElement('button');button.type='button';button.textContent=label;button.disabled=page<0||page>=pages||page===state.page;button.onclick=()=>go(page);pager.appendChild(button);
+        }
+        const status=document.createElement('span');status.textContent=' Rows '+(entries.length?start+1:0)+'–'+Math.min(start+historyPageSize,entries.length)+' of '+entries.length+' · Page '+(state.page+1)+' of '+pages+' · All rows remain editable. ';pager.appendChild(status);
+        const jump=document.createElement('input');jump.type='date';jump.className='history-date-input';jump.setAttribute('aria-label','Find history date');pager.appendChild(jump);
+        const find=document.createElement('button');find.type='button';find.textContent='Go to date';find.onclick=()=>{if(!jump.value)return;const index=entries.findIndex(r=>(r.observationDate||localCalendarDate(new Date(r.savedAt||Date.now())))<=jump.value);go(Math.floor((index<0?entries.length-1:index)/historyPageSize));};pager.appendChild(find);
+    }
+    state.dirty=false;
+    body.oninput=()=>{state.dirty=true;};
+    entries.slice(start,start+historyPageSize).forEach((entry,index)=>{
         const isCurrent = !entry.reference && !historyPreviewHidden && (entry.savedAt===currentEntryTime || !entry.savedAt);
         const tr=document.createElement('tr'); if(isCurrent) tr.className='history-current';
         const deleteCell=document.createElement('td');
@@ -2617,7 +2638,8 @@ function marketForDate(key,day,values){
     const r=rows[lo-1];return r&&Date.parse(day)-Date.parse(r[0])<=4*86400000?{date:r[0],close:r[1]}:null;
 }
 function marketCells(day,values){return marketColumns.map(([key])=>{const q=marketForDate(key,day,values);return '<td class="history-normal" title="'+(q?'Session '+q.date:'Unavailable')+'">'+(q?q.close.toFixed(2):'—')+'</td>';}).join('');}
-function marketValuesForDay(day){return appEquityRows().find(r=>r.date===day);}
+let marketLookupCache=null;
+function marketValuesForDay(day){const rows=appEquityRows();if(marketLookupCache?.rows!==rows)marketLookupCache={rows,byDate:new Map(rows.map(r=>[r.date,r]))};return marketLookupCache.byDate.get(day);}
 
 function sp500ForDate(day){
     if(!/^\d{4}-\d{2}-\d{2}$/.test(day) || day>localCalendarDate(new Date()))return null;
@@ -3105,13 +3127,17 @@ function liquidityHistoryRows(entries=entryHistory){
     [...entries].sort((a,b)=>Date.parse(a.cpCheckedAt||a.updatedAt||a.savedAt)-Date.parse(b.cpCheckedAt||b.updatedAt||b.savedAt)).forEach(r=>{const v=r.values;if(v.cp_date==null||validateLiquidityInputs(v))return;const date=liquidityDate(v.cp_date),existing=byDate.get(date);if(existing?.live&&[existing.financial,existing.nonfinancial,existing.treasury].every(Number.isFinite)&&Date.parse(fredLiveData.fetchedAt)>Date.parse(r.cpCheckedAt||r.updatedAt||r.savedAt))return;byDate.set(date,{...cpSpreads([date,v.cp_financial,v.cp_nonfinancial,v.cp_treasury]),manual:true});});
     return [...byDate.values()].sort((a,b)=>a.date.localeCompare(b.date));
 }
+let momentumRowsCache=null;
 function relativeMomentumRows(){
-    const quotes=appEquityRows(),sp=new Map(quotes.map(r=>[r.date,r.sp500])),ndx=new Map(quotes.map(r=>[r.date,r.nasdaq100]));
+    const quotes=appEquityRows(),today=localCalendarDate(new Date());
+    if(momentumRowsCache?.quotes===quotes&&momentumRowsCache.today===today)return momentumRowsCache.rows;
+    const sp=new Map(quotes.map(r=>[r.date,r.sp500])),ndx=new Map(quotes.map(r=>[r.date,r.nasdaq100]));
     // Nasdaq session dates define the calendar; do not shorten the lag around missing S&P observations.
     const days=[...nasdaqDaily.nasdaq100.map(r=>r[0])];
     const latest=[...sp.keys(),...ndx.keys()].filter(d=>d<=localCalendarDate(new Date())).sort().at(-1);const cursor=new Date(days.at(-1)+'T00:00:00Z');
     while(cursor.toISOString().slice(0,10)<latest){cursor.setUTCDate(cursor.getUTCDate()+1);if(cursor.getUTCDay()!==0&&cursor.getUTCDay()!==6)days.push(cursor.toISOString().slice(0,10));}
-    return days.map((date,i)=>{const window=days.slice(i-20,i+1);const complete=i>=20&&window.length===21&&window.every(d=>Number.isFinite(sp.get(d))&&sp.get(d)>0&&Number.isFinite(ndx.get(d))&&ndx.get(d)>0);return {date,sp500:sp.get(date)??null,momentum:complete?100*((ndx.get(date)/sp.get(date))/(ndx.get(days[i-20])/sp.get(days[i-20]))-1):null};});
+    const rows=days.map((date,i)=>{const window=days.slice(i-20,i+1);const complete=i>=20&&window.length===21&&window.every(d=>Number.isFinite(sp.get(d))&&sp.get(d)>0&&Number.isFinite(ndx.get(d))&&ndx.get(d)>0);return {date,sp500:sp.get(date)??null,momentum:complete?100*((ndx.get(date)/sp.get(date))/(ndx.get(days[i-20])/sp.get(days[i-20]))-1):null};});
+    momentumRowsCache={quotes,today,rows};return rows;
 }
 function diagnosticWatch(rows,key,day,direction){
     const end=Date.parse(day),valid=rows.filter(r=>r.date<=day&&Number.isFinite(r[key])).sort((a,b)=>a.date.localeCompare(b.date)),latest=valid.at(-1),exceptions=[];
