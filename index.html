@@ -745,7 +745,6 @@ button.secondary {
 <p id="analysisStatus" role="status" aria-live="polite"></p>
 </div>
 <h3>Analysis history</h3><p class="table-note">Newest requests first. View opens the saved prompt and response above. Pending requests can be completed later. Use × to delete a request and its response. Edit values directly, then click Save on that row, as in History. Totals must equal category sums. Risk numbers only: white = below watch threshold or incomplete range, amber = watch, red = stressed. Headers stay fixed while scrolling. Original prompts retain their original snapshots; edited rows show their edit time on hover.</p>
-<div id="historyPager" class="table-note" aria-label="History pages"></div>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Saved AI analysis history"><table class="history-table"><thead><tr><th>Request date &amp; time</th><th>Entry date</th><th>Total /50</th><th>Volatility /10</th><th>Credit /14</th><th>Macro /8</th><th>Equity /12</th><th>Forced Selling /6</th><th>Response saved</th><th scope="col">Actions</th><th scope="col">Download</th></tr></thead><tbody id="analysisHistoryBody"></tbody></table></div>
 </details>
 
@@ -874,6 +873,7 @@ button.secondary {
     <li>Direct Cboe VIX3M dashboard; use the same completed session as VIX: <a href="https://www.cboe.com/us/indices/dashboard/VIX3M/" target="_blank" rel="noopener">https://www.cboe.com/us/indices/dashboard/VIX3M/</a></li>
     <li>Direct US Treasury daily par yield curve; select the latest available year and the 10-year column. Recalculate the 20-session change from this same official series: <a href="https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve" target="_blank" rel="noopener">https://home.treasury.gov/resource-center/data-chart-center/interest-rates/TextView?type=daily_treasury_yield_curve</a></li>
     <li>Direct EIA Cushing WTI daily spot-price history and download; do not replace spot with crude futures or a CFD: <a href="https://www.eia.gov/dnav/pet/hist/RWTCd.htm" target="_blank" rel="noopener">https://www.eia.gov/dnav/pet/hist/RWTCd.htm</a></li>
+    <li>Also check EIA Daily Prices for a newer completed WTI wholesale spot close: <a href="https://www.eia.gov/todayinenergy/prices.php" target="_blank" rel="noopener">https://www.eia.gov/todayinenergy/prices.php</a>. Use the date in “Wholesale Spot Petroleum Prices” (the close date), not the page publication date. Select WTI in USD/barrel; do not use the separate futures table. EIA republishes this spot quote from Refinitiv.</li>
     <li>Direct Nasdaq Composite history; use final closing index levels: <a href="https://indexes.nasdaq.com/Index/History/COMP" target="_blank" rel="noopener">https://indexes.nasdaq.com/Index/History/COMP</a></li>
     <li>Direct Nasdaq-100 history; match the S&amp;P equity session: <a href="https://indexes.nasdaq.com/Index/History/NDX" target="_blank" rel="noopener">https://indexes.nasdaq.com/Index/History/NDX</a></li>
     <li>Direct ICE MOVE data services; select end-of-day observations. If licensed access is unavailable, use Yahoo history below: <a href="https://developer.ice.com/fixed-income-data-services/catalog/ice-data-indices-move-index" target="_blank" rel="noopener">https://developer.ice.com/fixed-income-data-services/catalog/ice-data-indices-move-index</a></li>
@@ -898,6 +898,7 @@ button.secondary {
     <li>FINRA margin debt table and historical Excel download: <a href="https://www.finra.org/rules-guidance/key-topics/margin-accounts/margin-statistics" target="_blank" rel="noopener">https://www.finra.org/rules-guidance/key-topics/margin-accounts/margin-statistics</a></li>
     </ul>
     <p>Calculation checks: convert FRED credit-spread levels from percentage points to basis points by multiplying by 100. Calculate spread changes as differences in basis points. Calculate yield change as (latest yield − yield 20 trading sessions earlier) × 100. S&amp;P distances are (close / simple moving average − 1) × 100 using 50 or 200 sessions including the signal session. VIX and WTI percentage changes use the specified trading-session lag. Breadth change is a percentage-point difference from the same S&amp;P 500 breadth series, not the all-US-stock series or a change in the index price. The suggested breadth provider uses current constituents; inspect its methodology. Use a consistent WTI spot-price series. S&amp;P close, high, low and volume must refer to the same completed session; the volume average excludes that session. Do not replace missing observations with zero or shorten the averaging window.</p>
+    <p><strong>WTI price and 20-session change:</strong> Check both EIA Daily Prices and the historical Cushing WTI series before retaining an older price. When Daily Prices has a newer completed spot close, verify that it matches the historical series in instrument, location, units and underlying source (Refinitiv). Identify the date exactly 20 trading sessions earlier using the applicable spot-market calendar, excluding weekends and market holidays; verify that date’s closing spot price in the same series. Calculate (latest spot close / close 20 sessions earlier − 1) × 100 and update both WTI fields together. This endpoint return requires two verified closes and an independently verified session count; unlike a moving average, it does not require every intervening price. Missing intermediate observations must not shift the comparison date, be filled with estimates, or cause a shorter lag. This WTI endpoint rule takes precedence over the general complete-history-window fallback below. If either endpoint, series consistency or the session count cannot be verified, retain the latest verified WTI pair and state its date and limitation. In the freshness note, give both WTI endpoint dates, prices and source URLs, including when combining EIA’s daily page with its historical table. Do not carry forward the old 20-day change when updating the price.</p>
     <p><strong>Verified-data fallback when sources are delayed or unavailable:</strong> Look for the latest verifiable figures, using older observations where necessary. If a page is rate-limited, blocked, incomplete or showing an unfinished session, try the official CSV/JSON/Excel download or an alternate source. If accessible in your working environment, inspect previously saved source downloads (for this project, historical-data/) and their source dates. Do not assume an AI has access to local files. Use saved data only when its provenance, units, observation dates and completeness can be checked; do not treat dashboard sample values or a previous AI answer as verified source data.</p>
     <p>Keep related inputs together: S&amp;P close, high, low and reported ^GSPC volume must match one completed session, with low ≤ close ≤ high. Calculate its daily return, 50/200-session moving-average distances and preceding 20-session volume average relative to that same session, using every required session. Match both Nasdaq closes to that equity session. Keep each other level and its changes anchored to the same observation date and series: VIX and its changes plus same-date VIX3M spread; HY OAS and its changes; Treasury yield and its change; WTI spot and its change; S&amp;P breadth and its change; USDJPY close and its 3-FX-session change. If a required history window has gaps, find a complete source or move the entire related group back to the latest fully verifiable date; never shorten a window or fill a gap with zero.</p>
     <p>Check FINRA's current published table for a newer report even if saved downloads contain an older month. Publication delays and insufficient-trade CP observations cannot be filled using estimates or another website's live proxy. Use that published reference month, debt in USD millions, and the same series 12 and 3 months earlier. Keep all three CP/Treasury diagnostic rates on their latest common observation date and supply that date as YYYYMMDD. Different indicator groups may use different dates because publication schedules differ; do not describe the resulting row as a single-session snapshot.</p>
@@ -920,16 +921,8 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 </div>
 
-</details>
-
-
-
-<!-- QUICK PASTE -->
-
-
-<details class="overview-details dashboard-section" name="dashboard-panels"><summary>History and Risk Charts</summary>
 <h2 class="section-heading" id="dashboardHistory" tabindex="-1">History</h2>
-<p class="table-note">Review market entries and linked charts. <a href="#fundingHeading">Dollar funding history</a>.</p>
+<p class="table-note">Review and edit market entries. <a href="#fundingHeading">Dollar funding history</a>.</p>
 <section class="control-panel" aria-labelledby="historyHeading">
 <h2 class="panel-title" id="historyHeading">Current and past entries</h2>
 <p class="table-note">Saved when you select Parse &amp; Update; edit saved dates and numbers directly in this table. Newest entry first. Use the red × to delete a row after confirmation. Deleting the current saved entry restores the latest remaining entry, or sample defaults if none remain. Edit a saved row’s date, time or indicator values, then select Save. Its composite score is calculated from the existing market indicators plus margin leverage, volume pressure, CP funding stress and Nasdaq relative momentum (50 points maximum). Rows are reordered by date; the newest saved row supplies the current dashboard values. Unavailable added inputs display as a score range, never as assumed zero. Dates default to entry time and can be changed to your observation time, in <span id="historyTimezone"></span>, not when the market data was published. Units appear in column headings; value cells contain numbers only.</p>
@@ -938,11 +931,22 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Five-year reference backfill: 1,254 trading sessions, September 27, 2021–September 24, 2026. Newest entries first. Editing and saving a reference row creates a personal copy; your saved entries take precedence for their date. Charts include both. Missing inputs produce score ranges. Dates identify daily observations, not publication times. This is retrospective analysis, not a point-in-time backtest.</p><details class="table-note"><summary>Backfill sources and assumptions</summary><p>FRED supplies credit spreads, yields, WTI, USDJPY and Nasdaq indexes; Cboe supplies VIX; Yahoo supplies S&amp;P OHLC/volume, MOVE and VIX3M; TheTrading.Tools supplies S&amp;P breadth using current constituents; FINRA supplies margin debt. Debt uses a conservative reference-month +2 months availability assumption. Calculations use full session windows, never shortened for missing data. FX momentum stays unavailable if a required weekday is missing. Downloaded vintages and current constituents limit historical interpretation. Reference data does not refresh automatically. HY and BBB spread history before September 2023 is unavailable from the downloaded FRED series and remains blank; affected composite scores show ranges.</p></details>
 <p class="table-note">All history data fields are editable, including the total, scored CP date, CP points, Nasdaq relative momentum and Nasdaq points. Edit then Save. Changes to those five calculated fields are manual history-table overrides, stored and synced with the entry; hover to see whether a value is manual. Clear an override to restore calculation. Dashboard charts, category scores and AI trend calculations continue to use raw inputs and model rules. Updating the composite reconciles same-date CP/index observations across saved rows and resets these manual calculated-field overrides. Saving a reference row creates a personal copy.</p>
 <p class="table-note" id="historyNotice" role="status"></p>
+<div id="historyPager" class="table-note" aria-label="History pages"></div>
 <div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Current and past indicator values; scroll horizontally to see all indicators">
 <table class="history-table"><thead id="historyHead"></thead><tbody id="historyBody"></tbody></table>
 </div>
 <p class="table-note">History syncs to your account automatically every 8 minutes while logged in (and via "Sync now"), so it follows you across devices. It's still cached locally too, so it survives a refresh even offline. Default sample values are not saved automatically.</p>
 </section>
+
+</details>
+
+
+
+<!-- QUICK PASTE -->
+
+
+<details class="overview-details dashboard-section" name="dashboard-panels"><summary>Risk Charts</summary>
+<h2 class="section-heading" id="dashboardRiskCharts" tabindex="-1">Risk Charts</h2>
 
 
 <section class="control-panel" aria-labelledby="riskChartHeading">
