@@ -547,6 +547,7 @@ button.secondary {
 #appShell table{border-collapse:separate;border-spacing:0;overflow:visible}
 #appShell table thead th{position:sticky;top:0;z-index:4;background:var(--card-bg2,#1e293b);box-shadow:0 1px 0 var(--border)}
 #appShell .history-table thead th:first-child{z-index:5}
+#fedHead button{background:transparent;color:inherit;border:0;padding:0;margin:0;font:inherit;text-transform:inherit;text-align:inherit;white-space:normal}#fedPager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:12px 0}
 #appShell .data-table-scroll:focus-visible,#appShell .matrix-wrap:focus-visible{outline:2px solid #947454;outline-offset:2px}
 </style>
 <style>.indicator-intro{max-width:100%;margin:12px 0 20px}.indicator-intro p{line-height:1.65;margin:0 0 12px}.indicator-intro p:last-child{margin-bottom:0}</style>
@@ -668,7 +669,7 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPromptControls">AI Analysis</a></nav>
+<nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fedQuickHeading">Update Fed</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPromptControls">AI Analysis</a></nav>
 <aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
 <p class="table-note">A summary of the dashboard’s heuristic stress signals. The score is not a crash probability or confirmation of forced selling.</p>
@@ -1012,6 +1013,22 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </section>
 
 </details>
+<details class="overview-details dashboard-section" name="dashboard-panels" id="fedWatchPanel"><summary>Fed Interest Rate Watch</summary>
+<section class="control-panel" aria-labelledby="fedQuickHeading">
+<h2 id="fedQuickHeading">Update Fed</h2>
+<p class="table-note">Track the next decision and market-implied probabilities. These observations do not add points to the crash risk score. Times below include their timezone; probabilities are percentages, not certainty.</p>
+<div class="history-repair">
+<button type="button" onclick="generateFedPrompt()">Generate latest-data prompt</button>
+<button type="button" onclick="copyFedPrompt()">Copy prompt</button>
+<label for="fedPrompt">Prompt to paste into your AI assistant (editable)</label><textarea id="fedPrompt" class="paste-box" rows="7"></textarea>
+<label for="fedPaste">Paste AI response (one JSON object)</label><textarea id="fedPaste" class="paste-box" rows="5"></textarea>
+<button type="button" onclick="importFedWatch()">Parse &amp; Update Fed</button>
+<button type="button" onclick="document.getElementById('fedPaste').value=''">Clear paste</button>
+<p id="fedStatus" class="table-note" role="status"></p></div>
+<h3>Fed Interest Rate Watch</h3><p class="table-note">Latest observations first by default. Click column headings to sort. Edit a row, then Save or Cancel; × deletes a saved row. Blank comparison values mean unavailable.</p>
+<div id="fedPager" class="history-pager"></div>
+<div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="Editable Fed interest rate history"><table class="history-table"><thead id="fedHead"></thead><tbody id="fedBody"></tbody></table></div>
+</section></details>
 <details class="overview-details dashboard-section" name="dashboard-panels"><summary>Forced Selling and Funding Diagnostics</summary>
 <h2 class="section-heading" id="forcedSellingHeading">Risk Factors for Force Selling</h2>
 <div id="forcedSelling"></div>
@@ -1542,7 +1559,7 @@ async function pushSnapshotToCloud(){
     const raw = localStorage.getItem(historyKey()) || '[]';
     const {error} = await client
         .from('user_app_data')
-        .upsert({user_id:user.id, data:{entryHistory: raw, fundingHistory:localStorage.getItem(fundingKey()) || '[]',fredHistory:localStorage.getItem(fredDataStorage()) || null,analysisHistory:localStorage.getItem(analysisKey()) || '[]'}, updated_at:new Date().toISOString()});
+        .upsert({user_id:user.id, data:{entryHistory: raw, fedWatchHistory:localStorage.getItem(fedWatchKey()) || '[]', fundingHistory:localStorage.getItem(fundingKey()) || '[]',fredHistory:localStorage.getItem(fredDataStorage()) || null,analysisHistory:localStorage.getItem(analysisKey()) || '[]'}, updated_at:new Date().toISOString()});
     if(error) return {ok:false, reason:error.message};
     return {ok:true};
 }
@@ -1560,6 +1577,7 @@ async function pullSnapshotFromCloud(){
         .maybeSingle();
     if(error) return {ok:false, reason:error.message};
     if(data && data.data && data.data.entryHistory !== undefined){
+        if(data.data.fedWatchHistory !== undefined){const rows=JSON.parse(data.data.fedWatchHistory);if(!Array.isArray(rows))throw Error('Invalid cloud Fed history');rows.forEach(validateFedWatch);localStorage.setItem(fedWatchKey(),JSON.stringify(rows));}
         if(data.data.fundingHistory !== undefined){ const f=JSON.parse(data.data.fundingHistory); if(!Array.isArray(f))throw Error('Invalid cloud funding history'); f.forEach(validateFunding); localStorage.setItem(fundingKey(), JSON.stringify(f)); }
         if(data.data.fredHistory){const rates=validateFredData(JSON.parse(data.data.fredHistory));localStorage.setItem(fredDataStorage(),JSON.stringify(rates));}
         if(data.data.analysisHistory !== undefined){const analyses=validateAnalysisHistory(JSON.parse(data.data.analysisHistory));localStorage.setItem(analysisKey(),JSON.stringify(analyses));}
@@ -1930,6 +1948,7 @@ function loadEntryHistory(userId){
     loadAnalyses();
     loadFredPreferences();
     loadFunding();
+    loadFedWatch();
     entryHistory = [];
     currentEntryTime = null;
     historyStorageError = '';
@@ -2340,6 +2359,7 @@ function revealDashboardTarget(){
     let node=target.parentElement;while(node){if(node.tagName==='DETAILS'){node.hidden=false;node.open=true;}node=node.parentElement;}
     document.querySelectorAll('.dashboard-nav a').forEach(a=>{if(a.getAttribute('href')==='#'+id)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current');});
     if(id==='fundingQuickHeading')generateFundingQuickPrompt();
+    if(id==='fedQuickHeading'&&!document.getElementById('fedPrompt').value)generateFedPrompt();
     if(id==='cpUpdate'){generateCpPrompt();document.getElementById('cpPromptDetails').open=true;}
     target.scrollIntoView({block:'start'});
     if(id==='analysisPromptControls')document.getElementById('analysisQuestions').focus({preventScroll:true});
@@ -3000,6 +3020,61 @@ let fundingRecords=[], fundingEdit=null;
 const fundingFields=[['observationDate','Observation date','date'],['publishedAt','Publication date/time (UTC; ISO 8601)','text'],['balance','Balance outstanding (USD million)','number'],['testBalance','Explicitly identified tests outstanding (USD million; blank if unknown)','number'],['testEvidence','Official test evidence URL (required for adjustment)','url'],['source','Official release URL','url']];
 function fundingDisplayRecords(){return [...fundingReference,...fundingRecords];}
 function fundingAvailability(r){return Date.parse(r.reference?r.savedAt:r.publishedAt);}
+
+// Separate, account-scoped Fed observations; never used by crash scoring.
+const fedFields=[['observedAt','Source timestamp (ISO, timezone)','text'],['meetingDate','Decision date','date'],['targetLower','Target lower (%)','number'],['targetUpper','Target upper (%)','number'],['hike','Hike (%)','number'],['hold','Hold (%)','number'],['cut','Cut (%)','number'],['comparisonAt','5-session comparison timestamp','text'],['hikeChange5d','Hike 5-session change (pp)','number'],['holdChange5d','Hold 5-session change (pp)','number'],['cutChange5d','Cut 5-session change (pp)','number'],['source','Probability source (HTTPS)','url'],['calendarSource','Official calendar (HTTPS)','url'],['notes','Notes / methodology','text']];
+let fedWatchRows=[],fedPage=0,fedSort='observedAt',fedDirection=-1,fedDirty=new Set();
+function fedWatchKey(){return 'crash-risk-fed-watch-v1:'+historyOwner;}
+function validateFedWatch(r){
+ if(!r||typeof r!=='object'||Array.isArray(r))throw Error('Paste one Fed JSON object.');
+ const timestamp=v=>typeof v==='string'&&/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v)&&Number.isFinite(Date.parse(v));
+ if(!timestamp(r.observedAt)||Date.parse(r.observedAt)>Date.now())throw Error('A verified source timestamp with timezone, no later than now, is required.');
+ if(typeof r.meetingDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(r.meetingDate)||!Number.isFinite(Date.parse(r.meetingDate))||new Date(r.meetingDate).toISOString().slice(0,10)!==r.meetingDate)throw Error('A valid decision date is required.');
+ for(const k of ['targetLower','targetUpper','hike','hold','cut'])if(typeof r[k]!=='number'||!Number.isFinite(r[k])||r[k]<0||r[k]>100)throw Error(k+' must be a verified number from 0 to 100.');
+ if(r.targetLower>r.targetUpper)throw Error('Target lower must not exceed target upper.');
+ if(Math.abs(r.hike+r.hold+r.cut-100)>.5)throw Error('Hike, hold and cut must total 100% (rounding tolerance 0.5).');
+ for(const k of ['source','calendarSource']){let u;try{u=new URL(r[k]);}catch{throw Error(k+' must be a supporting HTTPS URL.');}if(u.protocol!=='https:'||u.username||u.password)throw Error(k+' must be a supporting HTTPS URL.');if(k==='calendarSource'&&!['www.federalreserve.gov','federalreserve.gov'].includes(u.hostname))throw Error('Use the official Federal Reserve calendar URL.');}
+ const changes=['hikeChange5d','holdChange5d','cutChange5d'];
+ if(r.comparisonAt!=null){if(!timestamp(r.comparisonAt)||Date.parse(r.comparisonAt)>=Date.parse(r.observedAt))throw Error('Comparison timestamp must precede this observation.');for(const k of changes)if(typeof r[k]!=='number'||!Number.isFinite(r[k])||Math.abs(r[k])>100)throw Error('All three comparison changes must be verified numbers.');if(Math.abs(changes.reduce((a,k)=>a+r[k],0))>1)throw Error('Comparison changes must net to approximately zero.');for(const [i,k] of ['hike','hold','cut'].entries())if(r[k]-r[changes[i]]<-.5||r[k]-r[changes[i]]>100.5)throw Error('Comparison implies an invalid prior probability.');}
+ else if(changes.some(k=>r[k]!=null))throw Error('Comparison changes require a verified comparison timestamp.');
+ if(r.notes!=null&&typeof r.notes!=='string')throw Error('Notes must be text.');
+ return Object.fromEntries(fedFields.map(([k])=>[k,r[k]??(k==='notes'?'':null)]));
+}
+function loadFedWatch(){
+ fedWatchRows=[];fedPage=0;fedSort='observedAt';fedDirection=-1;fedDirty.clear();
+ for(const id of ['fedPrompt','fedPaste'])document.getElementById(id).value='';
+ try{const rows=JSON.parse(localStorage.getItem(fedWatchKey())||'[]');if(!Array.isArray(rows))throw Error('Invalid history');fedWatchRows=rows.map(validateFedWatch);document.getElementById('fedStatus').textContent='';}catch(e){document.getElementById('fedStatus').textContent='Fed history could not be loaded: '+e.message;}
+ renderFedWatch();
+}
+function persistFedWatch(rows){localStorage.setItem(fedWatchKey(),JSON.stringify(rows));fedWatchRows=rows;}
+function fedLeaveEdits(){return !fedDirty.size||confirm('Discard unsaved edits on this Fed history page?');}
+function fedSortedRows(){return fedWatchRows.map((r,i)=>({r,i})).sort((a,b)=>{const x=a.r[fedSort],y=b.r[fedSort];if(x==null||x==='')return y==null||y===''?0:1;if(y==null||y==='')return -1;const v=fedSort.endsWith('At')?Date.parse(x)-Date.parse(y):typeof x==='number'?x-y:String(x).localeCompare(String(y));return v*fedDirection||Date.parse(b.r.observedAt)-Date.parse(a.r.observedAt);});}
+function renderFedWatch(){
+ const head=document.getElementById('fedHead'),body=document.getElementById('fedBody'),pager=document.getElementById('fedPager');head.replaceChildren();body.replaceChildren();pager.replaceChildren();fedDirty.clear();
+ const button=(label,fn)=>{const b=document.createElement('button');b.type='button';b.className='secondary history-date-save';b.textContent=label;b.onclick=fn;return b;};
+ const hr=document.createElement('tr');const action=document.createElement('th');action.textContent='Actions';hr.appendChild(action);
+ for(const [k,label] of fedFields){const th=document.createElement('th');th.scope='col';th.setAttribute('aria-sort',fedSort===k?(fedDirection===1?'ascending':'descending'):'none');th.appendChild(button(label,()=>{if(!fedLeaveEdits())return;fedDirection=fedSort===k?-fedDirection:1;fedSort=k;fedPage=0;renderFedWatch();}));hr.appendChild(th);}head.appendChild(hr);
+ const rows=fedSortedRows(),pages=Math.max(1,Math.ceil(rows.length/50));fedPage=Math.min(fedPage,pages-1);
+ for(const [label,page] of [['First',0],['Previous',fedPage-1],['Next',fedPage+1],['Last',pages-1]]){const b=button(label,()=>{if(!fedLeaveEdits())return;fedPage=page;renderFedWatch();});b.disabled=page<0||page>=pages||page===fedPage;pager.appendChild(b);}
+ pager.appendChild(button('Latest first',()=>{if(!fedLeaveEdits())return;fedSort='observedAt';fedDirection=-1;fedPage=0;renderFedWatch();}));const info=document.createElement('span');info.textContent=` Page ${fedPage+1} of ${pages} · ${rows.length} saved observations`;pager.appendChild(info);
+ for(const {r,i} of rows.slice(fedPage*50,fedPage*50+50)){
+ const tr=document.createElement('tr'),td=document.createElement('td'),inputs={};tr.appendChild(td);
+ const restore=()=>{fedFields.forEach(([k])=>inputs[k].value=r[k]??'');fedDirty.delete(i);};
+ const del=button('×',()=>{if(!fedLeaveEdits()||!confirm('Delete this Fed observation?'))return;try{persistFedWatch(fedWatchRows.filter((_,j)=>j!==i));renderFedWatch();}catch(e){document.getElementById('fedStatus').textContent='Not deleted: '+e.message;}});del.className='history-delete';del.setAttribute('aria-label','Delete Fed observation '+r.observedAt);td.appendChild(del);
+ td.appendChild(button('Save',()=>{try{const raw={};fedFields.forEach(([k,,type])=>raw[k]=type==='number'?(inputs[k].value.trim()===''?null:Number(inputs[k].value)):inputs[k].value.trim()||null);const row=validateFedWatch(raw);if(fedWatchRows.some((v,j)=>j!==i&&v.observedAt===row.observedAt&&v.meetingDate===row.meetingDate))throw Error('An observation for this timestamp and meeting already exists.');const next=fedWatchRows.slice();next[i]=row;persistFedWatch(next);Object.assign(r,row);fedDirty.delete(i);document.getElementById('fedStatus').textContent='Fed row saved. Sorting is applied when the table is refreshed.';}catch(e){document.getElementById('fedStatus').textContent='Not saved: '+e.message;}}));td.appendChild(button('Cancel',restore));
+ for(const [k,label,type] of fedFields){const cell=document.createElement('td'),input=document.createElement('input');input.type=type;if(type==='number')input.step='any';input.className=type==='number'?'history-value-input history-normal':'history-date-input';input.style.minWidth=type==='number'?'100px':'180px';input.value=r[k]??'';input.setAttribute('aria-label',label+' for '+r.observedAt);input.oninput=()=>fedDirty.add(i);inputs[k]=input;cell.appendChild(input);tr.appendChild(cell);}body.appendChild(tr);
+ }
+ if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=fedFields.length+1;td.textContent='No Fed observations saved. Generate a prompt above to begin.';tr.appendChild(td);body.appendChild(tr);}
+}
+function generateFedPrompt(){document.getElementById('fedPrompt').value=`Research the next Federal Reserve interest-rate decision and latest market-implied outcome probabilities published as of ${new Date().toISOString()}. Browse sources. Return only one JSON object with these fields:
+{"observedAt":null,"meetingDate":null,"targetLower":null,"targetUpper":null,"hike":null,"hold":null,"cut":null,"comparisonAt":null,"hikeChange5d":null,"holdChange5d":null,"cutChange5d":null,"source":"","calendarSource":"https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm","notes":""}
+Use the official Federal Reserve FOMC calendar for the next decision date (final meeting day), and the latest published Federal Reserve implementation note for the current target range. Link that target-range source in notes. Target bounds and probabilities are percentages. Use CME FedWatch https://www.cmegroup.com/fedwatch and its methodology https://www.cmegroup.com/tools-information/quikstrike/cme-fedwatch-tool-user-guide.html for probabilities. Prefer the most recent completed US trading-session snapshot and state that session in notes. If inaccessible, a timestamped attributable secondary report may be used, clearly identified with its own source URL; never describe it as a directly verified CME snapshot.
+Aggregate all target-rate outcomes above the CURRENT target range into hike, the unchanged range into hold, and all lower ranges into cut. They should total 100% subject to rounding. These are market-implied probabilities, not a forecast of a crash. Use one source snapshot and the same next meeting for all three figures; do not combine timestamps or providers. observedAt must be the verified source snapshot timestamp in ISO 8601 with explicit timezone, not retrieval time or a guessed timestamp. meetingDate is YYYY-MM-DD. Do not use future releases or stale probabilities for a meeting that has already occurred.
+If verified historical probabilities exist exactly five completed US trading sessions earlier for the SAME meeting and provider, put that snapshot timestamp in comparisonAt and give current minus prior hike/hold/cut probability changes in percentage points. Identify both snapshots and the five-session match in notes. If not fully verified, all four comparison fields must be null. Do not substitute a calendar week or switch meetings.
+Use null for unavailable numbers or timestamps; do not invent or infer missing observations. Include plain HTTPS supporting URLs in source and calendarSource; put methodology, limitations and additional supporting URLs in notes. No Markdown fences or text outside the JSON. Incomplete core data will remain unsaved for review.`;}
+async function copyFedPrompt(){if(!document.getElementById('fedPrompt').value)generateFedPrompt();try{await navigator.clipboard.writeText(document.getElementById('fedPrompt').value);document.getElementById('fedStatus').textContent='Prompt copied.';}catch{document.getElementById('fedStatus').textContent='Select and copy the prompt manually.';}}
+function importFedWatch(){try{const row=validateFedWatch(JSON.parse(document.getElementById('fedPaste').value.trim()));if(fedWatchRows.some(r=>r.observedAt===row.observedAt&&r.meetingDate===row.meetingDate))throw Error('This observation already exists. Edit its saved row instead.');if(!fedLeaveEdits())return;persistFedWatch([...fedWatchRows,row]);fedPage=0;fedSort='observedAt';fedDirection=-1;renderFedWatch();document.getElementById('fedStatus').textContent='Fed observation saved.';}catch(e){document.getElementById('fedStatus').textContent='Not saved: '+e.message;}}
+
 function fundingKey(){return 'crash-risk-funding-v1:'+historyOwner;}
 function fundingNumber(n){return n===null||n===undefined?'—':n.toLocaleString(undefined,{maximumFractionDigits:3});}
 function validateFunding(r){
