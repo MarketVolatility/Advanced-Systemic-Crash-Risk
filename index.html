@@ -7,6 +7,13 @@
 
 
 <style>
+#cloudOverwritePanel{width:min(640px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;background:var(--card-bg);color:var(--text-main);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.5);}
+#cloudOverwritePanel:not([open]){display:none;}
+#cloudOverwritePanel::backdrop{background:rgba(0,0,0,.7);}
+#cloudOverwritePanel p{line-height:1.5;color:var(--text-muted);}
+#cloudOverwritePanel label{display:block;margin-bottom:8px;}
+#cloudOverwritePassword{display:block;width:100%;box-sizing:border-box;margin-bottom:16px;padding:10px;background:var(--bg-color);color:inherit;border:1px solid var(--border);border-radius:6px;}
+
 /* =========================================================
    AUTHENTICATION
    Front-end login/verification gate.
@@ -679,19 +686,19 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
-<section id="cloudOverwritePanel" hidden style="border:1px solid var(--text-muted);border-radius:10px;padding:16px;margin:12px 0;">
-<h3>Overwrite cloud with this device’s saved data</h3>
+<dialog id="cloudOverwritePanel" aria-labelledby="cloudOverwriteTitle" oncancel="event.preventDefault();hideCloudOverwrite()">
+<h3 id="cloudOverwriteTitle">Overwrite cloud with this device’s saved data</h3>
 <p>This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local + last cloud for AI” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
 <p id="cloudOverwriteSummary"></p>
 <form onsubmit="overwriteCloudWithLocal(event)">
-<label style="display:block;margin:12px 0;"><input id="cloudOverwriteConfirmed" type="checkbox" required> I confirm this device has the latest saved data and want to replace the cloud copy and resume syncing.</label>
+<p>By entering your password and selecting “Verify password and overwrite cloud”, you confirm this device has the latest saved data and agree to replace the cloud copy and resume syncing.</p>
 <label for="cloudOverwritePassword">Account password</label>
 <input id="cloudOverwritePassword" type="password" autocomplete="current-password" required>
 <button id="cloudOverwriteSubmit" type="submit">Verify password and overwrite cloud</button>
 <button class="secondary" id="cloudOverwriteCancel" type="button" onclick="hideCloudOverwrite()">Cancel</button>
 <p id="cloudOverwriteStatus" role="status" aria-live="polite"></p>
 </form>
-</section>
+</dialog>
 <nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fedQuickHeading">Update Fed</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPromptControls">AI Analysis</a></nav>
 <aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
@@ -1759,7 +1766,6 @@ function showCloudOverwrite(){
     if(cloudOverwritePending)return;
     const panel=document.getElementById('cloudOverwritePanel');
     document.getElementById('cloudOverwritePassword').value='';
-    document.getElementById('cloudOverwriteConfirmed').checked=false;
     document.getElementById('cloudOverwriteStatus').textContent='';
     try{
         if(!historyOwner)throw Error('Sign in before replacing cloud data.');
@@ -1767,22 +1773,21 @@ function showCloudOverwrite(){
         const rows=JSON.parse(snapshot.entryHistory);
         cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot)};
         document.getElementById('cloudOverwriteSummary').textContent=rows.length+' saved market rows on this device'+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
-        panel.hidden=false;panel.scrollIntoView({block:'nearest'});document.getElementById('cloudOverwritePassword').focus();
+        if(!panel.open)panel.showModal();document.getElementById('cloudOverwritePassword').focus();
     }catch(error){document.getElementById('syncStatus').textContent=error.message;}
 }
 function hideCloudOverwrite(){
     if(cloudOverwritePending)return;
     cloudOverwriteSelection=null;
     document.getElementById('cloudOverwritePassword').value='';
-    document.getElementById('cloudOverwriteConfirmed').checked=false;
-    document.getElementById('cloudOverwritePanel').hidden=true;
+    document.getElementById('cloudOverwritePanel').close();
 }
 async function overwriteCloudWithLocal(event){
     event.preventDefault();
     if(cloudOverwritePending||manualSyncPending)return;
     const input=document.getElementById('cloudOverwritePassword'),status=document.getElementById('cloudOverwriteStatus');
     let password=input.value;input.value='';
-    if(!document.getElementById('cloudOverwriteConfirmed').checked||!password){status.textContent='Confirm that the local copy is latest and enter your account password.';return;}
+    if(!password){status.textContent='Enter your account password to confirm the overwrite.';return;}
     const selection=cloudOverwriteSelection;
     cloudOverwritePending=true;stopAutoSync();syncReadyOwner=null;
     for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn'])document.getElementById(id).disabled=true;
@@ -1816,7 +1821,7 @@ async function overwriteCloudWithLocal(event){
         if(!written?.length)throw Error('Cloud data changed during confirmation. Nothing was overwritten; review and retry.');
         if(historyOwner!==owner)throw Error('Cloud saved for the verified account; account changed, so automatic sync remains paused.');
         syncBaseline=snapshotFingerprint(local);syncReadyOwner=owner;startAutoSync();
-        cloudOverwriteSelection=null;document.getElementById('cloudOverwriteConfirmed').checked=false;
+        cloudOverwriteSelection=null;
         status.textContent='Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.';
         document.getElementById('syncStatus').textContent='Cloud replaced with local data. Automatic sync resumed.';
     }catch(error){
