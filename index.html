@@ -1368,7 +1368,7 @@ function editAnalysisRow(id,tr){
     const values=[localTime(row.createdAt),row.day,analysisRange(row.total),...row.categories.map(analysisRange),localTime(row.responseSavedAt)],inputs=[];
     [...tr.children].slice(0,9).forEach((td,i)=>{td.replaceChildren();const input=document.createElement('input');input.type=i===0||i===8?'datetime-local':i===1?'date':'text';input.value=values[i];input.step='1';input.setAttribute('aria-label',['Request time','Entry date','Total score',...analysisNames,'Response saved time'][i]);input.className=i>1&&i<8?'history-value-input '+analysisCellColor(i===2?row.total:row.categories[i-3],i===2?50:[10,14,8,12,6][i-3]):'history-date-input';input.title=i>1&&i<8?'Score or range; incomplete ranges stay white.':'Edit and click Save on this row.';td.appendChild(input);inputs.push(input);});
     const actions=tr.children[9];
-    const save=document.createElement('button');save.textContent='Save';save.type='button';save.className='history-date-save';save.onclick=()=>{
+    const save=document.createElement('button');save.textContent='Save';save.type='button';save.className='history-date-save';save.onclick=async()=>{
         try{
             const parse=(value,max)=>{const match=value.trim().match(/^(\d+)(?:\s*[–-]\s*(\d+))?$/);if(!match)throw Error('Scores must be whole numbers or ranges such as 2–4.');const low=Number(match[1]),high=Number(match[2]??match[1]);if(low>high||high>max)throw Error('Score is outside its category maximum.');return {low,high};};
             const total=parse(inputs[2].value,50),categories=row.categories.map((c,i)=>({...c,...parse(inputs[i+3].value,[10,14,8,12,6][i])}));
@@ -1376,7 +1376,7 @@ function editAnalysisRow(id,tr){
             if(!inputs[0].value||!inputs[1].value)throw Error('Request time and entry date are required.');
             if(row.response.trim()&&!inputs[8].value)throw Error('A saved response needs a saved time.');
             const updated={...row,createdAt:new Date(inputs[0].value).toISOString(),day:inputs[1].value,total,categories,responseSavedAt:inputs[8].value?new Date(inputs[8].value).toISOString():null,editedAt:new Date().toISOString(),originalSnapshot:row.originalSnapshot||{createdAt:row.createdAt,day:row.day,total:row.total,categories:row.categories,responseSavedAt:row.responseSavedAt}};
-            if(persistAnalyses(analysisRecords.map(r=>r.id===id?updated:r)))analysisMessage('History row updated. Original prompt and market inputs are retained; table edits do not recalculate the dashboard.');
+            if(await persistAnalyses(analysisRecords.map(r=>r.id===id?updated:r)))analysisMessage('History row updated. Original prompt and market inputs are retained; table edits do not recalculate the dashboard.');
         }catch(e){analysisMessage(e.message);}
     };
     actions.appendChild(save);
@@ -1396,13 +1396,14 @@ function loadAnalyses(){
     for(const id of ['analysisPrompt','analysisResponse'])document.getElementById(id).value='';
     document.getElementById('analysisQuestions').value=analysisDefaultQuestions;
     document.getElementById('analysisSnapshotLabel').textContent='';analysisMessage('');
-    try{analysisRecords=validateAnalysisHistory(JSON.parse(localStorage.getItem(analysisKey())||'[]'));}
+    try{analysisRecords=validateAnalysisHistory(JSON.parse(readAppStorage(analysisKey())||'[]'));}
     catch{analysisLoadError=true;analysisMessage('Stored analyses could not be loaded. Saving is disabled to protect the existing data.');}
     renderAnalysisHistory();
 }
-function persistAnalyses(next){
+async function persistAnalyses(next){
     if(!historyOwner||analysisLoadError){analysisMessage('Sign in with readable analysis storage before saving.');return false;}
-    try{localStorage.setItem(analysisKey(),JSON.stringify(next));analysisRecords=next;renderAnalysisHistory();return true;}
+    const owner=historyOwner;
+    try{await writeAppStorage(analysisKey(),JSON.stringify(next));if(historyOwner!==owner)return false;analysisRecords=next;renderAnalysisHistory();return true;}
     catch{analysisMessage('Browser storage could not save this analysis. Your text is still here; copy it before leaving.');return false;}
 }
 function analysisHasEdits(){const r=analysisRecords.find(r=>r.id===activeAnalysisId);return r&&(document.getElementById('analysisPrompt').value!==r.prompt||document.getElementById('analysisResponse').value!==r.response||analysisWordDraft?.base64!==r.word?.base64);}
@@ -1434,7 +1435,7 @@ function analysisRecentScorePrompt(days){
     return `LAST 14 CALENDAR DAYS OF RISK SCORES (${days[0].day} through ${days.at(-1).day}, inclusive; ending on the request date)\n${table}\n\nINDICATOR CONTRIBUTIONS WITHIN THE FIVE CATEGORIES (points, not raw market values)\n${details}\n\nThese are recalculated dashboard scores from saved market entries and embedded historical reference data, not manually edited AI-analysis history scores. For each date use the latest personal saved entry if present; otherwise use that date’s reference row. Dates are entry/scoring dates, not necessarily the observation dates of all inputs. No missing day, weekend or holiday is forward-filled. Unavailable means no entry for that date; numeric ranges preserve incomplete inputs. Reference data are retrospective and may be stale. Compare total and category trends, identify which indicator contributions explain changes, and discuss persistent, improving, worsening and conflicting signals. Do not infer a trend across unavailable dates or treat narrowing missing-data ranges as proven market improvement. Keep this 14-day window separate from the current snapshot if its scoring date differs.`;
 }
 
-function generateAnalysisPrompt(){
+async function generateAnalysisPrompt(){
     if(!historyOwner){analysisMessage('Sign in before generating an analysis.');return;}
     if(analysisHasEdits()&&!window.confirm('Replace unsaved prompt or response edits with a new request?'))return;
     const createdAt=new Date().toISOString(),day=currentEntryTime?localCalendarDate(new Date(currentEntryTime)):localCalendarDate(new Date());
@@ -1445,7 +1446,7 @@ function generateAnalysisPrompt(){
     const recentScores=analysisRecentScores(localCalendarDate(new Date(createdAt)));
     const prompt=`Analyze this Crash Risk Dashboard snapshot. Request generated: ${createdAt}. Entry scoring date: ${day}. Entry timestamp: ${currentEntryTime||'UNSAVED SAMPLE VALUES — illustrative only'}. These timestamps do not establish observation dates for every input.\n\nTotal score: ${analysisRange(total)} / 50\n${categories.map(c=>c.name+': '+analysisRange(c)+' / '+c.maximum).join('\n')}\n\nUse these supplied scores as the dashboard snapshot, including all missing-data ranges. This is a heuristic stress score, not a calibrated crash probability. Bands: 0–4, 5–9, 10–15, 16–22, 23–30, 31–50. Do not invent missing observations, infer that a low score guarantees safety, or treat signals as proof of forced liquidation. CP and Nasdaq leadership are scored; dollar swaps and 200DMA distance velocity are unscored context. Distinguish facts, interpretations and scenarios. If browsing is available, verify relevant current context with dated primary-source links; keep it separate from this snapshot. Otherwise disclose that current information was not verified. Do not silently substitute newer figures or change the supplied scores.\n\nScored indicator contributions:\n${JSON.stringify(factors,null,2)}\nForced-selling components (in addition to USDJPY):\n${JSON.stringify(forcedPoints(values,day),null,2)}\nRaw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent and cp_date YYYYMMDD):\n${JSON.stringify(values,null,2)}\nDerived CP and Nasdaq inputs:\n${JSON.stringify(model50Inputs(values,day),null,2)}\n\n${analysisRecentScorePrompt(recentScores)}\n\nQuestions and requested output:\n${questions}\n\n${analysisReferenceGuidance}\n\nBEGIN HISTORICAL REFERENCE WRITE-UP — 00 260929 Analysis Executive Summary.docx\n${analysisReferenceWriteup}\nEND HISTORICAL REFERENCE WRITE-UP\n\nNow write a fresh analysis answering the current questions in the reference format. Analyze the 14-day trajectory alongside the latest snapshot throughout, and include an explicit 14-Day Trend Analysis subsection within the seven-section executive-summary format, with dated evidence, category and indicator drivers, persistence, reversals and uncertainty. Use only this request’s snapshot for dashboard values and scores, with separately identified verified context. Apply the accuracy corrections above. Avoid unsupported numerical crash forecasts.`;
     const row={id:createdAt+'-'+Math.random().toString(36).slice(2),createdAt,day,entryTime:currentEntryTime,total,categories,values,recentScores,questions,prompt,response:'',responseSavedAt:null};
-    if(persistAnalyses([row,...analysisRecords])){openAnalysis(row.id,true);analysisMessage('Prompt generated and request saved. Copy it into your AI assistant, then paste the response here.');}
+    if(await persistAnalyses([row,...analysisRecords])){openAnalysis(row.id,true);analysisMessage('Prompt generated and request saved. Copy it into your AI assistant, then paste the response here.');}
 }
 async function copyAnalysisPrompt(){
     const el=document.getElementById('analysisPrompt');if(!el.value.trim()){analysisMessage('Generate a prompt first.');return;}
@@ -1521,12 +1522,12 @@ async function importAnalysisWord(file){
     finally{document.getElementById('analysisWordFile').value='';}
 }
 
-function saveAnalysisResponse(){
+async function saveAnalysisResponse(){
     const r=analysisRecords.find(r=>r.id===activeAnalysisId),response=document.getElementById('analysisResponse').value;
     if(!r){analysisMessage('Generate or view a request first so the response has a score snapshot.');return;}
     if(!response.trim()){analysisMessage('Paste an AI response before saving.');return;}
     const updated={...r,response,word:analysisWordDraft?.text===response?analysisWordDraft:null,prompt:document.getElementById('analysisPrompt').value,questions:document.getElementById('analysisQuestions').value,responseSavedAt:new Date().toISOString()};
-    if(persistAnalyses(analysisRecords.map(x=>x.id===r.id?updated:x)))analysisMessage('Response saved in this browser. Use Sync now to upload immediately, or wait for automatic sync.');
+    if(await persistAnalyses(analysisRecords.map(x=>x.id===r.id?updated:x)))analysisMessage('Response saved in this browser. Use Sync now to upload immediately, or wait for automatic sync.');
 }
 function openAnalysis(id,skipConfirm=false){
     if(!skipConfirm&&analysisHasEdits()&&!window.confirm('Discard unsaved edits and view this saved analysis?'))return;
@@ -1537,10 +1538,10 @@ function openAnalysis(id,skipConfirm=false){
     analysisMessage(r.responseSavedAt?'Viewing saved response. Edits require Save response.':'Pending response — paste and save when ready.');
     document.getElementById(r.response.trim()?'analysisResponsePreview':'analysisSnapshotLabel').scrollIntoView({block:'nearest'});
 }
-function deleteAnalysis(id){
+async function deleteAnalysis(id){
     const record=analysisRecords.find(r=>r.id===id);if(!record)return;
     if(!window.confirm('Delete analysis from '+new Date(record.createdAt).toLocaleString()+' and its saved response?'+(id===activeAnalysisId&&analysisHasEdits()?' Unsaved edits to this analysis will also be discarded.':'')+' This cannot be undone.'))return;
-    if(!persistAnalyses(analysisRecords.filter(r=>r.id!==id)))return;
+    if(!await persistAnalyses(analysisRecords.filter(r=>r.id!==id)))return;
     if(activeAnalysisId===id){
         activeAnalysisId=null;analysisWordDraft=null;document.getElementById('analysisResponsePreview').replaceChildren();
         document.getElementById('analysisPrompt').value='';
@@ -1586,7 +1587,40 @@ async function awaitSyncRequest(request,timeoutMs=15000){
     finally{clearTimeout(timer);}
 }
 function snapshotKeys(owner){return {entryHistory:'crash-risk-history-v1:'+owner,fedWatchHistory:'crash-risk-fed-watch-v1:'+owner,fundingHistory:'crash-risk-funding-v1:'+owner,fredHistory:'crash-risk-fred-data-v1:'+owner,analysisHistory:'crash-risk-analysis-v1:'+owner};}
-function localSnapshot(owner){return Object.fromEntries(Object.entries(snapshotKeys(owner)).map(([field,key])=>[field,localStorage.getItem(key)||(field==='fredHistory'?null:'[]')]));}
+const largeStorageCache=new Map();
+function readAppStorage(key){return largeStorageCache.has(key)?largeStorageCache.get(key):localStorage.getItem(key);}
+async function writeAppStorage(key,value){
+    if(key.startsWith('crash-risk-analysis-v1:')&&window.indexedDB){
+        await recoveryDatabase('readwrite',store=>store.put({key,value}));
+        largeStorageCache.set(key,value);
+        localStorage.removeItem(key);
+    }else if(value==null)localStorage.removeItem(key);else localStorage.setItem(key,value);
+}
+async function initializeAccountStorage(owner){
+    if(!window.indexedDB)return;
+    const key='crash-risk-analysis-v1:'+owner,legacy=localStorage.getItem(key);
+    if(legacy!==null){
+        validateAnalysisHistory(JSON.parse(legacy));
+        await recoveryDatabase('readwrite',store=>store.put({key,value:legacy}));
+        const checked=await recoveryDatabase('readonly',store=>store.get(key));
+        if(checked?.value!==legacy)throw Error('Analysis storage migration could not be verified. Original data kept.');
+        if(localStorage.getItem(key)!==legacy)throw Error('Analysis changed during migration. Retry loading.');
+        largeStorageCache.set(key,legacy);localStorage.removeItem(key);
+    }else{
+        const saved=await recoveryDatabase('readonly',store=>store.get(key));
+        if(saved?.value!=null)validateAnalysisHistory(JSON.parse(saved.value));
+        largeStorageCache.set(key,saved?.value??null);
+    }
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k?.startsWith('crash-risk-recovery-v1:'+owner+':')||k==='crash-risk-history-backup-v1:'+owner)keys.push(k);}
+    for(const k of keys){
+        const value=localStorage.getItem(k);if(value==null)continue;
+        await recoveryDatabase('readwrite',store=>store.put({key:k,value}));
+        const checked=await recoveryDatabase('readonly',store=>store.get(k));
+        if(checked?.value===value&&localStorage.getItem(k)===value)localStorage.removeItem(k);
+    }
+}
+function localSnapshot(owner){return Object.fromEntries(Object.entries(snapshotKeys(owner)).map(([field,key])=>[field,readAppStorage(key)||(field==='fredHistory'?null:'[]')]));}
 function validateSyncSnapshot(data){
     if(!data || typeof data!=='object')throw Error('Invalid cloud snapshot');
     for(const field of Object.keys(snapshotKeys(''))){
@@ -1637,7 +1671,7 @@ async function recoveryBackups(owner){
     for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith(prefix)||key==='crash-risk-history-backup-v1:'+owner)backups[key]=localStorage.getItem(key);}
     if(window.indexedDB){
         const records=await recoveryDatabase('readonly',store=>store.getAll());
-        for(const record of records)if(record.key.startsWith(prefix)&&!Object.hasOwn(backups,record.key))backups[record.key]=record.value;
+        for(const record of records)if((record.key.startsWith(prefix)||record.key==='crash-risk-history-backup-v1:'+owner)&&!Object.hasOwn(backups,record.key))backups[record.key]=record.value;
     }
     return backups;
 }
@@ -1741,7 +1775,7 @@ async function pullSnapshotFromCloud(){
             await saveRecoverySnapshot(owner,'before-cloud-load',local);
             await saveRecoverySnapshot(owner,'cloud-first-seen',data.data);
             if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))return {ok:false,reason:'Account or local data changed during backup; cloud load cancelled. Retry Sync now.'};
-            for(const [field,key] of Object.entries(keys))if(data.data[field]!=null && (!local[field]||local[field]==='[]'))localStorage.setItem(key,data.data[field]);
+            for(const [field,key] of Object.entries(keys))if(data.data[field]!=null && (!local[field]||local[field]==='[]'))await writeAppStorage(key,data.data[field]);
         }
         syncBaseline=snapshotFingerprint(data?.data);syncReadyOwner=owner;
         return {ok:true,found:!!data?.data};
@@ -1764,19 +1798,18 @@ function stopAutoSync(){
     if(syncIntervalHandle){ clearInterval(syncIntervalHandle); syncIntervalHandle = null; }
 }
 
-function applyRestoredLocalSnapshot(owner,snapshot){
+async function applyRestoredLocalSnapshot(owner,snapshot){
     validateSyncSnapshot(snapshot);
     const keys=snapshotKeys(owner),previous={},written=[];
-    for(const key of Object.values(keys))previous[key]=localStorage.getItem(key);
+    for(const key of Object.values(keys))previous[key]=readAppStorage(key);
     try{
         for(const [field,key] of Object.entries(keys)){
-            if(snapshot[field]==null)localStorage.removeItem(key);
-            else localStorage.setItem(key,snapshot[field]);
+            await writeAppStorage(key,snapshot[field]);
             written.push(key);
         }
     }catch(error){
         let rollbackFailed=false;
-        for(const key of written.reverse())try{if(previous[key]==null)localStorage.removeItem(key);else localStorage.setItem(key,previous[key]);}catch{rollbackFailed=true;}
+        for(const key of written.reverse())try{await writeAppStorage(key,previous[key]);}catch{rollbackFailed=true;}
         throw Error('Cloud restored, but local storage could not be restored. Sync remains paused. '+(rollbackFailed?'Recover the preserved backup before continuing.':'Previous local data was kept; free browser storage outside this site and retry.')+' '+error.message);
     }
 }
@@ -1902,7 +1935,7 @@ async function overwriteCloudWithLocal(event){
         if(historyOwner!==owner)throw Error('Cloud saved for the verified account; account changed, so automatic sync remains paused.');
         if(selection.restoreSnapshot){
             if(snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Cloud restored, but local data changed during the request. Local edits were kept; sync remains paused. Review and retry restoration.');
-            applyRestoredLocalSnapshot(owner,target);
+            await applyRestoredLocalSnapshot(owner,target);
             loadEntryHistory(owner);
             renderDashboard();
             syncBaseline=snapshotFingerprint(target);syncReadyOwner=owner;startAutoSync();
@@ -1992,6 +2025,7 @@ async function openDashboard(user){
     document.getElementById('appShell').style.display = 'block';
     document.querySelectorAll('input[type="password"]').forEach(el => { el.value = ''; });
     try {
+    await initializeAccountStorage(user.id);
     loadEntryHistory(user.id);
     renderDashboard(); // Show this device’s data before waiting for the network.
 
@@ -2942,7 +2976,7 @@ function commitEntry(values,observationDate=null){
     const candidate={savedAt,updatedAt:now,values:prepared.values,...(Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?{cpCheckedAt:now}:{})};
     const reconciled=reconcileCompositeEntries([candidate,...entryHistory]);
     try{writeMarketHistory(JSON.stringify(reconciled.rows));}
-    catch(error){alert('Update could not be saved. Existing history has been kept; check browser storage and try again.');return;}
+    catch(error){alert('Update could not be saved. Existing history has been kept. '+error.message);return;}
     entryHistory=reconciled.rows;currentEntryTime=savedAt;currentData={...entryHistory[0].values};model50Cache=null;historyPreviewHidden=false;historyStorageError='';
     const period=document.getElementById('forcedPeriod');if(period)period.value='current';
     renderDashboard();
