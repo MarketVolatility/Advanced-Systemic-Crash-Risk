@@ -1383,7 +1383,19 @@ function editAnalysisRow(id,tr){
 }
 
 function analysisKey(){return 'crash-risk-analysis-v1:'+historyOwner;}
-function analysisMessage(text){document.getElementById('analysisStatus').textContent=text;}
+function setAppFeedback(target,text,tone){
+    const el=typeof target==='string'?document.getElementById(target):target;if(!el)return;
+    text=String(text??'');
+    if(!tone){
+        if(/Imported data differs|Password verified\. Nothing has been replaced|enter your password|confirm the overwrite/i.test(text))tone='verify';
+        else if(/could not|cannot|failed|unavailable|not saved|not deleted|nothing imported|unchanged:|sync paused|invalid|rejected|not started/i.test(text))tone='error';
+        else if(/saved|successfully|restored to both|Cloud replaced|synced|sync resumed|Prompt copied|download requested|exported|new release versions imported|deleted|Key removed|Entry boxes filled/i.test(text))tone='success';
+        else tone='notice';
+    }
+    el.textContent=text;
+    el.style.color=tone==='success'?'var(--green)':tone==='verify'?'#db2777':tone==='error'?'var(--red)':'var(--text-muted)';
+}
+function analysisMessage(text){setAppFeedback('analysisStatus',text);}
 function analysisRange(r){return r.low===r.high?String(r.low):r.low+'–'+r.high;}
 function validateAnalysisHistory(rows){
     const validRange=(r,max)=>r&&Number.isFinite(r.low)&&Number.isFinite(r.high)&&r.low>=0&&r.high>=r.low&&r.high<=max;
@@ -1681,8 +1693,8 @@ async function exportRecoveryData(){
         const owner=historyOwner,backups=await recoveryBackups(owner);
         if(historyOwner!==owner)throw Error('Account changed; export cancelled.');
         const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),owner,current:localSnapshot(owner),backups},null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-    }catch(error){document.getElementById('syncStatus').textContent='Recovery export failed: '+error.message;}
+        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setAppFeedback('syncStatus','Recovery download requested.','success');
+    }catch(error){setAppFeedback('syncStatus','Recovery export failed: '+error.message);}
 }
 async function cloudComparisonData(){
     if(!historyOwner)throw Error('Sign in to export your saved copies.');
@@ -1726,8 +1738,8 @@ async function exportCloudComparison(){
     const status=document.getElementById('syncStatus');
     try{
         const comparison=await downloadCloudComparison();
-        status.textContent='Comparison download requested. Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'. No stored data was changed.';
-    }catch(error){status.textContent=error.message;}
+        setAppFeedback(status,'Comparison download requested. Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'. No stored data was changed.');
+    }catch(error){setAppFeedback(status,error.message);}
 }
 async function pushSnapshotToCloud(){
     try{
@@ -1789,7 +1801,7 @@ function startAutoSync(){
         const el = document.getElementById('syncStatus');
         if(el){
             el.textContent = result.ok ? `Auto-synced at ${new Date().toLocaleTimeString()}.` : `Sync failed: ${result.reason}`;
-            el.style.color = result.ok ? 'var(--text-muted)' : '#f59e0b';
+            el.style.color = result.ok ? 'var(--green)' : '#f59e0b';
         }
     }, 8 * 60 * 1000);
 }
@@ -1852,7 +1864,7 @@ async function importCloudRestore(input){
         const snapshot=parseCloudRestore(await file.text());
         if(historyOwner!==owner)throw Error('Account changed; select the file again.');
         showCloudOverwrite(snapshot);
-    }catch(error){document.getElementById('syncStatus').textContent='Restore not started: '+error.message;}
+    }catch(error){setAppFeedback('syncStatus','Restore not started: '+error.message);}
 }
 let cloudOverwriteOriginalText=null;
 let cloudOverwritePending=false,cloudOverwriteSelection=null;
@@ -1866,7 +1878,7 @@ function showCloudOverwrite(restoreSnapshot=null){
     agreement.textContent=restoreSnapshot?'Enter your account password and select Restore to confirm that this file contains the cloud data you want for this account.':cloudOverwriteOriginalText.agreement;
     document.getElementById('cloudOverwriteSubmit').textContent=restoreSnapshot?'Verify password and restore cloud':'Verify password and overwrite cloud';
     document.getElementById('cloudOverwritePassword').value='';
-    document.getElementById('cloudOverwriteStatus').textContent='';
+    setAppFeedback('cloudOverwriteStatus','');
     try{
         if(!historyOwner)throw Error('Sign in before replacing cloud data.');
         const snapshot=localSnapshot(historyOwner);validateSyncSnapshot(snapshot);
@@ -1874,10 +1886,10 @@ function showCloudOverwrite(restoreSnapshot=null){
         const rows=JSON.parse((restoreSnapshot||snapshot).entryHistory);
         const differences=restoreSnapshot?compareRestoreSnapshot(snapshot,restoreSnapshot):[];
         cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot),restoreSnapshot,differences,differenceConfirmed:false};
-        document.getElementById('cloudRestoreDifferences').textContent=restoreSnapshot?(differences.length?'Imported data differs from current local data:\n'+differences.join('\n')+'\nAfter verifying your password, you will be asked to enter it again to approve replacing these differences.':'The imported copy matches current local data.'):'';
+        setAppFeedback('cloudRestoreDifferences',restoreSnapshot?(differences.length?'Imported data differs from current local data:\n'+differences.join('\n')+'\nAfter verifying your password, you will be asked to enter it again to approve replacing these differences.':'The imported copy matches current local data.'):'');
         document.getElementById('cloudOverwriteSummary').textContent=rows.length+(restoreSnapshot?' market rows in the previous cloud copy':' saved market rows on this device')+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
         if(!panel.open)panel.showModal();document.getElementById('cloudOverwritePassword').focus();
-    }catch(error){document.getElementById('syncStatus').textContent=error.message;}
+    }catch(error){setAppFeedback('syncStatus',error.message);}
 }
 function hideCloudOverwrite(){
     if(cloudOverwritePending)return;
@@ -1890,7 +1902,7 @@ async function overwriteCloudWithLocal(event){
     if(cloudOverwritePending||manualSyncPending)return;
     const input=document.getElementById('cloudOverwritePassword'),status=document.getElementById('cloudOverwriteStatus');
     let password=input.value;input.value='';
-    if(!password){status.textContent='Enter your account password to confirm the overwrite.';return;}
+    if(!password){setAppFeedback(status,'Enter your account password to confirm the overwrite.');return;}
     const selection=cloudOverwriteSelection;
     cloudOverwritePending=true;stopAutoSync();syncReadyOwner=null;
     for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn','restoreCloudBtn'])document.getElementById(id).disabled=true;
@@ -1899,7 +1911,7 @@ async function overwriteCloudWithLocal(event){
         if(!owner||historyOwner!==owner)throw Error('Account changed. Reopen the confirmation.');
         const local=localSnapshot(owner);validateSyncSnapshot(local);
         if(snapshotFingerprint(local)!==selection.fingerprint)throw Error('Local data changed. Reopen the confirmation to review the latest copy.');
-        status.textContent='Verifying your password…';
+        setAppFeedback(status,'Verifying your password…');
         const {data:identity,error:identityError}=await awaitSyncRequest(client.auth.getUser());
         if(identityError||identity?.user?.id!==owner||!identity.user.email)throw Error('Please sign in again before replacing cloud data.');
         // Separate, memory-only authentication never replaces the dashboard session.
@@ -1913,10 +1925,10 @@ async function overwriteCloudWithLocal(event){
             document.getElementById('cloudOverwriteTitle').textContent='Different data found — permission to replace local and cloud?';
             document.getElementById('cloudOverwriteAgreement').textContent='The imported records differ from your local copy as listed above. To approve replacement of both local and cloud data, enter your password again and select Confirm restore. Cancel keeps your current data.';
             document.getElementById('cloudOverwriteSubmit').textContent='Confirm restore with password again';
-            status.textContent='Password verified. Nothing has been replaced. Please enter your password again to approve the differences.';
+            setAppFeedback(status,'Password verified. Nothing has been replaced. Please enter your password again to approve the differences.');
             input.focus();return;
         }
-        status.textContent='Backing up the cloud copy and saving your local data…';
+        setAppFeedback(status,'Backing up the cloud copy and saving your local data…');
         const {data:remote,error:readError}=await awaitSyncRequest(verified.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(readError)throw readError;
         if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Account or local data changed. Reopen the confirmation.');
@@ -1940,18 +1952,18 @@ async function overwriteCloudWithLocal(event){
             renderDashboard();
             syncBaseline=snapshotFingerprint(target);syncReadyOwner=owner;startAutoSync();
             cloudOverwriteSelection=null;
-            status.textContent='Previous cloud content restored to both cloud and this device. Dashboard refreshed; automatic sync resumed. A backup comparison download was requested.';
-            document.getElementById('syncStatus').textContent=status.textContent;
+            setAppFeedback(status,'Previous cloud content restored to both cloud and this device. Dashboard refreshed; automatic sync resumed. A backup comparison download was requested.');
+            setAppFeedback('syncStatus',status.textContent);
             return;
         }
         syncBaseline=snapshotFingerprint(local);syncReadyOwner=owner;startAutoSync();
         cloudOverwriteSelection=null;
-        status.textContent='Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.';
-        document.getElementById('syncStatus').textContent='Cloud replaced with local data. Automatic sync resumed.';
+        setAppFeedback(status,'Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.');
+        setAppFeedback('syncStatus','Cloud replaced with local data. Automatic sync resumed.');
     }catch(error){
         syncReadyOwner=null;stopAutoSync();
-        status.textContent='Sync paused: '+(error?.message||String(error));
-        document.getElementById('syncStatus').textContent=status.textContent;
+        setAppFeedback(status,'Sync paused: '+(error?.message||String(error)));
+        setAppFeedback('syncStatus',status.textContent);
     }finally{
         password='';input.value='';cloudOverwritePending=false;
         for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn','restoreCloudBtn'])document.getElementById(id).disabled=false;
@@ -2463,7 +2475,7 @@ async function copyQuickPastePrompt(){
     try {
         if(!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable');
         await navigator.clipboard.writeText(prompt);
-        status.textContent='Prompt copied.';
+        setAppFeedback(status,'Prompt copied.','success');
     } catch(error){
         const selection=window.getSelection();
         const range=document.createRange();range.selectNodeContents(document.getElementById('quickPastePrompt'));
@@ -2721,13 +2733,13 @@ function renderOpeningOverview(){
 function generateCpPrompt(){
     document.getElementById('cpAiPrompt').value='Research the latest common observation date available as of '+new Date().toISOString()+' for FRED DCPF3M (90-day AA financial CP), DCPN3M (90-day AA nonfinancial CP), and DTB3 (3-month Treasury bills). Use https://fred.stlouisfed.org/series/DCPF3M , https://fred.stlouisfed.org/series/DCPN3M and https://fred.stlouisfed.org/series/DTB3 . Return exactly four comma-separated numbers: YYYYMMDD, financial CP rate in percent, nonfinancial CP rate in percent, Treasury bill rate in percent. All rates must share that date. Use an older verified common date if necessary, never fill missing rates or mix dates. If any cannot be verified, explain instead of inventing numbers.';
 }
-async function copyCpPrompt(){generateCpPrompt();try{await navigator.clipboard.writeText(document.getElementById('cpAiPrompt').value);document.getElementById('cpAiStatus').textContent='Prompt copied.';}catch{document.getElementById('cpAiPrompt').select();document.getElementById('cpAiStatus').textContent='Select and copy the prompt manually.';}}
+async function copyCpPrompt(){generateCpPrompt();try{await navigator.clipboard.writeText(document.getElementById('cpAiPrompt').value);setAppFeedback('cpAiStatus','Prompt copied.');}catch{document.getElementById('cpAiPrompt').select();setAppFeedback('cpAiStatus','Select and copy the prompt manually.');}}
 function applyCpResponse(){
-    if(!historyOwner||!currentEntryTime){document.getElementById("cpAiStatus").textContent="Sign in and save a researched composite entry first, or use Fetch latest data to update CP history independently.";return;}
+    if(!historyOwner||!currentEntryTime){setAppFeedback('cpAiStatus',"Sign in and save a researched composite entry first, or use Fetch latest data to update CP history independently.");return;}
     const raw=document.getElementById('cpAiResponse').value.trim().split(',');const nums=raw.map(x=>Number(x.trim()));
-    if(raw.length!==4||raw.some(x=>!x.trim())||!nums.every(Number.isFinite)){document.getElementById('cpAiStatus').textContent='Use exactly four numeric fields: date and three rates.';return;}
+    if(raw.length!==4||raw.some(x=>!x.trim())||!nums.every(Number.isFinite)){setAppFeedback('cpAiStatus','Use exactly four numeric fields: date and three rates.');return;}
     const values={...currentData,cp_date:nums[0],cp_financial:nums[1],cp_nonfinancial:nums[2],cp_treasury:nums[3]};const error=validateLiquidityInputs(values);
-    if(error){document.getElementById('cpAiStatus').textContent=error;return;}const inputError=validateForcedInputs(values);if(inputError){document.getElementById('cpAiStatus').textContent=inputError;return;}commitEntry(values);document.getElementById('cpAiStatus').textContent='CP rates saved and check time refreshed; the observation date changes only when newer common-date rates are supplied.';
+    if(error){setAppFeedback('cpAiStatus',error);return;}const inputError=validateForcedInputs(values);if(inputError){setAppFeedback('cpAiStatus',inputError);return;}if(!commitEntry(values))return;setAppFeedback('cpAiStatus','CP rates saved and check time refreshed; the observation date changes only when newer common-date rates are supplied.');
 }
 function closeOtherDashboardPanels(selected){
     document.querySelectorAll('details.overview-details').forEach(panel=>{if(panel!==selected)panel.open=false;});
@@ -2976,12 +2988,13 @@ function commitEntry(values,observationDate=null){
     const candidate={savedAt,updatedAt:now,values:prepared.values,...(Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?{cpCheckedAt:now}:{})};
     const reconciled=reconcileCompositeEntries([candidate,...entryHistory]);
     try{writeMarketHistory(JSON.stringify(reconciled.rows));}
-    catch(error){alert('Update could not be saved. Existing history has been kept. '+error.message);return;}
+    catch(error){setAppFeedback('compositeReconcileStatus','Update could not be saved. Existing history has been kept. '+error.message,'error');alert('Update could not be saved. Existing history has been kept. '+error.message);return;}
     entryHistory=reconciled.rows;currentEntryTime=savedAt;currentData={...entryHistory[0].values};model50Cache=null;historyPreviewHidden=false;historyStorageError='';
     const period=document.getElementById('forcedPeriod');if(period)period.value='current';
     renderDashboard();
     const status=document.getElementById('compositeReconcileStatus');
-    if(status)status.textContent=prepared.notices.join(' ')+' Checked History against CP Funding & Leadership: '+reconciled.corrected+' rows reconciled; '+reconciled.cleared+' manual calculated-field overrides reset. Missing source data or incomplete 21-session windows remain unavailable.';
+    if(status)setAppFeedback(status,'Data updated and saved successfully. '+prepared.notices.join(' ')+' Checked History against CP Funding & Leadership: '+reconciled.corrected+' rows reconciled; '+reconciled.cleared+' manual calculated-field overrides reset. Missing source data or incomplete 21-session windows remain unavailable.','success');
+    return true;
 }
 
 function parseQuickPaste(){
@@ -3366,7 +3379,7 @@ const fundingReference = [{"id":"swpt-reference-2025-12-24","observationDate":"2
 let fredLiveData=null,fredFetchBusy=false,fredRequestGeneration=0;
 function fredKeyStorage(){return 'crash-risk-fred-key-v1:'+historyOwner;}
 function fredDataStorage(){return 'crash-risk-fred-data-v1:'+historyOwner;}
-function fredMessage(text){document.getElementById('fredFetchStatus').textContent=text;}
+function fredMessage(text){setAppFeedback('fredFetchStatus',text);}
 function validateFredData(data){
     if(!data||data.version!==1||data.source!=='FRED'||JSON.stringify(data.series)!=='["DCPF3M","DCPN3M","DTB3"]'||!Array.isArray(data.rows)||!data.rows.length||data.rows.length>10000||!Number.isFinite(Date.parse(data.fetchedAt)))throw Error('Invalid FRED response.');
     const clean=[];let previous='';
@@ -3436,7 +3449,7 @@ function validateFedWatch(r){
 function loadFedWatch(){
  fedWatchRows=[];fedPage=0;fedSort='observedAt';fedDirection=-1;fedDirty.clear();
  for(const id of ['fedPrompt','fedPaste'])document.getElementById(id).value='';
- try{const rows=JSON.parse(localStorage.getItem(fedWatchKey())||'[]');if(!Array.isArray(rows))throw Error('Invalid history');fedWatchRows=rows.map(validateFedWatch);document.getElementById('fedStatus').textContent='';}catch(e){document.getElementById('fedStatus').textContent='Fed history could not be loaded: '+e.message;}
+ try{const rows=JSON.parse(localStorage.getItem(fedWatchKey())||'[]');if(!Array.isArray(rows))throw Error('Invalid history');fedWatchRows=rows.map(validateFedWatch);setAppFeedback('fedStatus','');}catch(e){setAppFeedback('fedStatus','Fed history could not be loaded: '+e.message);}
  renderFedWatch();
 }
 function persistFedWatch(rows){localStorage.setItem(fedWatchKey(),JSON.stringify(rows));fedWatchRows=rows;}
@@ -3455,8 +3468,8 @@ function renderFedWatch(){
  for(const {r,i} of rows.slice(fedPage*50,fedPage*50+50)){
  const tr=document.createElement('tr'),td=document.createElement('td'),inputs={};tr.appendChild(td);
  const restore=()=>{fedFields.forEach(([k])=>inputs[k].value=r[k]??'');fedDirty.delete(i);};
- const del=button('×',()=>{if(!fedLeaveEdits()||!confirm('Delete this Fed observation?'))return;try{persistFedWatch(fedWatchRows.filter((_,j)=>j!==i));renderFedWatch();}catch(e){document.getElementById('fedStatus').textContent='Not deleted: '+e.message;}});del.className='history-delete';del.setAttribute('aria-label','Delete Fed observation '+r.observedAt);td.appendChild(del);
- td.appendChild(button('Save',()=>{try{const raw={};fedFields.forEach(([k,,type])=>raw[k]=type==='number'?(inputs[k].value.trim()===''?null:Number(inputs[k].value)):inputs[k].value.trim()||null);const row=validateFedWatch(raw);if(fedWatchRows.some((v,j)=>j!==i&&fedSameObservation(v,row)))throw Error('An observation for this timestamp and meeting already exists.');const next=fedWatchRows.slice();next[i]=row;persistFedWatch(next);Object.assign(r,row);timing.textContent=fedTimingLabel(row);fedDirty.delete(i);document.getElementById('fedStatus').textContent='Fed row saved. Sorting is applied when the table is refreshed.';}catch(e){document.getElementById('fedStatus').textContent='Not saved: '+e.message;}}));td.appendChild(button('Cancel',restore));const timing=document.createElement('div');timing.className='table-note';timing.textContent=fedTimingLabel(r);td.appendChild(timing);
+ const del=button('×',()=>{if(!fedLeaveEdits()||!confirm('Delete this Fed observation?'))return;try{persistFedWatch(fedWatchRows.filter((_,j)=>j!==i));renderFedWatch();setAppFeedback('fedStatus','Fed observation deleted successfully.','success');}catch(e){setAppFeedback('fedStatus','Not deleted: '+e.message);}});del.className='history-delete';del.setAttribute('aria-label','Delete Fed observation '+r.observedAt);td.appendChild(del);
+ td.appendChild(button('Save',()=>{try{const raw={};fedFields.forEach(([k,,type])=>raw[k]=type==='number'?(inputs[k].value.trim()===''?null:Number(inputs[k].value)):inputs[k].value.trim()||null);const row=validateFedWatch(raw);if(fedWatchRows.some((v,j)=>j!==i&&fedSameObservation(v,row)))throw Error('An observation for this timestamp and meeting already exists.');const next=fedWatchRows.slice();next[i]=row;persistFedWatch(next);Object.assign(r,row);timing.textContent=fedTimingLabel(row);fedDirty.delete(i);setAppFeedback('fedStatus','Fed row saved. Sorting is applied when the table is refreshed.');}catch(e){setAppFeedback('fedStatus','Not saved: '+e.message);}}));td.appendChild(button('Cancel',restore));const timing=document.createElement('div');timing.className='table-note';timing.textContent=fedTimingLabel(r);td.appendChild(timing);
  for(const [k,label,type] of fedFields){const cell=document.createElement('td'),input=document.createElement('input');input.type=type;if(type==='number')input.step='any';input.className=type==='number'?'history-value-input history-normal':'history-date-input';input.style.minWidth=type==='number'?'100px':'180px';input.value=r[k]??'';input.setAttribute('aria-label',label+' for '+r.observedAt);input.oninput=()=>fedDirty.add(i);inputs[k]=input;cell.appendChild(input);tr.appendChild(cell);}body.appendChild(tr);
  }
  if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=fedFields.length+1;td.textContent='No Fed observations saved. Generate a prompt above to begin.';tr.appendChild(td);body.appendChild(tr);}
@@ -3467,8 +3480,8 @@ Use the official Federal Reserve FOMC calendar for the next decision date (final
 Aggregate all target-rate outcomes above the CURRENT target range into hike, the unchanged range into hold, and all lower ranges into cut. They should total 100% subject to rounding. These are market-implied probabilities, not a forecast of a crash. Use one source snapshot and the same next meeting for all three figures; do not combine timestamps or providers. observedAt must be the verified source snapshot timestamp in ISO 8601 with explicit timezone, not retrieval time or a guessed timestamp. If the snapshot timestamp cannot be verified, use observedAt:null. Put a verified article publication timestamp in publishedAt (ISO 8601 with explicit timezone), or null if unavailable. Never substitute article time for snapshot time. Records without snapshot timestamps are saved with an explicit timing-unverified label. meetingDate is YYYY-MM-DD. Do not use future releases or stale probabilities for a meeting that has already occurred.
 If verified historical probabilities exist exactly five completed US trading sessions earlier for the SAME meeting and provider, put that snapshot timestamp in comparisonAt and give current minus prior hike/hold/cut probability changes in percentage points. Identify both snapshots and the five-session match in notes. If not fully verified, all four comparison fields must be null. Do not substitute a calendar week or switch meetings.
 Use null for unavailable numbers or timestamps; do not invent or infer missing observations. Include plain HTTPS supporting URLs in source and calendarSource; put methodology, limitations and additional supporting URLs in notes. No Markdown fences or text outside the JSON. Missing decision date, target range, probabilities or supporting URLs will remain unsaved for review. Missing timestamps alone may be saved, explicitly labelled as unverified; leave all comparison fields null if observedAt is null.`;}
-async function copyFedPrompt(){if(!document.getElementById('fedPrompt').value)generateFedPrompt();try{await navigator.clipboard.writeText(document.getElementById('fedPrompt').value);document.getElementById('fedStatus').textContent='Prompt copied.';}catch{document.getElementById('fedStatus').textContent='Select and copy the prompt manually.';}}
-function importFedWatch(){try{const row=validateFedWatch(JSON.parse(document.getElementById('fedPaste').value.trim()));if(fedWatchRows.some(r=>fedSameObservation(r,row)))throw Error('This observation already exists. Edit its saved row instead.');if(!fedLeaveEdits())return;persistFedWatch([...fedWatchRows,row]);fedPage=0;fedSort='observedAt';fedDirection=-1;renderFedWatch();document.getElementById('fedStatus').textContent='Fed observation saved. '+fedTimingLabel(row)+'.';}catch(e){document.getElementById('fedStatus').textContent='Not saved: '+e.message;}}
+async function copyFedPrompt(){if(!document.getElementById('fedPrompt').value)generateFedPrompt();try{await navigator.clipboard.writeText(document.getElementById('fedPrompt').value);setAppFeedback('fedStatus','Prompt copied.');}catch{setAppFeedback('fedStatus','Select and copy the prompt manually.');}}
+function importFedWatch(){try{const row=validateFedWatch(JSON.parse(document.getElementById('fedPaste').value.trim()));if(fedWatchRows.some(r=>fedSameObservation(r,row)))throw Error('This observation already exists. Edit its saved row instead.');if(!fedLeaveEdits())return;persistFedWatch([...fedWatchRows,row]);fedPage=0;fedSort='observedAt';fedDirection=-1;renderFedWatch();setAppFeedback('fedStatus','Fed observation saved. '+fedTimingLabel(row)+'.');}catch(e){setAppFeedback('fedStatus','Not saved: '+e.message);}}
 
 function fundingKey(){return 'crash-risk-funding-v1:'+historyOwner;}
 function fundingNumber(n){return n===null||n===undefined?'—':n.toLocaleString(undefined,{maximumFractionDigits:3});}
@@ -3510,12 +3523,12 @@ function saveFundingForm(){
         if(fundingEdit){const old=fundingRecords.find(v=>v.id===fundingEdit);if(!old)throw Error('Entry changed. Start editing again.');r.publishedAt=now;r.observationDate=old.observationDate;r.supersedes=old.id;}
         r.id=fundingId();r.savedAt=now;
         if(fundingRecords.some(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt))throw Error('This observation and publication already exist. Edit the existing row.');
-        persistFunding([...fundingRecords,r]);resetFundingForm();document.getElementById('fundingStatus').textContent='Funding entry saved. Queued for normal account sync.';
-    }catch(e){document.getElementById('fundingStatus').textContent=e.message;}
+        persistFunding([...fundingRecords,r]);resetFundingForm();setAppFeedback('fundingStatus','Funding entry saved. Queued for normal account sync.');
+    }catch(e){setAppFeedback('fundingStatus',e.message);}
 }
 function resetFundingForm(){fundingEdit=null;fundingFields.forEach(([k])=>{document.getElementById('funding_'+k).value='';document.getElementById('funding_'+k).disabled=false;});document.getElementById('fundingSave').textContent='Save funding entry';}
-function editFunding(r){fundingEdit=r.id;fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');document.getElementById('funding_observationDate').disabled=true;document.getElementById('funding_publishedAt').value=new Date().toISOString();document.getElementById('funding_publishedAt').disabled=true;document.getElementById('fundingSave').textContent='Save correction (available from now)';document.getElementById('fundingStatus').textContent='The original release is retained. Corrections take effect now to avoid changing what was known earlier.';}
-function deleteFunding(r){if(!confirm('Delete the funding observation '+r.observationDate+' and all its saved versions?'))return;try{persistFunding(fundingRecords.filter(v=>v.observationDate!==r.observationDate));resetFundingForm();}catch(e){document.getElementById('fundingStatus').textContent=e.message;}}
+function editFunding(r){fundingEdit=r.id;fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');document.getElementById('funding_observationDate').disabled=true;document.getElementById('funding_publishedAt').value=new Date().toISOString();document.getElementById('funding_publishedAt').disabled=true;document.getElementById('fundingSave').textContent='Save correction (available from now)';setAppFeedback('fundingStatus','The original release is retained. Corrections take effect now to avoid changing what was known earlier.');}
+function deleteFunding(r){if(!confirm('Delete the funding observation '+r.observationDate+' and all its saved versions?'))return;try{persistFunding(fundingRecords.filter(v=>v.observationDate!==r.observationDate));resetFundingForm();setAppFeedback('fundingStatus','Funding observation deleted successfully.','success');}catch(e){setAppFeedback('fundingStatus',e.message);}}
 function importFunding(){
     try{const data=JSON.parse(document.getElementById('fundingImport').value);if(!Array.isArray(data)||data.length>10000)throw Error('Provide an array of at most 10,000 releases.');
         const next=[...fundingRecords];let count=0;
@@ -3523,12 +3536,12 @@ function importFunding(){
             const old=next.find(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt);
             if(old){if(fundingFields.some(([k])=>(old[k]??'')!==(r[k]??'')))throw Error('Conflicting values for an existing publication. Edit the row to preserve its original version.');return;}
             next.push({...r,id:fundingId(),savedAt:new Date().toISOString()});count++;
-        });persistFunding(next);document.getElementById('fundingStatus').textContent=count+' new release versions imported. Publication timestamps and test evidence are supplied by the importer; verify them against originals.';
-    }catch(e){document.getElementById('fundingStatus').textContent='Nothing imported: '+e.message;}
+        });persistFunding(next);setAppFeedback('fundingStatus',count+' new release versions imported. Publication timestamps and test evidence are supplied by the importer; verify them against originals.');
+    }catch(e){setAppFeedback('fundingStatus','Nothing imported: '+e.message);}
 }
 function exportFunding(){const a=document.createElement('a'),url=URL.createObjectURL(new Blob([JSON.stringify(fundingRecords,null,2)],{type:'application/json'}));a.href=url;a.download='dollar-funding-history.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);}
 function fundingPrompt(){document.getElementById('fundingPrompt').value='Research Fed SWPT weekly dollar liquidity swap balances for the past year through today. Return ONLY a JSON array with observationDate (YYYY-MM-DD), publishedAt (exact first-publication timestamp with timezone), balance (USD millions), testBalance (USD millions or null), testEvidence (official URL or empty string), source (official release URL). Preserve separate revisions with their actual publication times. Use original Fed H.4.1 releases or ALFRED vintages and NY Fed operation results. Never use an observation date as a publication date. If exact availability cannot be verified, omit that release and explain outside the JSON. testBalance must include only explicitly identified operational-test transactions outstanding on the observation date, using settlement and maturity dates. Use null unless full reconciliation, including a verified zero, is possible. Do not infer tests from transaction size, invent values, or return risk scores. Review sources before importing.';}
-async function copyFundingPrompt(){try{if(!document.getElementById('fundingPrompt').value)fundingPrompt();await navigator.clipboard.writeText(document.getElementById('fundingPrompt').value);document.getElementById('fundingStatus').textContent='Prompt copied.';}catch{document.getElementById('fundingStatus').textContent='Select and copy the prompt manually; clipboard access is unavailable.';}}
+async function copyFundingPrompt(){try{if(!document.getElementById('fundingPrompt').value)fundingPrompt();await navigator.clipboard.writeText(document.getElementById('fundingPrompt').value);setAppFeedback('fundingStatus','Prompt copied.');}catch{setAppFeedback('fundingStatus','Select and copy the prompt manually; clipboard access is unavailable.');}}
 function renderFunding(){
     renderFreshness();
     const lastSaved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);const stamp=document.getElementById("dollarUpdateTime");if(stamp)stamp.textContent=lastSaved?"Last saved update: "+displayUpdateTime(lastSaved):"Last saved update: none — embedded reference history only.";
@@ -3576,8 +3589,8 @@ FINAL OUTPUT CHECK: Return only the JSON object, preferably on one line. The fir
 }
 async function copyFundingQuickPrompt(){
     generateFundingQuickPrompt();
-    try{await navigator.clipboard.writeText(document.getElementById('fundingQuickPrompt').value);document.getElementById('fundingQuickStatus').textContent='Prompt copied. Paste it into your AI, then paste its JSON response below.';}
-    catch{document.getElementById('fundingQuickStatus').textContent='Clipboard unavailable. Select and copy the prompt above manually.';}
+    try{await navigator.clipboard.writeText(document.getElementById('fundingQuickPrompt').value);setAppFeedback('fundingQuickStatus','Prompt copied. Paste it into your AI, then paste its JSON response below.');}
+    catch{setAppFeedback('fundingQuickStatus','Clipboard unavailable. Select and copy the prompt above manually.');}
 }
 function fillFundingFromAI(){
     const status=document.getElementById('fundingQuickStatus');
