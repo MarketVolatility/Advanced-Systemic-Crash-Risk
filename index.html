@@ -681,6 +681,8 @@ button.secondary {
             <button class="secondary" onclick="exportRecoveryData()">Export recovery data</button>
             <button class="secondary" onclick="exportCloudComparison()">Export local + last cloud for AI</button>
             <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
+            <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud from comparison file</button>
+            <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
             <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
@@ -688,10 +690,10 @@ button.secondary {
 </header>
 <dialog id="cloudOverwritePanel" aria-labelledby="cloudOverwriteTitle" oncancel="event.preventDefault();hideCloudOverwrite()">
 <h3 id="cloudOverwriteTitle">Overwrite cloud with this device’s saved data</h3>
-<p>This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local + last cloud for AI” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
+<p id="cloudOverwriteExplanation">This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local + last cloud for AI” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. You can restore the previous cloud content using the downloaded comparison file and “Restore previous cloud from comparison file”. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
 <p id="cloudOverwriteSummary"></p>
 <form onsubmit="overwriteCloudWithLocal(event)">
-<p>By entering your password and selecting “Verify password and overwrite cloud”, you confirm this device has the latest saved data and agree to replace the cloud copy and resume syncing.</p>
+<p id="cloudOverwriteAgreement">By entering your password and selecting “Verify password and overwrite cloud”, you confirm this device has the latest saved data and agree to replace the cloud copy and resume syncing.</p>
 <label for="cloudOverwritePassword">Account password</label>
 <input id="cloudOverwritePassword" type="password" autocomplete="current-password" required>
 <button id="cloudOverwriteSubmit" type="submit">Verify password and overwrite cloud</button>
@@ -1761,18 +1763,50 @@ function stopAutoSync(){
     if(syncIntervalHandle){ clearInterval(syncIntervalHandle); syncIntervalHandle = null; }
 }
 
+function parseCloudRestore(text){
+    const file=JSON.parse(text);
+    if(file?.format!=='crash-risk-cloud-local-comparison-v1')throw Error('Select a crash-risk-local-cloud-comparison JSON file.');
+    const cloud=file.lastPreservedCloud;
+    if(!cloud||typeof cloud!=='object'||Array.isArray(cloud))throw Error('This file contains no previous cloud record to restore.');
+    const snapshot={};
+    for(const field of Object.keys(snapshotKeys(''))){
+        if(!Object.hasOwn(cloud,field))throw Error('The previous cloud copy is incomplete: missing '+field+'.');
+        if(field!=='fredHistory'&&!Array.isArray(cloud[field]))throw Error('Invalid '+field+' in previous cloud copy.');
+        snapshot[field]=cloud[field]===null?null:JSON.stringify(cloud[field]);
+    }
+    validateSyncSnapshot(snapshot);
+    return snapshot;
+}
+async function importCloudRestore(input){
+    const file=input.files?.[0],owner=historyOwner;input.value='';
+    if(!file||cloudOverwritePending||manualSyncPending)return;
+    try{
+        if(!owner)throw Error('Sign in before restoring cloud data.');
+        const snapshot=parseCloudRestore(await file.text());
+        if(historyOwner!==owner)throw Error('Account changed; select the file again.');
+        showCloudOverwrite(snapshot);
+    }catch(error){document.getElementById('syncStatus').textContent='Restore not started: '+error.message;}
+}
+let cloudOverwriteOriginalText=null;
 let cloudOverwritePending=false,cloudOverwriteSelection=null;
-function showCloudOverwrite(){
+function showCloudOverwrite(restoreSnapshot=null){
     if(cloudOverwritePending)return;
     const panel=document.getElementById('cloudOverwritePanel');
+    const explanation=document.getElementById('cloudOverwriteExplanation'),agreement=document.getElementById('cloudOverwriteAgreement');
+    if(!cloudOverwriteOriginalText)cloudOverwriteOriginalText={explanation:explanation.textContent,agreement:agreement.textContent};
+    document.getElementById('cloudOverwriteTitle').textContent=restoreSnapshot?'Restore previous cloud content from file':'Overwrite cloud with this device’s saved data';
+    explanation.textContent=restoreSnapshot?'This restores the preserved cloud copy from your imported comparison file to the signed-in account. Your current cloud copy will be backed up and a comparison file downloaded first. Local data stays unchanged. Automatic sync will remain paused to prevent it from replacing the restored cloud copy.':cloudOverwriteOriginalText.explanation;
+    agreement.textContent=restoreSnapshot?'Enter your account password and select Restore to confirm that this file contains the cloud data you want for this account.':cloudOverwriteOriginalText.agreement;
+    document.getElementById('cloudOverwriteSubmit').textContent=restoreSnapshot?'Verify password and restore cloud':'Verify password and overwrite cloud';
     document.getElementById('cloudOverwritePassword').value='';
     document.getElementById('cloudOverwriteStatus').textContent='';
     try{
         if(!historyOwner)throw Error('Sign in before replacing cloud data.');
         const snapshot=localSnapshot(historyOwner);validateSyncSnapshot(snapshot);
-        const rows=JSON.parse(snapshot.entryHistory);
-        cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot)};
-        document.getElementById('cloudOverwriteSummary').textContent=rows.length+' saved market rows on this device'+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
+        if(restoreSnapshot)validateSyncSnapshot(restoreSnapshot);
+        const rows=JSON.parse((restoreSnapshot||snapshot).entryHistory);
+        cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot),restoreSnapshot};
+        document.getElementById('cloudOverwriteSummary').textContent=rows.length+(restoreSnapshot?' market rows in the previous cloud copy':' saved market rows on this device')+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
         if(!panel.open)panel.showModal();document.getElementById('cloudOverwritePassword').focus();
     }catch(error){document.getElementById('syncStatus').textContent=error.message;}
 }
@@ -1790,7 +1824,7 @@ async function overwriteCloudWithLocal(event){
     if(!password){status.textContent='Enter your account password to confirm the overwrite.';return;}
     const selection=cloudOverwriteSelection;
     cloudOverwritePending=true;stopAutoSync();syncReadyOwner=null;
-    for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn'])document.getElementById(id).disabled=true;
+    for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn','restoreCloudBtn'])document.getElementById(id).disabled=true;
     try{
         const owner=selection?.owner,client=getAuthClient();
         if(!owner||historyOwner!==owner)throw Error('Account changed. Reopen the confirmation.');
@@ -1812,7 +1846,8 @@ async function overwriteCloudWithLocal(event){
         await saveRecoverySnapshot(owner,label,{local,cloud:remote?.data??null,cloudUpdatedAt:remote?.updated_at??null});
         await downloadCloudComparison(); // Request the recovery download before replacing the cloud record.
         if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Account or local data changed during backup. Reopen the confirmation.');
-        const payload={user_id:owner,data:local,updated_at:new Date().toISOString()};
+        const target=selection.restoreSnapshot||local;validateSyncSnapshot(target);
+        const payload={user_id:owner,data:target,updated_at:new Date().toISOString()};
         let request=verified.from('user_app_data');
         request=remote?request.update(payload).eq('user_id',owner):request.insert(payload);
         if(remote)request=remote.updated_at==null?request.is('updated_at',null):request.eq('updated_at',remote.updated_at);
@@ -1820,6 +1855,13 @@ async function overwriteCloudWithLocal(event){
         if(writeError)throw writeError;
         if(!written?.length)throw Error('Cloud data changed during confirmation. Nothing was overwritten; review and retry.');
         if(historyOwner!==owner)throw Error('Cloud saved for the verified account; account changed, so automatic sync remains paused.');
+        if(selection.restoreSnapshot){
+            syncBaseline=snapshotFingerprint(target);syncReadyOwner=null;stopAutoSync();
+            cloudOverwriteSelection=null;
+            status.textContent='Previous cloud content restored. Local data was kept. Automatic sync is paused to protect the restored cloud copy. A backup comparison download was requested.';
+            document.getElementById('syncStatus').textContent=status.textContent;
+            return;
+        }
         syncBaseline=snapshotFingerprint(local);syncReadyOwner=owner;startAutoSync();
         cloudOverwriteSelection=null;
         status.textContent='Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.';
@@ -1830,7 +1872,7 @@ async function overwriteCloudWithLocal(event){
         document.getElementById('syncStatus').textContent=status.textContent;
     }finally{
         password='';input.value='';cloudOverwritePending=false;
-        for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn'])document.getElementById(id).disabled=false;
+        for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn','restoreCloudBtn'])document.getElementById(id).disabled=false;
     }
 }
 let manualSyncPending=false;
