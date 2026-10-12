@@ -950,6 +950,7 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 
 <div class="btn-container">
     <button onclick="parseQuickPaste()">Parse & Update</button>
+    <span id="quickPasteStatus" role="status" aria-live="polite" style="margin-left:12px;font-weight:600"></span>
 </div>
 
 </div>
@@ -1885,8 +1886,8 @@ function showCloudOverwrite(restoreSnapshot=null){
         if(restoreSnapshot)validateSyncSnapshot(restoreSnapshot);
         const rows=JSON.parse((restoreSnapshot||snapshot).entryHistory);
         const differences=restoreSnapshot?compareRestoreSnapshot(snapshot,restoreSnapshot):[];
-        cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot),restoreSnapshot,differences,differenceConfirmed:false};
-        setAppFeedback('cloudRestoreDifferences',restoreSnapshot?(differences.length?'Imported data differs from current local data:\n'+differences.join('\n')+'\nAfter verifying your password, you will be asked to enter it again to approve replacing these differences.':'The imported copy matches current local data.'):'');
+        cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot),restoreSnapshot,differences};
+        setAppFeedback('cloudRestoreDifferences',restoreSnapshot?(differences.length?'Imported data differs from current local data:\n'+differences.join('\n')+'\nEnter your password and select Restore to approve replacing these differences.':'The imported copy matches current local data.'):'');
         document.getElementById('cloudOverwriteSummary').textContent=rows.length+(restoreSnapshot?' market rows in the previous cloud copy':' saved market rows on this device')+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
         if(!panel.open)panel.showModal();document.getElementById('cloudOverwritePassword').focus();
     }catch(error){setAppFeedback('syncStatus',error.message);}
@@ -1919,15 +1920,6 @@ async function overwriteCloudWithLocal(event){
         const {data:login,error:loginError}=await awaitSyncRequest(verified.auth.signInWithPassword({email:identity.user.email,password}));
         password='';
         if(loginError||login?.user?.id!==owner||!login.session)throw Error('Password verification failed. No cloud data was replaced.');
-        if(selection.restoreSnapshot&&selection.differences.length&&!selection.differenceConfirmed){
-            if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Local data changed. Reopen the comparison before restoring.');
-            selection.differenceConfirmed=true;
-            document.getElementById('cloudOverwriteTitle').textContent='Different data found — permission to replace local and cloud?';
-            document.getElementById('cloudOverwriteAgreement').textContent='The imported records differ from your local copy as listed above. To approve replacement of both local and cloud data, enter your password again and select Confirm restore. Cancel keeps your current data.';
-            document.getElementById('cloudOverwriteSubmit').textContent='Confirm restore with password again';
-            setAppFeedback(status,'Password verified. Nothing has been replaced. Please enter your password again to approve the differences.');
-            input.focus();return;
-        }
         setAppFeedback(status,'Backing up the cloud copy and saving your local data…');
         const {data:remote,error:readError}=await awaitSyncRequest(verified.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(readError)throw readError;
@@ -2988,16 +2980,18 @@ function commitEntry(values,observationDate=null){
     const candidate={savedAt,updatedAt:now,values:prepared.values,...(Number.isFinite(values.cp_date)&&!validateLiquidityInputs(values)?{cpCheckedAt:now}:{})};
     const reconciled=reconcileCompositeEntries([candidate,...entryHistory]);
     try{writeMarketHistory(JSON.stringify(reconciled.rows));}
-    catch(error){setAppFeedback('compositeReconcileStatus','Update could not be saved. Existing history has been kept. '+error.message,'error');alert('Update could not be saved. Existing history has been kept. '+error.message);return;}
+    catch(error){setAppFeedback('quickPasteStatus','Update could not be saved. Existing history kept.','error');setAppFeedback('compositeReconcileStatus','Update could not be saved. Existing history has been kept. '+error.message,'error');alert('Update could not be saved. Existing history has been kept. '+error.message);return;}
     entryHistory=reconciled.rows;currentEntryTime=savedAt;currentData={...entryHistory[0].values};model50Cache=null;historyPreviewHidden=false;historyStorageError='';
     const period=document.getElementById('forcedPeriod');if(period)period.value='current';
     renderDashboard();
     const status=document.getElementById('compositeReconcileStatus');
     if(status)setAppFeedback(status,'Data updated and saved successfully. '+prepared.notices.join(' ')+' Checked History against CP Funding & Leadership: '+reconciled.corrected+' rows reconciled; '+reconciled.cleared+' manual calculated-field overrides reset. Missing source data or incomplete 21-session windows remain unavailable.','success');
+    setAppFeedback('quickPasteStatus','Data updated and saved successfully.','success');
     return true;
 }
 
 function parseQuickPaste(){
+    setAppFeedback('quickPasteStatus','');
     const items=document.getElementById('quickPasteInput').value.trim().replace(/^\[|\]$/g,'').split(',').map(v=>v.trim());
     if(items.length!==inputColumns.length && items.length!==26 && items.length!==27 && items.length!==29 && items.length!==31){alert('Provide exactly 35 comma-separated values in the listed order. Use null for unavailable new fields.');return;}
     const values={};
