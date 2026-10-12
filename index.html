@@ -672,11 +672,26 @@ button.secondary {
             <span class="user-email" id="loggedInEmail"></span>
             <button class="secondary" id="syncNowBtn" onclick="syncNow()">Sync now</button>
             <button class="secondary" onclick="exportRecoveryData()">Export recovery data</button>
+            <button class="secondary" onclick="exportCloudComparison()">Export local + last cloud for AI</button>
+            <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
             <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
+<section id="cloudOverwritePanel" hidden style="border:1px solid var(--text-muted);border-radius:10px;padding:16px;margin:12px 0;">
+<h3>Overwrite cloud with this device’s saved data</h3>
+<p>This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local + last cloud for AI” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
+<p id="cloudOverwriteSummary"></p>
+<form onsubmit="overwriteCloudWithLocal(event)">
+<label style="display:block;margin:12px 0;"><input id="cloudOverwriteConfirmed" type="checkbox" required> I confirm this device has the latest saved data and want to replace the cloud copy and resume syncing.</label>
+<label for="cloudOverwritePassword">Account password</label>
+<input id="cloudOverwritePassword" type="password" autocomplete="current-password" required>
+<button id="cloudOverwriteSubmit" type="submit">Verify password and overwrite cloud</button>
+<button class="secondary" id="cloudOverwriteCancel" type="button" onclick="hideCloudOverwrite()">Cancel</button>
+<p id="cloudOverwriteStatus" role="status" aria-live="polite"></p>
+</form>
+</section>
 <nav class="dashboard-nav" aria-label="Dashboard sections"><a href="#dashboardOverview" aria-current="location">Overview</a><a href="#dashboardUpdate">Update Composite Crash Risk Score</a><a href="#fedQuickHeading">Update Fed</a><a href="#fundingQuickHeading">Update Dollar Funding Data</a><a href="#cpUpdate">Update CP Funding Data</a><a href="#analysisPromptControls">AI Analysis</a></nav>
 <aside class="freshness-strip" aria-labelledby="freshnessTitle"><h2 id="freshnessTitle">Data Freshness</h2><div id="overviewFreshness"></div></aside>
 <h2 class="section-heading" id="dashboardOverview" tabindex="-1">Overview</h2>
@@ -1588,6 +1603,48 @@ function exportRecoveryData(){
     const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),owner,current:localSnapshot(owner),backups},null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
+function cloudComparisonData(){
+    if(!historyOwner)throw Error('Sign in to export your saved copies.');
+    const prefix='crash-risk-recovery-v1:'+historyOwner+':',candidates=[];
+    for(let i=0;i<localStorage.length;i++){
+        const key=localStorage.key(i);if(!key?.startsWith(prefix))continue;
+        const label=key.slice(prefix.length);
+        const manual=label.startsWith('before-manual-overwrite-');
+        if(!manual&&!['cloud-before-conflict','cloud-first-seen','cloud-conflict'].includes(label))continue;
+        try{
+            const record=JSON.parse(localStorage.getItem(key));
+            if(!Number.isFinite(Date.parse(record.savedAt)))continue;
+            candidates.push({manual,label,savedAt:record.savedAt,cloud:manual?record.data.cloud:record.data,localAtBackup:manual?record.data.local:null,cloudUpdatedAt:manual?record.data.cloudUpdatedAt:null});
+        }catch{/* Preserve unreadable backups, but do not present them as verified copies. */}
+    }
+    // Prefer the last pre-overwrite cloud copy, even after a later successful sync.
+    candidates.sort((a,b)=>Number(b.manual)-Number(a.manual)||Date.parse(b.savedAt)-Date.parse(a.savedAt));
+    const last=candidates[0];
+    if(!last)throw Error('No cloud copy has been preserved yet. Use Sync now to check the cloud; a detected difference will be backed up for comparison.');
+    const decode=snapshot=>snapshot==null?null:Object.fromEntries(Object.entries(snapshot).map(([key,value])=>{try{return [key,typeof value==='string'?JSON.parse(value):value];}catch{return [key,{unreadableRaw:value}];}}));
+    return {
+        format:'crash-risk-cloud-local-comparison-v1',exportedAt:new Date().toISOString(),
+        instructions:'Compare currentLocal with lastPreservedCloud and, if present, localAtBackup. List missing rows, differing values, dates and record counts for every dataset. Do not assume the newest timestamp proves correctness; do not invent missing records or apply changes.',
+        backup:{savedAt:last.savedAt,cloudUpdatedAt:last.cloudUpdatedAt,kind:last.manual?'Cloud before last manual overwrite':'Last preserved cloud snapshot',cloudRecordExisted:last.cloud!=null},
+        currentLocal:decode(localSnapshot(historyOwner)),
+        lastPreservedCloud:decode(last.cloud),localAtBackup:decode(last.localAtBackup)
+    };
+}
+function downloadCloudComparison(comparison=cloudComparisonData()){
+    const blob=new Blob([JSON.stringify(comparison,null,2)],{type:'application/json'});
+    const url=URL.createObjectURL(blob),link=document.createElement('a');
+    link.href=url;link.download='crash-risk-local-cloud-comparison-'+new Date().toISOString().slice(0,10)+'.json';
+    document.body.appendChild(link);
+    try{link.click();}finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
+    return comparison;
+}
+function exportCloudComparison(){
+    const status=document.getElementById('syncStatus');
+    try{
+        const comparison=downloadCloudComparison();
+        status.textContent='Comparison download requested. Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'. No stored data was changed.';
+    }catch(error){status.textContent=error.message;}
+}
 async function pushSnapshotToCloud(){
     try{
         if(!window.supabase)return {ok:false,reason:'Supabase not initialized'};
@@ -1656,14 +1713,104 @@ function stopAutoSync(){
     if(syncIntervalHandle){ clearInterval(syncIntervalHandle); syncIntervalHandle = null; }
 }
 
-async function syncNow(){
-    const el = document.getElementById('syncStatus');
-    if(el){ el.textContent = 'Syncing…'; el.style.color = 'var(--text-muted)'; }
-    const result = await pushSnapshotToCloud();
-    if(el){
-        el.textContent = result.ok ? `Synced at ${new Date().toLocaleTimeString()}.` : `Sync failed: ${result.reason}`;
-        el.style.color = result.ok ? '#10b981' : '#f59e0b';
+let cloudOverwritePending=false,cloudOverwriteSelection=null;
+function showCloudOverwrite(){
+    if(cloudOverwritePending)return;
+    const panel=document.getElementById('cloudOverwritePanel');
+    document.getElementById('cloudOverwritePassword').value='';
+    document.getElementById('cloudOverwriteConfirmed').checked=false;
+    document.getElementById('cloudOverwriteStatus').textContent='';
+    try{
+        if(!historyOwner)throw Error('Sign in before replacing cloud data.');
+        const snapshot=localSnapshot(historyOwner);validateSyncSnapshot(snapshot);
+        const rows=JSON.parse(snapshot.entryHistory);
+        cloudOverwriteSelection={owner:historyOwner,fingerprint:snapshotFingerprint(snapshot)};
+        document.getElementById('cloudOverwriteSummary').textContent=rows.length+' saved market rows on this device'+(rows.length?' · Latest: '+new Date(Math.max(...rows.map(r=>Date.parse(r.savedAt)))).toLocaleString():'')+'.';
+        panel.hidden=false;panel.scrollIntoView({block:'nearest'});document.getElementById('cloudOverwritePassword').focus();
+    }catch(error){document.getElementById('syncStatus').textContent=error.message;}
+}
+function hideCloudOverwrite(){
+    if(cloudOverwritePending)return;
+    cloudOverwriteSelection=null;
+    document.getElementById('cloudOverwritePassword').value='';
+    document.getElementById('cloudOverwriteConfirmed').checked=false;
+    document.getElementById('cloudOverwritePanel').hidden=true;
+}
+async function overwriteCloudWithLocal(event){
+    event.preventDefault();
+    if(cloudOverwritePending||manualSyncPending)return;
+    const input=document.getElementById('cloudOverwritePassword'),status=document.getElementById('cloudOverwriteStatus');
+    let password=input.value;input.value='';
+    if(!document.getElementById('cloudOverwriteConfirmed').checked||!password){status.textContent='Confirm that the local copy is latest and enter your account password.';return;}
+    const selection=cloudOverwriteSelection;
+    cloudOverwritePending=true;stopAutoSync();syncReadyOwner=null;
+    for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn'])document.getElementById(id).disabled=true;
+    try{
+        const owner=selection?.owner,client=getAuthClient();
+        if(!owner||historyOwner!==owner)throw Error('Account changed. Reopen the confirmation.');
+        const local=localSnapshot(owner);validateSyncSnapshot(local);
+        if(snapshotFingerprint(local)!==selection.fingerprint)throw Error('Local data changed. Reopen the confirmation to review the latest copy.');
+        status.textContent='Verifying your password…';
+        const {data:identity,error:identityError}=await awaitSyncRequest(client.auth.getUser());
+        if(identityError||identity?.user?.id!==owner||!identity.user.email)throw Error('Please sign in again before replacing cloud data.');
+        // Separate, memory-only authentication never replaces the dashboard session.
+        const verified=window.supabase.createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY,{auth:{persistSession:false,autoRefreshToken:false,detectSessionInUrl:false,storageKey:'crash-risk-overwrite-verification'}});
+        const {data:login,error:loginError}=await awaitSyncRequest(verified.auth.signInWithPassword({email:identity.user.email,password}));
+        password='';
+        if(loginError||login?.user?.id!==owner||!login.session)throw Error('Password verification failed. No cloud data was replaced.');
+        status.textContent='Backing up the cloud copy and saving your local data…';
+        const {data:remote,error:readError}=await awaitSyncRequest(verified.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
+        if(readError)throw readError;
+        if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Account or local data changed. Reopen the confirmation.');
+        const label='before-manual-overwrite-'+Date.now()+'-'+Math.random().toString(36).slice(2);
+        saveRecoverySnapshot(owner,label,{local,cloud:remote?.data??null,cloudUpdatedAt:remote?.updated_at??null});
+        downloadCloudComparison(); // Request the recovery download before replacing the cloud record.
+        const payload={user_id:owner,data:local,updated_at:new Date().toISOString()};
+        let request=verified.from('user_app_data');
+        request=remote?request.update(payload).eq('user_id',owner):request.insert(payload);
+        if(remote)request=remote.updated_at==null?request.is('updated_at',null):request.eq('updated_at',remote.updated_at);
+        const {data:written,error:writeError}=await awaitSyncRequest(request.select('user_id'));
+        if(writeError)throw writeError;
+        if(!written?.length)throw Error('Cloud data changed during confirmation. Nothing was overwritten; review and retry.');
+        if(historyOwner!==owner)throw Error('Cloud saved for the verified account; account changed, so automatic sync remains paused.');
+        syncBaseline=snapshotFingerprint(local);syncReadyOwner=owner;startAutoSync();
+        cloudOverwriteSelection=null;document.getElementById('cloudOverwriteConfirmed').checked=false;
+        status.textContent='Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.';
+        document.getElementById('syncStatus').textContent='Cloud replaced with local data. Automatic sync resumed.';
+    }catch(error){
+        syncReadyOwner=null;stopAutoSync();
+        status.textContent='Sync paused: '+(error?.message||String(error));
+        document.getElementById('syncStatus').textContent=status.textContent;
+    }finally{
+        password='';input.value='';cloudOverwritePending=false;
+        for(const id of ['cloudOverwriteSubmit','cloudOverwriteCancel','syncNowBtn','overwriteCloudBtn'])document.getElementById(id).disabled=false;
     }
+}
+let manualSyncPending=false;
+async function syncNow(){
+    if(manualSyncPending||cloudOverwritePending)return;
+    manualSyncPending=true;
+    const el=document.getElementById('syncStatus');
+    try{
+        if(el){el.textContent='Checking cloud connection…';el.style.color='var(--text-muted)';}
+        if(!historyOwner)throw Error('Sign in before syncing.');
+        const owner=historyOwner;
+        if(syncReadyOwner!==owner){
+            const checked=await pullSnapshotFromCloud();
+            if(!checked.ok)throw Error(checked.reason);
+            if(historyOwner!==owner)throw Error('Account changed; sync cancelled');
+            loadEntryHistory(owner);
+            renderDashboard();
+        }
+        const result=await pushSnapshotToCloud();
+        if(!result.ok)throw Error(result.reason);
+        if(historyOwner!==owner)return;
+        startAutoSync();
+        if(el){el.textContent=`Synced at ${new Date().toLocaleTimeString()}. Automatic sync resumed.`;el.style.color='#10b981';}
+    }catch(error){
+        stopAutoSync();syncReadyOwner=null;
+        if(el){el.textContent='Sync paused: '+(error?.message||String(error));el.style.color='#f59e0b';}
+    }finally{manualSyncPending=false;}
 }
 
 function showAuthStep(id){
