@@ -1591,28 +1591,67 @@ function validateSyncSnapshot(data){
     }
 }
 function snapshotFingerprint(data){return JSON.stringify(Object.keys(snapshotKeys('')).map(k=>data?.[k]??null));}
-function saveRecoverySnapshot(owner,label,data){
+function recoveryDatabase(mode,operation){
+    return new Promise((resolve,reject)=>{
+        let db,transaction,finished=false;
+        const finish=(error,result)=>{if(finished)return;finished=true;clearTimeout(timer);if(db)db.close();error?reject(error):resolve(result);};
+        const timer=setTimeout(()=>{try{transaction?.abort();}catch{}finish(Error('Backup storage timed out. Cloud was not overwritten.'));},15000);
+        let request;
+        try{request=window.indexedDB.open('crash-risk-recovery-v1',1);}catch(error){finish(error);return;}
+        request.onupgradeneeded=()=>request.result.createObjectStore('snapshots',{keyPath:'key'});
+        request.onerror=()=>finish(request.error||Error('Backup storage could not open.'));
+        request.onblocked=()=>finish(Error('Backup storage is blocked by another tab. Close other dashboard tabs and retry.'));
+        request.onsuccess=()=>{
+            db=request.result;if(finished){db.close();return;}
+            try{
+                transaction=db.transaction('snapshots',mode);
+                const result=operation(transaction.objectStore('snapshots'));
+                transaction.oncomplete=()=>finish(null,result.result);
+                transaction.onerror=()=>finish(transaction.error||Error('Backup could not be saved.'));
+                transaction.onabort=()=>finish(transaction.error||Error('Backup was cancelled.'));
+            }catch(error){finish(error);}
+        };
+    });
+}
+async function saveRecoverySnapshot(owner,label,data){
     const key='crash-risk-recovery-v1:'+owner+':'+label;
-    // Keep the first pre-conflict copy intact; subsequent refreshes cannot erase it.
-    if(!localStorage.getItem(key))localStorage.setItem(key,JSON.stringify({savedAt:new Date().toISOString(),data}));
+    if(localStorage.getItem(key))return;
+    const value=JSON.stringify({savedAt:new Date().toISOString(),data});
+    if(window.indexedDB){
+        const existing=await recoveryDatabase('readonly',store=>store.get(key));
+        if(!existing)await recoveryDatabase('readwrite',store=>store.put({key,value}));
+    }else localStorage.setItem(key,value);
 }
-function exportRecoveryData(){
+async function recoveryBackups(owner){
+    const backups={},prefix='crash-risk-recovery-v1:'+owner+':';
+    for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key?.startsWith(prefix)||key==='crash-risk-history-backup-v1:'+owner)backups[key]=localStorage.getItem(key);}
+    if(window.indexedDB){
+        const records=await recoveryDatabase('readonly',store=>store.getAll());
+        for(const record of records)if(record.key.startsWith(prefix)&&!Object.hasOwn(backups,record.key))backups[record.key]=record.value;
+    }
+    return backups;
+}
+async function exportRecoveryData(){
     if(!historyOwner)return;
-    const owner=historyOwner,backups={};
-    for(let i=0;i<localStorage.length;i++){const key=localStorage.key(i);if(key.startsWith('crash-risk-recovery-v1:'+owner+':')||key==='crash-risk-history-backup-v1:'+owner)backups[key]=localStorage.getItem(key);}
-    const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),owner,current:localSnapshot(owner),backups},null,2)],{type:'application/json'});
-    const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    try{
+        const owner=historyOwner,backups=await recoveryBackups(owner);
+        if(historyOwner!==owner)throw Error('Account changed; export cancelled.');
+        const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),owner,current:localSnapshot(owner),backups},null,2)],{type:'application/json'});
+        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(error){document.getElementById('syncStatus').textContent='Recovery export failed: '+error.message;}
 }
-function cloudComparisonData(){
+async function cloudComparisonData(){
     if(!historyOwner)throw Error('Sign in to export your saved copies.');
-    const prefix='crash-risk-recovery-v1:'+historyOwner+':',candidates=[];
-    for(let i=0;i<localStorage.length;i++){
-        const key=localStorage.key(i);if(!key?.startsWith(prefix))continue;
+    const owner=historyOwner,prefix='crash-risk-recovery-v1:'+owner+':',candidates=[];
+    const backups=await recoveryBackups(owner);
+    if(historyOwner!==owner)throw Error('Account changed; comparison cancelled.');
+    for(const [key,value] of Object.entries(backups)){
+        if(!key.startsWith(prefix))continue;
         const label=key.slice(prefix.length);
         const manual=label.startsWith('before-manual-overwrite-');
         if(!manual&&!['cloud-before-conflict','cloud-first-seen','cloud-conflict'].includes(label))continue;
         try{
-            const record=JSON.parse(localStorage.getItem(key));
+            const record=JSON.parse(value);
             if(!Number.isFinite(Date.parse(record.savedAt)))continue;
             candidates.push({manual,label,savedAt:record.savedAt,cloud:manual?record.data.cloud:record.data,localAtBackup:manual?record.data.local:null,cloudUpdatedAt:manual?record.data.cloudUpdatedAt:null});
         }catch{/* Preserve unreadable backups, but do not present them as verified copies. */}
@@ -1630,7 +1669,8 @@ function cloudComparisonData(){
         lastPreservedCloud:decode(last.cloud),localAtBackup:decode(last.localAtBackup)
     };
 }
-function downloadCloudComparison(comparison=cloudComparisonData()){
+async function downloadCloudComparison(comparison){
+    comparison=comparison||await cloudComparisonData();
     const blob=new Blob([JSON.stringify(comparison,null,2)],{type:'application/json'});
     const url=URL.createObjectURL(blob),link=document.createElement('a');
     link.href=url;link.download='crash-risk-local-cloud-comparison-'+new Date().toISOString().slice(0,10)+'.json';
@@ -1638,10 +1678,10 @@ function downloadCloudComparison(comparison=cloudComparisonData()){
     try{link.click();}finally{link.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);}
     return comparison;
 }
-function exportCloudComparison(){
+async function exportCloudComparison(){
     const status=document.getElementById('syncStatus');
     try{
-        const comparison=downloadCloudComparison();
+        const comparison=await downloadCloudComparison();
         status.textContent='Comparison download requested. Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'. No stored data was changed.';
     }catch(error){status.textContent=error.message;}
 }
@@ -1656,7 +1696,7 @@ async function pushSnapshotToCloud(){
         const {data:remote,error:readError}=await awaitSyncRequest(client.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(readError)return {ok:false,reason:readError.message};
         if(historyOwner!==owner)return {ok:false,reason:'Account changed; sync cancelled'};
-        if(snapshotFingerprint(remote?.data)!==syncBaseline){syncReadyOwner=null;saveRecoverySnapshot(owner,'cloud-conflict',remote?.data);return {ok:false,reason:'Cloud changed on another device. Sync paused; local rows kept.'};}
+        if(snapshotFingerprint(remote?.data)!==syncBaseline){syncReadyOwner=null;await saveRecoverySnapshot(owner,'cloud-conflict',remote?.data);return {ok:false,reason:'Cloud changed on another device. Sync paused; local rows kept.'};}
         let request=client.from('user_app_data');
         const payload={user_id:owner,data:local,updated_at:new Date().toISOString()};
         // Compare-and-swap prevents a concurrent device from being overwritten.
@@ -1684,12 +1724,13 @@ async function pullSnapshotFromCloud(){
             const keys=snapshotKeys(owner);
             const differs=Object.keys(keys).some(k=>local[k] && local[k]!=='[]' && data.data[k]!=null && local[k]!==data.data[k]);
             if(differs){
-                saveRecoverySnapshot(owner,'local-before-conflict',local);
-                saveRecoverySnapshot(owner,'cloud-before-conflict',data.data);
+                await saveRecoverySnapshot(owner,'local-before-conflict',local);
+                await saveRecoverySnapshot(owner,'cloud-before-conflict',data.data);
                 return {ok:false,reason:'Local and cloud copies differ. Your local history was kept; both copies are backed up. Sync paused for recovery.'};
             }
-            saveRecoverySnapshot(owner,'before-cloud-load',local);
-            saveRecoverySnapshot(owner,'cloud-first-seen',data.data);
+            await saveRecoverySnapshot(owner,'before-cloud-load',local);
+            await saveRecoverySnapshot(owner,'cloud-first-seen',data.data);
+            if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))return {ok:false,reason:'Account or local data changed during backup; cloud load cancelled. Retry Sync now.'};
             for(const [field,key] of Object.entries(keys))if(data.data[field]!=null && (!local[field]||local[field]==='[]'))localStorage.setItem(key,data.data[field]);
         }
         syncBaseline=snapshotFingerprint(data?.data);syncReadyOwner=owner;
@@ -1763,8 +1804,9 @@ async function overwriteCloudWithLocal(event){
         if(readError)throw readError;
         if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Account or local data changed. Reopen the confirmation.');
         const label='before-manual-overwrite-'+Date.now()+'-'+Math.random().toString(36).slice(2);
-        saveRecoverySnapshot(owner,label,{local,cloud:remote?.data??null,cloudUpdatedAt:remote?.updated_at??null});
-        downloadCloudComparison(); // Request the recovery download before replacing the cloud record.
+        await saveRecoverySnapshot(owner,label,{local,cloud:remote?.data??null,cloudUpdatedAt:remote?.updated_at??null});
+        await downloadCloudComparison(); // Request the recovery download before replacing the cloud record.
+        if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==selection.fingerprint)throw Error('Account or local data changed during backup. Reopen the confirmation.');
         const payload={user_id:owner,data:local,updated_at:new Date().toISOString()};
         let request=verified.from('user_app_data');
         request=remote?request.update(payload).eq('user_id',owner):request.insert(payload);
