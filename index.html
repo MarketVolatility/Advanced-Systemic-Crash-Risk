@@ -678,11 +678,7 @@ button.secondary {
         <div class="user-menu">
             <span class="user-email" id="loggedInEmail"></span>
             <button class="secondary" id="syncNowBtn" onclick="syncNow()">Sync now</button>
-            <button class="secondary" onclick="exportRecoveryData()">Export recovery data</button>
-            <button class="secondary" onclick="exportCloudComparison()">Export local + last cloud for AI</button>
-            <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
-            <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud from comparison file</button>
-            <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
+            <button class="secondary" onclick="openTroubleshootSync()">Troubleshoot Sync</button>
             <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
         </div>
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
@@ -1258,6 +1254,19 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 </tbody><tfoot><tr><th scope="row" colspan="4">Total Forced Selling category maximum</th><td><strong>6 points</strong></td></tr></tfoot></table></div>
 </section>
 </details>
+<details class="overview-details dashboard-section" name="dashboard-panels" id="troubleshootSyncPanel">
+<summary tabindex="-1" id="troubleshootSyncHeading">Troubleshoot Sync</summary>
+<div class="control-panel">
+<div style="display:flex;flex-wrap:wrap;gap:8px;">
+            <button class="secondary" onclick="exportRecoveryData()">Export recovery data</button>
+            <button class="secondary" onclick="exportCloudComparison()">Export local + last cloud for AI</button>
+            <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
+            <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud from comparison file</button>
+            <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
+</div>
+</div>
+</details>
+
 
 <footer class="dashboard-disclaimer copyright-notice">© 2026 Advanced Systemic Crash Risk Dashboard. All rights reserved. Third-party data belongs to its respective owners.</footer>
 
@@ -2732,6 +2741,12 @@ function applyCpResponse(){
     if(raw.length!==4||raw.some(x=>!x.trim())||!nums.every(Number.isFinite)){setAppFeedback('cpAiStatus','Use exactly four numeric fields: date and three rates.');return;}
     const values={...currentData,cp_date:nums[0],cp_financial:nums[1],cp_nonfinancial:nums[2],cp_treasury:nums[3]};const error=validateLiquidityInputs(values);
     if(error){setAppFeedback('cpAiStatus',error);return;}const inputError=validateForcedInputs(values);if(inputError){setAppFeedback('cpAiStatus',inputError);return;}if(!commitEntry(values))return;setAppFeedback('cpAiStatus','CP rates saved and check time refreshed; the observation date changes only when newer common-date rates are supplied.');
+}
+function openTroubleshootSync(){
+    const panel=document.getElementById('troubleshootSyncPanel');
+    closeOtherDashboardPanels(panel);panel.open=true;
+    const heading=document.getElementById('troubleshootSyncHeading');
+    heading.scrollIntoView({block:'start'});heading.focus({preventScroll:true});
 }
 function closeOtherDashboardPanels(selected){
     document.querySelectorAll('details.overview-details').forEach(panel=>{if(panel!==selected)panel.open=false;});
