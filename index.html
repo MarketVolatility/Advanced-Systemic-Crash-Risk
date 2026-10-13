@@ -686,7 +686,7 @@ button.secondary {
 </header>
 <dialog id="cloudOverwritePanel" aria-labelledby="cloudOverwriteTitle" oncancel="event.preventDefault();hideCloudOverwrite()">
 <h3 id="cloudOverwriteTitle">Overwrite cloud with this device’s saved data</h3>
-<p id="cloudOverwriteExplanation">This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local + last cloud for AI” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. You can restore the previous cloud content using the downloaded comparison file and “Restore previous cloud from comparison file”. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
+<p id="cloudOverwriteExplanation">This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local and cloud backup for AI comparison” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. You can restore the previous cloud content using the downloaded comparison file and “Restore previous cloud backup from AI comparison file”. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
 <p id="cloudOverwriteSummary"></p>
 <p id="cloudRestoreDifferences" role="status" style="white-space:pre-line"></p>
 <form onsubmit="overwriteCloudWithLocal(event)">
@@ -1258,10 +1258,9 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <summary tabindex="-1" id="troubleshootSyncHeading">Troubleshoot Sync</summary>
 <div class="control-panel">
 <div style="display:flex;flex-wrap:wrap;gap:8px;">
-            <button class="secondary" onclick="exportRecoveryData()">Export recovery data</button>
-            <button class="secondary" onclick="exportCloudComparison()">Export local + last cloud for AI</button>
+            <button class="secondary" onclick="exportCloudComparison()">Export local and cloud backup for AI comparison</button>
             <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
-            <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud from comparison file</button>
+            <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud backup from AI comparison file</button>
             <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
 </div>
 </div>
@@ -1697,15 +1696,7 @@ async function recoveryBackups(owner){
     }
     return backups;
 }
-async function exportRecoveryData(){
-    if(!historyOwner)return;
-    try{
-        const owner=historyOwner,backups=await recoveryBackups(owner);
-        if(historyOwner!==owner)throw Error('Account changed; export cancelled.');
-        const blob=new Blob([JSON.stringify({exportedAt:new Date().toISOString(),owner,current:localSnapshot(owner),backups},null,2)],{type:'application/json'});
-        const url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='crash-risk-recovery-'+new Date().toISOString().slice(0,10)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);setAppFeedback('syncStatus','Recovery download requested.','success');
-    }catch(error){setAppFeedback('syncStatus','Recovery export failed: '+error.message);}
-}
+async function exportRecoveryData(){return exportCloudComparison();}
 async function cloudComparisonData(){
     if(!historyOwner)throw Error('Sign in to export your saved copies.');
     const owner=historyOwner,prefix='crash-risk-recovery-v1:'+owner+':',candidates=[];
@@ -1725,14 +1716,14 @@ async function cloudComparisonData(){
     // Prefer the last pre-overwrite cloud copy, even after a later successful sync.
     candidates.sort((a,b)=>Number(b.manual)-Number(a.manual)||Date.parse(b.savedAt)-Date.parse(a.savedAt));
     const last=candidates[0];
-    if(!last)throw Error('No cloud copy has been preserved yet. Use Sync now to check the cloud; a detected difference will be backed up for comparison.');
     const decode=snapshot=>snapshot==null?null:Object.fromEntries(Object.entries(snapshot).map(([key,value])=>{try{return [key,typeof value==='string'?JSON.parse(value):value];}catch{return [key,{unreadableRaw:value}];}}));
     return {
         format:'crash-risk-cloud-local-comparison-v1',exportedAt:new Date().toISOString(),
-        instructions:'Compare currentLocal with lastPreservedCloud and, if present, localAtBackup. List missing rows, differing values, dates and record counts for every dataset. Do not assume the newest timestamp proves correctness; do not invent missing records or apply changes.',
-        backup:{savedAt:last.savedAt,cloudUpdatedAt:last.cloudUpdatedAt,kind:last.manual?'Cloud before last manual overwrite':'Last preserved cloud snapshot',cloudRecordExisted:last.cloud!=null},
+        instructions:'Compare currentLocal with lastPreservedCloud and, if present, localAtBackup. Also inspect recoveryBackups (raw saved JSON strings) for additional recoverable records. List missing rows, differing values, dates and record counts for every dataset. If no cloud copy is preserved, say that comparison is unavailable; never treat null as an empty cloud dataset. Do not assume the newest timestamp proves correctness; do not invent missing records or apply changes.',
+        recoveryBackups:backups,
+        backup:{savedAt:last?.savedAt??null,cloudUpdatedAt:last?.cloudUpdatedAt??null,kind:last?(last.manual?'Cloud before last manual overwrite':'Last preserved cloud snapshot'):'No preserved cloud snapshot',cloudRecordExisted:last?.cloud!=null},
         currentLocal:decode(localSnapshot(historyOwner)),
-        lastPreservedCloud:decode(last.cloud),localAtBackup:decode(last.localAtBackup)
+        lastPreservedCloud:decode(last?.cloud),localAtBackup:decode(last?.localAtBackup)
     };
 }
 async function downloadCloudComparison(comparison){
@@ -1748,7 +1739,7 @@ async function exportCloudComparison(){
     const status=document.getElementById('syncStatus');
     try{
         const comparison=await downloadCloudComparison();
-        setAppFeedback(status,'Comparison download requested. Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'. No stored data was changed.');
+        setAppFeedback(status,'Backup download requested: current local data and '+Object.keys(comparison.recoveryBackups).length+' recovery backups. '+(comparison.backup.savedAt?'Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'.':'No cloud copy has been preserved yet; local backup is included.'),'success');
     }catch(error){setAppFeedback(status,error.message);}
 }
 async function pushSnapshotToCloud(){
@@ -1757,7 +1748,7 @@ async function pushSnapshotToCloud(){
         const owner=historyOwner,client=getAuthClient();
         const {data:userData}=await awaitSyncRequest(client.auth.getUser());
         if(!owner||userData?.user?.id!==owner||historyOwner!==owner)return {ok:false,reason:'Account changed; sync cancelled'};
-        if(syncReadyOwner!==owner)return {ok:false,reason:'Sync paused to protect saved data. Export recovery data before resolving the local/cloud difference.'};
+        if(syncReadyOwner!==owner)return {ok:false,reason:'Sync paused to protect saved data. Export local and cloud backup for AI comparison before resolving the local/cloud difference.'};
         const local=localSnapshot(owner);validateSyncSnapshot(local);
         const {data:remote,error:readError}=await awaitSyncRequest(client.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(readError)return {ok:false,reason:readError.message};
@@ -1959,7 +1950,7 @@ async function overwriteCloudWithLocal(event){
         }
         syncBaseline=snapshotFingerprint(local);syncReadyOwner=owner;startAutoSync();
         cloudOverwriteSelection=null;
-        setAppFeedback(status,'Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local + last cloud for AI to retry.');
+        setAppFeedback(status,'Cloud replaced with your saved local copy. Automatic sync resumed. Comparison download requested for AI analysis. If it did not appear in Downloads, use Export local and cloud backup for AI comparison to retry.');
         setAppFeedback('syncStatus','Cloud replaced with local data. Automatic sync resumed.');
     }catch(error){
         syncReadyOwner=null;stopAutoSync();
@@ -2061,7 +2052,7 @@ async function openDashboard(user){
         stopAutoSync();syncReadyOwner=null;
         document.getElementById('totalScoreDisp').innerText='Unavailable';
         document.getElementById('statusTermDisp').innerText='Dashboard could not load';
-        document.getElementById('scoreSubtext').innerText='Saved data may still be present. Export recovery data before making changes.';
+        document.getElementById('scoreSubtext').innerText='Saved data may still be present. Export local and cloud backup for AI comparison before making changes.';
         const notice=document.getElementById('syncStatus');
         if(notice){notice.textContent='Loading failed; sync paused: '+(error?.message||String(error));notice.style.color='#f59e0b';}
     }
@@ -2362,10 +2353,10 @@ function loadEntryHistory(userId){
         const saved = raw ? JSON.parse(raw) : [];
         if(!Array.isArray(saved))throw new Error('Invalid stored history');
         const readable=saved.filter(row=>row&&Number.isFinite(Date.parse(row.savedAt))&&validSnapshot(row.values));
-        if(readable.length!==saved.length){historyReadBlocked=true;historyStorageError='Some saved rows could not be read. Valid rows are shown; original storage is preserved. Export recovery data before editing.';}
+        if(readable.length!==saved.length){historyReadBlocked=true;historyStorageError='Some saved rows could not be read. Valid rows are shown; original storage is preserved. Export local and cloud backup for AI comparison before editing.';}
         entryHistory = readable.sort((a,b) => Date.parse(b.savedAt)-Date.parse(a.savedAt));
         if(entryHistory.length){ currentData = {...entryHistory[0].values}; currentEntryTime = entryHistory[0].savedAt; }
-    } catch(error){ historyReadBlocked=true;historyStorageError = 'Saved history could not be loaded. Original storage is preserved; saving and sync are blocked. Export recovery data.'; }
+    } catch(error){ historyReadBlocked=true;historyStorageError = 'Saved history could not be loaded. Original storage is preserved; saving and sync are blocked. Export local and cloud backup for AI comparison.'; }
     
 }
 function saveEntry(observationDate=null,cpCheckedAt=null){
