@@ -1484,6 +1484,33 @@ function analysisRecentScorePrompt(days){
     return `LAST 14 CALENDAR DAYS OF RISK SCORES (${days[0].day} through ${days.at(-1).day}, inclusive; ending on the request date)\n${table}\n\nINDICATOR CONTRIBUTIONS WITHIN THE FIVE CATEGORIES (points, not raw market values)\n${details}\n\nRAW RISK-FACTOR HISTORY (entry dates are not necessarily market observation dates; null means unavailable; units match the snapshot)\n${JSON.stringify(rawHistory,null,2)}\n\nThese are recalculated dashboard scores from saved market entries and embedded historical reference data, not manually edited AI-analysis history scores. For each date use the latest personal saved entry if present; otherwise use that date’s reference row. Dates are entry/scoring dates, not necessarily the observation dates of all inputs. No missing day, weekend or holiday is forward-filled. Unavailable means no entry for that date; numeric ranges preserve incomplete inputs. Reference data are retrospective and may be stale. Compare total and category trends, identify which indicator contributions explain changes, and discuss persistent, improving, worsening and conflicting signals. Do not infer a trend across unavailable dates or treat narrowing missing-data ranges as proven market improvement. Keep this 14-day window separate from the current snapshot if its scoring date differs.`;
 }
 
+async function analysisFullHistoryPrompt(){
+    const rows=historyDisplayEntries();
+    if(!currentEntryTime&&!historyPreviewHidden)rows.unshift({savedAt:null,values:{...currentData},entryLabel:'Current (unsaved)'});
+    const specs=[...historyOverrideFields.map(([key,label])=>[key,label]),['sp500','S&P 500 close'],...marketColumns.map(([k,l,u])=>[k,l+' ('+u+')']),...liquidityColumns.map(([k,l,u])=>[k,l+' ('+u+')']),...[...historyColumns,...forcedColumns].map(([k,l,u])=>[k,l+' ('+u+')'])];
+    const clean=value=>String(value??'Unavailable').replace(/[\t\r\n]+/g,' ');
+    const computed=[];
+    for(let i=0;i<rows.length;i++){
+        const row=rows[i],display=historyComparisonValues(row,true),day=row.observationDate||localCalendarDate(new Date(row.savedAt||Date.now()));
+        for(const [key,value] of Object.entries(row.historyOverrides||{}))display[key]=value&&typeof value==='object'?analysisRange(value):value;
+        for(const key of ['sp500',...marketColumns.map(c=>c[0])])if(Number.isFinite(display[key]))display[key]=display[key].toFixed(2);
+        computed.push({row,day,display});
+        // Yield during large exports so the dashboard remains responsive.
+        if(i%20===19&&globalThis.setTimeout)await new Promise(resolve=>setTimeout(resolve,0));
+    }
+    const lines=[['Entry','Date','Time','Source',...specs.map(c=>c[1])].join('\t')];
+    for(let i=0;i<computed.length;i++){
+        const {row,day,display}=computed[i],previous=computed[i+1]?.display;
+        const number=v=>v!==null&&v!==undefined&&String(v).trim()!==''&&Number.isFinite(Number(v))?Number(v):null;
+        const cells=specs.map(([key])=>{
+            const value=display[key],direction=previous?historyChangeDirection(key,number(value),number(previous[key])):'';
+            return clean(value)+(direction==='history-improved'?' [GREEN]':direction==='history-worsened'?' [DARK PINK]':'');
+        });
+        lines.push([row.entryLabel||(row.reference?'Historical reference':row.savedAt===currentEntryTime?'Current':'Past'),day,row.savedAt?new Date(row.savedAt).toLocaleTimeString():'Unsaved',row.reference?'Embedded reference':row.savedAt?'Personal saved entry':'Unsaved preview',...cells].map(clean).join('\t'));
+    }
+    return 'ENTIRE HISTORY TABLE — '+rows.length+' rows, newest first, all pages and multiple entries per day included.\nTab-separated columns. [GREEN] means the app’s green improvement outline; [DARK PINK] means its dark-pink deterioration outline. No tag means no colored outline (unchanged, missing, direction-neutral or no preceding entry). These text tags preserve the visual outline information when pasted into an AI assistant. Compare each row with the immediately following, older row. Outlines describe direction under dashboard conventions, not a change in awarded risk points or a forecast. Dates/times are entry dates, not necessarily market observation dates. Manual calculated-field overrides are preserved as displayed; the current snapshot and 14-day score analysis use model calculations. Unsaved table edits are excluded; save them before generating this prompt. Embedded reference rows are retrospective, not point-in-time evidence.\n'+lines.join('\n')+'\nEND ENTIRE HISTORY TABLE';
+}
+
 async function generateAnalysisPrompt(){
     if(!historyOwner){analysisMessage('Sign in before generating an analysis.');return;}
     if(analysisHasEdits()&&!window.confirm('Replace unsaved prompt or response edits with a new request?'))return;
@@ -1493,7 +1520,11 @@ async function generateAnalysisPrompt(){
     const questions=document.getElementById('analysisQuestions').value.trim()||analysisDefaultQuestions;
     const factors=Object.values(regimeCharts).flatMap(c=>c.keys.map(k=>({indicator:metricConfig[k].name,...metricPointRange(k,values,day),maximum:metricConfig[k].maxPoints})));
     const recentScores=analysisRecentScores(localCalendarDate(new Date(createdAt)));
-    const prompt=`Analyze this Crash Risk Dashboard snapshot. Request generated: ${createdAt}. Entry scoring date: ${day}. Entry timestamp: ${currentEntryTime||'UNSAVED SAMPLE VALUES — illustrative only'}. These timestamps do not establish observation dates for every input.\n\nTotal score: ${analysisRange(total)} / 50\n${categories.map(c=>c.name+': '+analysisRange(c)+' / '+c.maximum).join('\n')}\n\nUse these supplied scores as the dashboard snapshot, including all missing-data ranges. This is a heuristic stress score, not a calibrated crash probability. Bands: 0–4, 5–9, 10–15, 16–22, 23–30, 31–50. Do not invent missing observations, infer that a low score guarantees safety, or treat signals as proof of forced liquidation. CP and Nasdaq leadership are scored; dollar swaps and 200DMA distance velocity are unscored context. Distinguish facts, interpretations and scenarios. If browsing is available, verify relevant current context with dated primary-source links; keep it separate from this snapshot. Otherwise disclose that current information was not verified. Do not silently substitute newer figures or change the supplied scores.\n\nScored indicator contributions:\n${JSON.stringify(factors,null,2)}\nForced-selling components (in addition to USDJPY):\n${JSON.stringify(forcedPoints(values,day),null,2)}\nRaw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent and cp_date YYYYMMDD):\n${JSON.stringify(values,null,2)}\nDerived CP and Nasdaq inputs:\n${JSON.stringify(model50Inputs(values,day),null,2)}\n\n${analysisRecentScorePrompt(recentScores)}\n\nQuestions and requested output:\n${questions}\n\n${analysisReferenceGuidance}\n\n${analysisDeliveryAndTrendGuidance}\n\nBEGIN HISTORICAL REFERENCE WRITE-UP — 00 260929 Analysis Executive Summary.docx\n${analysisReferenceWriteup}\nEND HISTORICAL REFERENCE WRITE-UP\n\nNow write a fresh analysis answering the current questions in the reference format. Analyze the 14-day trajectory alongside the latest snapshot throughout, and include an explicit 14-Day Trend Analysis subsection within the seven-section executive-summary format, with dated evidence, category and indicator drivers, persistence, reversals and uncertainty. Use only this request’s snapshot for dashboard values and scores, with separately identified verified context. Apply the accuracy corrections above. Avoid unsupported numerical crash forecasts. Follow the delivery instructions above: export the complete report as a downloadable Word document if supported; otherwise provide the complete analysis in your reply.`;
+    const promptOwner=historyOwner;
+    analysisMessage('Preparing the entire history table, including cell-outline labels…');
+    const fullHistory=await analysisFullHistoryPrompt();
+    if(historyOwner!==promptOwner)return;
+    const prompt=`Analyze this Crash Risk Dashboard snapshot. Request generated: ${createdAt}. Entry scoring date: ${day}. Entry timestamp: ${currentEntryTime||'UNSAVED SAMPLE VALUES — illustrative only'}. These timestamps do not establish observation dates for every input.\n\nTotal score: ${analysisRange(total)} / 50\n${categories.map(c=>c.name+': '+analysisRange(c)+' / '+c.maximum).join('\n')}\n\nUse these supplied scores as the dashboard snapshot, including all missing-data ranges. This is a heuristic stress score, not a calibrated crash probability. Bands: 0–4, 5–9, 10–15, 16–22, 23–30, 31–50. Do not invent missing observations, infer that a low score guarantees safety, or treat signals as proof of forced liquidation. CP and Nasdaq leadership are scored; dollar swaps and 200DMA distance velocity are unscored context. Distinguish facts, interpretations and scenarios. If browsing is available, verify relevant current context with dated primary-source links; keep it separate from this snapshot. Otherwise disclose that current information was not verified. Do not silently substitute newer figures or change the supplied scores.\n\nScored indicator contributions:\n${JSON.stringify(factors,null,2)}\nForced-selling components (in addition to USDJPY):\n${JSON.stringify(forcedPoints(values,day),null,2)}\nRaw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent and cp_date YYYYMMDD):\n${JSON.stringify(values,null,2)}\nDerived CP and Nasdaq inputs:\n${JSON.stringify(model50Inputs(values,day),null,2)}\n\n${analysisRecentScorePrompt(recentScores)}\n\n${fullHistory}\n\nQuestions and requested output:\n${questions}\n\n${analysisReferenceGuidance}\n\n${analysisDeliveryAndTrendGuidance}\n\nBEGIN HISTORICAL REFERENCE WRITE-UP — 00 260929 Analysis Executive Summary.docx\n${analysisReferenceWriteup}\nEND HISTORICAL REFERENCE WRITE-UP\n\nNow write a fresh analysis answering the current questions in the reference format. Analyze the 14-day trajectory alongside the latest snapshot throughout, and include an explicit 14-Day Trend Analysis subsection within the seven-section executive-summary format, with dated evidence, category and indicator drivers, persistence, reversals and uncertainty. Use only this request’s snapshot for dashboard values and scores, with separately identified verified context. Apply the accuracy corrections above. Avoid unsupported numerical crash forecasts. Follow the delivery instructions above: export the complete report as a downloadable Word document if supported; otherwise provide the complete analysis in your reply.`;
     const row={id:createdAt+'-'+Math.random().toString(36).slice(2),createdAt,day,entryTime:currentEntryTime,total,categories,values,recentScores,questions,prompt,response:'',responseSavedAt:null};
     if(await persistAnalyses([row,...analysisRecords])){openAnalysis(row.id,true);analysisMessage('Prompt generated and request saved. Copy it into your AI assistant, then paste the response here.');}
 }
@@ -2690,15 +2721,15 @@ function historyChangeDirection(key,current,previous){
     const sign=higherBetter.includes(key)?1:lowerBetter.includes(key)?-1:0;
     return !sign?'':(current-previous)*sign>0?'history-improved':'history-worsened';
 }
-function historyComparisonValues(entry){
+function historyComparisonValues(entry,displayMode=false){
     if(!entry)return {};
     const day=entry.observationDate||localCalendarDate(new Date(entry.savedAt||Date.now()));
     const bounds=compositeRange(entry.values,day),cells=model50Cells(entry.values,day);
     const values={...(!entry.reference?forcedInputsForDate(day):{}),...entry.values};
-    values.composite=bounds.low===bounds.high?bounds.low:null;
+    values.composite=displayMode?analysisRange(bounds):bounds.low===bounds.high?bounds.low:null;
     for(let i=1;i<historyOverrideFields.length;i++){
         const key=historyOverrideFields[i][0],text=cells[i-1].text;
-        values[key]=text!==''&&Number.isFinite(Number(text))?Number(text):null;
+        values[key]=displayMode?text:text!==''&&Number.isFinite(Number(text))?Number(text):null;
     }
     Object.assign(values,entry.historyOverrides||{});
     if(!Number.isFinite(values.sp500)&&!entry.reference)values.sp500=sp500ForDate(day)?.close??null;
