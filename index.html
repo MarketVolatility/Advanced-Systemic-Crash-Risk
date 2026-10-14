@@ -1367,9 +1367,13 @@ function refreshAnalysisPreview(){
     if(analysisWordDraft&&analysisWordDraft.text!==text)analysisWordDraft=null;
     renderWordAnalysis(document.getElementById('analysisResponsePreview'),analysisWordDraft,text||'No response yet.');
 }
+function analysisSavedResponseBlob(row){
+    return row.word?.base64?new Blob([Uint8Array.from(atob(row.word.base64),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}):analysisWordBlob('',row.response||'');
+}
 function downloadAnalysisOriginal(id){
     const r=analysisRecords.find(r=>r.id===id);if(!r)return;
-    const blob=r.word?.base64?new Blob([Uint8Array.from(atob(r.word.base64),c=>c.charCodeAt(0))],{type:'application/vnd.openxmlformats-officedocument.wordprocessingml.document'}):analysisWordBlob(r.prompt,r.response);
+    if(!r.response?.trim()){analysisMessage('No saved response to download. Import or paste the analysis and select Save response first.');return;}
+    const blob=analysisSavedResponseBlob(r);
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');a.href=url;a.download=r.word?.name||'Analysis-'+r.day+'.docx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
@@ -1487,7 +1491,7 @@ function analysisWordBlob(prompt,response){
     const files={
         '[Content_Types].xml':'<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>',
         '_rels/.rels':'<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>',
-        'word/document.xml':'<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+paragraphs('AI Analysis Prompt',prompt)+(response.trim()?'<w:sdt><w:sdtPr><w:tag w:val="crash-risk-response"/></w:sdtPr><w:sdtContent>'+paragraphs('AI Analysis Response',response)+'</w:sdtContent></w:sdt>':'')+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>'
+        'word/document.xml':'<?xml version="1.0" encoding="UTF-8"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>'+(prompt.trim()?paragraphs('AI Analysis Prompt',prompt):'')+(response.trim()?'<w:sdt><w:sdtPr><w:tag w:val="crash-risk-response"/></w:sdtPr><w:sdtContent>'+paragraphs('AI Analysis Response',response)+'</w:sdtContent></w:sdt>':'')+'<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134"/></w:sectPr></w:body></w:document>'
     };
     const parts=[],central=[];let offset=0;
     for(const [name,text] of Object.entries(files)){
