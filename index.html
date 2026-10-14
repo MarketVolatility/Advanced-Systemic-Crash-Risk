@@ -7,9 +7,9 @@
 
 
 <style>
-#cloudOverwritePanel{width:min(640px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;background:var(--card-bg);color:var(--text-main);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.5);}
+#syncChoicePanel,#cloudOverwritePanel{width:min(640px,calc(100% - 32px));max-height:85vh;overflow:auto;box-sizing:border-box;background:var(--card-bg);color:var(--text-main);border:1px solid var(--border);border-radius:14px;padding:24px;box-shadow:0 20px 70px rgba(0,0,0,.5);}
 #cloudOverwritePanel:not([open]){display:none;}
-#cloudOverwritePanel::backdrop{background:rgba(0,0,0,.7);}
+#syncChoicePanel::backdrop,#cloudOverwritePanel::backdrop{background:rgba(0,0,0,.7);}
 #cloudOverwritePanel p{line-height:1.5;color:var(--text-muted);}
 #cloudOverwritePanel label{display:block;margin-bottom:8px;}
 #cloudOverwritePassword{display:block;width:100%;box-sizing:border-box;margin-bottom:16px;padding:10px;background:var(--bg-color);color:inherit;border:1px solid var(--border);border-radius:6px;}
@@ -684,6 +684,16 @@ button.secondary {
         <div style="font-size:11px; color:var(--text-muted); text-align:right; margin-top:4px;" id="syncStatus"></div>
     </div>
 </header>
+<dialog id="syncChoicePanel" aria-labelledby="syncChoiceTitle" oncancel="event.preventDefault();finishSyncChoice('later')">
+<h3 id="syncChoiceTitle">Choose which saved copy to use</h3>
+<p style="color:var(--pink,#d879a4)">Both copies changed, or there is no confirmed sync reference. These timestamps do not reliably establish which entire copy is newer.</p>
+<p id="syncChoiceLocal" style="white-space:pre-line"></p>
+<p id="syncChoiceCloud" style="white-space:pre-line"></p>
+<p>Your choice applies to all saved history, analyses, Fed Watch and funding data. Both copies will be backed up before replacement. Record dates can be edited; cloud upload time is not the time each record was edited.</p>
+<button type="button" onclick="finishSyncChoice('local')">Use browser copy</button>
+<button type="button" onclick="finishSyncChoice('cloud')">Use cloud copy</button>
+<button type="button" class="secondary" onclick="finishSyncChoice('later')">Decide later</button>
+</dialog>
 <dialog id="cloudOverwritePanel" aria-labelledby="cloudOverwriteTitle" oncancel="event.preventDefault();hideCloudOverwrite()">
 <h3 id="cloudOverwriteTitle">Overwrite cloud with this device’s saved data</h3>
 <p id="cloudOverwriteExplanation">This replaces all cloud-saved history, AI analyses, Fed Watch, funding records and cached FRED data with this browser’s saved copy. Unsaved edits are excluded. The existing cloud copy will be backed up in this browser first. Before overwriting, an “Export local and cloud backup for AI comparison” JSON file will be generated and automatically downloaded. Give this file to your AI assistant to compare the copies and analyze differences. If Safari blocks the download, use the export button to download it again. You can restore the previous cloud content using the downloaded comparison file and “Restore previous cloud backup from AI comparison file”. Browser backups are removed if you clear this site’s data; keep a downloaded copy.</p>
@@ -1670,7 +1680,7 @@ function validateSyncSnapshot(data){
         if(field==='analysisHistory')validateAnalysisHistory(rows);
     }
 }
-function snapshotFingerprint(data){return JSON.stringify(Object.keys(snapshotKeys('')).map(k=>data?.[k]??null));}
+function snapshotFingerprint(data){return JSON.stringify(Object.keys(snapshotKeys('')).map(k=>data?.[k]??(k==='fredHistory'?null:'[]')));}
 // Persist only a compact digest, not another copy of large Word documents.
 async function syncDigest(data){
     if(!globalThis.crypto?.subtle)return null;
@@ -1770,6 +1780,38 @@ async function exportCloudComparison(){
         setAppFeedback(status,'Backup download requested: current local data and '+Object.keys(comparison.recoveryBackups).length+' recovery backups. '+(comparison.backup.savedAt?'Preserved cloud copy: '+new Date(comparison.backup.savedAt).toLocaleString()+'.':'No cloud copy has been preserved yet; local backup is included.'),'success');
     }catch(error){setAppFeedback(status,error.message);}
 }
+let syncChoiceResolve=null;
+let syncChoiceDeferred=false;
+function finishSyncChoice(choice){
+    const resolve=syncChoiceResolve;syncChoiceResolve=null;
+    document.getElementById('syncChoicePanel').close();
+    if(resolve)resolve(choice);
+}
+function syncCopySummary(snapshot){
+    let newest=0,marketCount=0;
+    for(const field of Object.keys(snapshotKeys(''))){
+        try{const rows=JSON.parse(snapshot?.[field]||'null');if(!Array.isArray(rows))continue;
+            if(field==='entryHistory')marketCount=rows.length;
+            for(const row of rows)for(const key of ['updatedAt','savedAt','createdAt','fetchedAt']){const stamp=Date.parse(row?.[key]);if(Number.isFinite(stamp))newest=Math.max(newest,stamp);}
+        }catch{}
+    }
+    return marketCount+' market rows; latest recorded timestamp: '+(newest?new Date(newest).toLocaleString()+' ('+new Date(newest).toISOString()+')':'unavailable');
+}
+async function chooseSyncCopy(owner,local,remote){
+    if(syncChoiceResolve||syncChoiceDeferred)throw Error('Sync is waiting for your choice. Select Sync now when ready.');
+    document.getElementById('syncChoiceLocal').textContent='Browser copy\n'+syncCopySummary(local);
+    const uploaded=Date.parse(remote?.updated_at);
+    document.getElementById('syncChoiceCloud').textContent='Cloud copy\n'+syncCopySummary(remote?.data)+'\nCloud uploaded: '+(Number.isFinite(uploaded)?new Date(uploaded).toLocaleString()+' ('+new Date(uploaded).toISOString()+')':'unavailable');
+    const choice=await new Promise(resolve=>{syncChoiceResolve=resolve;document.getElementById('syncChoicePanel').showModal();});
+    if(choice==='later'){syncChoiceDeferred=true;throw Error('Nothing replaced. Select Sync now to choose a copy later.');}
+    if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))throw Error('Browser data changed while choosing. Please compare the updated copies again.');
+    const {data:fresh,error}=await awaitSyncRequest(getAuthClient().from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
+    if(error)throw error;
+    if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local)||snapshotFingerprint(fresh?.data)!==snapshotFingerprint(remote?.data)||fresh?.updated_at!==remote?.updated_at)throw Error('Data changed while choosing. No copy replaced; compare again.');
+    await saveRecoverySnapshot(owner,'before-sync-choice-'+Date.now(),{local,cloud:remote?.data,cloudUpdatedAt:remote?.updated_at});
+    if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))throw Error('Browser data changed during backup. No copy replaced.');
+    return choice;
+}
 let syncPushPending=null;
 function pushSnapshotToCloud(){
     if(syncPushPending)return syncPushPending;
@@ -1787,7 +1829,25 @@ async function performSnapshotPush(){
         const {data:remote,error:readError}=await awaitSyncRequest(client.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(readError)return {ok:false,reason:readError.message};
         if(historyOwner!==owner)return {ok:false,reason:'Account changed; sync cancelled'};
-        if(remote?.data && snapshotFingerprint(remote.data)!==syncBaseline){validateSyncSnapshot(remote.data);await saveRecoverySnapshot(owner,'cloud-before-auto-upload',remote.data);}
+        if(remote?.data && snapshotFingerprint(remote.data)!==syncBaseline){
+            validateSyncSnapshot(remote.data);
+            if(snapshotFingerprint(local)===syncBaseline || await cloudMatchesSavedBaseline(owner,local)){
+                await saveRecoverySnapshot(owner,'local-before-conflict',local);
+                await saveRecoverySnapshot(owner,'cloud-before-conflict',remote.data);
+                if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))return {ok:false,reason:'Local data changed during cloud load; automatic sync will retry.'};
+                await applyRestoredLocalSnapshot(owner,{...local,...remote.data});
+                await rememberSyncBaseline(owner,remote.data);
+                loadEntryHistory(owner);renderDashboard();
+                return {ok:true,loadedCloud:true};
+            }
+            const choice=await chooseSyncCopy(owner,local,remote);
+            if(choice==='cloud'){
+                await applyRestoredLocalSnapshot(owner,{...local,...remote.data});
+                await rememberSyncBaseline(owner,remote.data);loadEntryHistory(owner);renderDashboard();
+                return {ok:true,loadedCloud:true};
+            }
+            await saveRecoverySnapshot(owner,'cloud-before-auto-upload',remote.data);
+        }
         if(historyOwner!==owner)return {ok:false,reason:'Account changed; sync cancelled'};
         let request=client.from('user_app_data');
         const payload={user_id:owner,data:local,updated_at:new Date().toISOString()};
@@ -1807,28 +1867,42 @@ async function pullSnapshotFromCloud(){
         const owner=historyOwner,client=getAuthClient();
         const {data:userData}=await awaitSyncRequest(client.auth.getUser());
         if(!owner||userData?.user?.id!==owner||historyOwner!==owner)return {ok:false,reason:'Account changed; load cancelled'};
-        const {data,error}=await awaitSyncRequest(client.from('user_app_data').select('data').eq('user_id',owner).maybeSingle());
+        const {data,error}=await awaitSyncRequest(client.from('user_app_data').select('data,updated_at').eq('user_id',owner).maybeSingle());
         if(error)return {ok:false,reason:error.message};
         if(historyOwner!==owner)return {ok:false,reason:'Account changed; load cancelled'};
         const local=localSnapshot(owner);validateSyncSnapshot(local);
         if(data?.data){
             validateSyncSnapshot(data.data);
             const keys=snapshotKeys(owner);
-            const differs=Object.keys(keys).some(k=>local[k] && local[k]!=='[]' && data.data[k]!=null && local[k]!==data.data[k]);
-            if(differs && await cloudMatchesSavedBaseline(owner,data.data)){
-                // Only this device changed since the last confirmed sync; keep its edits.
-                if(historyOwner!==owner)return {ok:false,reason:'Account changed; load cancelled'};
-                syncBaseline=snapshotFingerprint(data.data);syncReadyOwner=owner;
-                return {ok:true,found:true,localPending:true};
-            }
-            if(differs){
+            // A saved empty array is intentional (e.g. deleting the last row), not a new device.
+            // Never replace an established browser's saved copy merely because cloud differs.
+            const hasLocalCopy=Object.values(keys).some(key=>readAppStorage(key)!==null);
+            const differs=snapshotFingerprint(local)!==snapshotFingerprint(data.data);
+            if(hasLocalCopy && differs && await cloudMatchesSavedBaseline(owner,local)){
+                // This device is unchanged since the confirmed sync; cloud has advanced.
                 await saveRecoverySnapshot(owner,'local-before-conflict',local);
                 await saveRecoverySnapshot(owner,'cloud-before-conflict',data.data);
-                // Normal login/refresh uses the cloud copy after preserving both versions.
-                if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))return {ok:false,reason:'Local data changed while loading; retry sync.'};
+                if(historyOwner!==owner||snapshotFingerprint(localSnapshot(owner))!==snapshotFingerprint(local))return {ok:false,reason:'Local data changed during cloud load; automatic sync will retry.'};
                 await applyRestoredLocalSnapshot(owner,{...local,...data.data});
                 await rememberSyncBaseline(owner,data.data);syncReadyOwner=owner;
                 return {ok:true,found:true};
+            }
+            if(hasLocalCopy && differs && !(await cloudMatchesSavedBaseline(owner,data.data))){
+                const choice=await chooseSyncCopy(owner,local,data);
+                if(choice==='cloud'){
+                    await applyRestoredLocalSnapshot(owner,{...local,...data.data});
+                    await rememberSyncBaseline(owner,data.data);syncReadyOwner=owner;
+                    return {ok:true,found:true};
+                }
+            }
+            if(hasLocalCopy){
+                if(differs){
+                    await saveRecoverySnapshot(owner,'local-before-conflict',local);
+                    await saveRecoverySnapshot(owner,'cloud-before-conflict',data.data);
+                }
+                if(historyOwner!==owner)return {ok:false,reason:'Account changed; load cancelled'};
+                syncBaseline=snapshotFingerprint(data.data);syncReadyOwner=owner;
+                return {ok:true,found:true,localPending:differs,keptLocal:true};
             }
             await saveRecoverySnapshot(owner,'before-cloud-load',local);
             await saveRecoverySnapshot(owner,'cloud-first-seen',data.data);
@@ -1843,7 +1917,7 @@ async function pullSnapshotFromCloud(){
 function startAutoSync(){
     if(syncIntervalHandle) clearInterval(syncIntervalHandle);
     syncIntervalHandle = setInterval(async () => {
-        if(!historyOwner||cloudOverwritePending||manualSyncPending)return;
+        if(!historyOwner||cloudOverwritePending||manualSyncPending||syncChoiceResolve||syncChoiceDeferred)return;
         if(syncReadyOwner!==historyOwner){await syncNow();return;}
         const result = await pushSnapshotToCloud();
         const el = document.getElementById('syncStatus');
@@ -2011,7 +2085,7 @@ async function overwriteCloudWithLocal(event){
 let manualSyncPending=false;
 async function syncNow(){
     if(manualSyncPending||cloudOverwritePending)return;
-    manualSyncPending=true;
+    manualSyncPending=true;syncChoiceDeferred=false;
     const el=document.getElementById('syncStatus');
     try{
         if(el){el.textContent='Checking cloud connection…';el.style.color='var(--text-muted)';}
@@ -2062,6 +2136,7 @@ async function authAction(event, messageId, action){
     return false;
 }
 function lockDashboard(){
+    if(syncChoiceResolve)finishSyncChoice('later');syncChoiceDeferred=false;
     stopAutoSync();syncReadyOwner=null;
     fredRequestGeneration++;fredLiveData=null;const fredInput=document.getElementById('fredApiKey');if(fredInput)fredInput.value='';
     document.getElementById('appShell').style.display = 'none';
@@ -2085,7 +2160,7 @@ async function openDashboard(user){
     const pullResult = await pullSnapshotFromCloud();
     if(pullResult.ok && pullResult.found){
         loadEntryHistory(user.id); // reload validated, non-conflicting cloud data
-        if(syncEl){ syncEl.textContent = pullResult.localPending?'Local updates kept. Select Sync now to upload, or wait for automatic sync.':'Loaded your saved history from the cloud.'; syncEl.style.color = '#10b981'; }
+        if(syncEl){ syncEl.textContent = pullResult.localPending?'This device’s saved data was kept. Automatic sync will upload it; Sync now is also available.':pullResult.keptLocal?'This device’s saved data is in sync.':'Loaded your saved history from the cloud.'; syncEl.style.color = '#10b981'; }
     } else if(pullResult.ok && !pullResult.found){
         const initialPush=await pushSnapshotToCloud();
         if(syncEl){syncEl.textContent=initialPush.ok?'Saved this device’s history to the cloud.':'Sync paused: '+initialPush.reason;}
