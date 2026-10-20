@@ -1284,8 +1284,15 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
             <button class="secondary" onclick="exportCloudComparison()">Export local and cloud backup for AI comparison</button>
             <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
             <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud backup from AI comparison file</button>
+            <button class="secondary" onclick="toggleDeletedHistory()">View deleted History</button>
             <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
 </div>
+<details id="deletedHistoryPanel" style="margin-top:16px" ontoggle="if(this.open)renderDeletedHistory()">
+<summary>Existing and deleted History</summary>
+<p class="table-note">Saved market rows on this device and recoverable rows from this account’s browser backups. “Backup only” means absent from current history; deletion cannot be confirmed. Restoring adds the original row to current history and normal cloud sync. Older rows without a retained backup cannot be recovered here. This recovery archive stays in this browser and is included in the AI comparison export.</p>
+<p id="deletedHistoryStatus" role="status"></p>
+<div style="overflow:auto;max-height:480px"><table class="history-table"><thead id="deletedHistoryHead" style="position:sticky;top:0;background:var(--bg-card,#131a28);z-index:1"></thead><tbody id="deletedHistoryBody"></tbody></table></div>
+</details>
 </div>
 </details>
 
@@ -2524,24 +2531,81 @@ function saveEntry(observationDate=null,cpCheckedAt=null){
     try { writeMarketHistory(JSON.stringify(entryHistory)); historyStorageError = ''; }
     catch(error){ historyStorageError = 'This update is visible but could not be saved to browser storage. Keep this page open to retain it.'; }
 }
-function deleteHistoryEntry(entry){
+function toggleDeletedHistory(){const panel=document.getElementById('deletedHistoryPanel');panel.open=!panel.open;}
+function recoveryHistoryRows(backups){
+    const found=new Map();
+    function collect(value,deletedAt=null,depth=0){
+        if(depth>6||value==null)return;
+        if(typeof value==='string'){try{collect(JSON.parse(value),deletedAt,depth+1);}catch{}return;}
+        if(Array.isArray(value)){
+            for(const row of value)if(row&&Number.isFinite(Date.parse(row.savedAt))&&validSnapshot(row.values)){
+                const old=found.get(row.savedAt);
+                if(!old||deletedAt)found.set(row.savedAt,{row,deletedAt});
+            }
+            return;
+        }
+        if(typeof value==='object')for(const key of ['data','local','cloud','entryHistory'])if(value[key]!=null)collect(value[key],value.deletedAt||deletedAt,depth+1);
+    }
+    for(const value of Object.values(backups))collect(value);
+    return found;
+}
+let deletedHistoryRenderVersion=0;
+async function renderDeletedHistory(){
+    const owner=historyOwner,version=++deletedHistoryRenderVersion;
+    const body=document.getElementById('deletedHistoryBody');body.replaceChildren();
+    if(!owner)return;
+    setAppFeedback('deletedHistoryStatus','Loading saved and recoverable history…');
+    try{
+        const backups=await recoveryBackups(owner);
+        if(owner!==historyOwner||version!==deletedHistoryRenderVersion)return;
+        const records=recoveryHistoryRows(backups);
+        for(const row of entryHistory)records.set(row.savedAt,{row,current:true});
+        const fields=inputColumns;
+        const head=document.getElementById('deletedHistoryHead');head.replaceChildren();const hr=document.createElement('tr');
+        for(const label of ['Entry date / time','Status','Deleted at','Action',...fields.map(c=>c[1])]){const th=document.createElement('th');th.textContent=label;hr.appendChild(th);}head.appendChild(hr);
+        for(const item of [...records.values()].sort((a,b)=>Date.parse(b.row.savedAt)-Date.parse(a.row.savedAt))){
+            const tr=document.createElement('tr');
+            const cell=text=>{const td=document.createElement('td');td.textContent=text;tr.appendChild(td);return td;};
+            cell(new Date(item.row.savedAt).toLocaleString());cell(item.current?'Existing':item.deletedAt?'Deleted':'Backup only');cell(item.deletedAt?new Date(item.deletedAt).toLocaleString():'—');
+            const action=cell('');if(!item.current){const button=document.createElement('button');button.className='secondary';button.textContent='Restore';button.onclick=()=>restoreDeletedHistory(item.row,owner);action.appendChild(button);}
+            for(const [key] of fields)cell(item.row.values[key]??'—');body.appendChild(tr);
+        }
+        setAppFeedback('deletedHistoryStatus',records.size+' rows shown.');
+    }catch(error){setAppFeedback('deletedHistoryStatus','Could not load recovery history: '+error.message,'error');}
+}
+function restoreDeletedHistory(row,owner){
+    if(owner!==historyOwner)return;
+    if(entryHistory.some(r=>r.savedAt===row.savedAt)){setAppFeedback('deletedHistoryStatus','This entry already exists. Nothing replaced.');return;}
+    if(!confirm('Restore the saved entry from '+new Date(row.savedAt).toLocaleString()+'? It will be included in normal cloud sync.'))return;
+    const next=[...entryHistory,JSON.parse(JSON.stringify(row))].sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
+    try{writeMarketHistory(JSON.stringify(next));}
+    catch(error){setAppFeedback('deletedHistoryStatus','Not restored: '+error.message,'error');return;}
+    entryHistory=next;currentEntryTime=next[0].savedAt;currentData={...next[0].values};model50Cache=null;historyPreviewHidden=false;historyStorageError='';
+    renderDashboard();renderDeletedHistory().then(()=>{if(owner===historyOwner)setAppFeedback('deletedHistoryStatus','History restored successfully. Normal cloud sync will include this row.','success');});
+}
+async function deleteHistoryEntry(entry){
     const savedIndex = entry.savedAt ? entryHistory.indexOf(entry) : -1;
     if(entry.savedAt && savedIndex < 0) return;
     const label = entry.savedAt ? new Date(entry.savedAt).toLocaleString() : 'the unsaved current row';
-    if(!window.confirm('Delete '+label+' from history? This cannot be undone.')) return;
+    if(!window.confirm('Delete '+label+' from history? Saved rows can be restored under Troubleshoot Sync → View deleted History.')) return;
     if(!entry.savedAt){
         historyPreviewHidden = true;
         renderEntryHistory();
         return;
     }
-    const remaining = entryHistory.filter((row,index)=>index !== savedIndex);
+    const owner=historyOwner;
+    try{
+        await saveRecoverySnapshot(owner,'deleted-history-'+Date.now()+'-'+Math.random().toString(36).slice(2),{deletedAt:new Date().toISOString(),entryHistory:JSON.stringify([entry])});
+        if(historyOwner!==owner||!entryHistory.includes(entry))return;
+    }catch(error){setAppFeedback('deletedHistoryStatus','Not deleted: recovery backup could not be saved. '+error.message,'error');alert('Not deleted: recovery backup could not be saved.');return;}
+    const remaining = entryHistory.filter(row=>row!==entry);
     try { writeMarketHistory(JSON.stringify(remaining)); }
     catch(error){
         historyStorageError = 'The row could not be deleted from browser storage. It has been kept. Please try again.';
         renderEntryHistory();
         return;
     }
-    const wasCurrent = currentEntryTime !== null && savedIndex === 0;
+    const wasCurrent = currentEntryTime !== null && entryHistory.indexOf(entry) === 0;
     entryHistory = remaining;
     historyStorageError = '';
     if(wasCurrent){
@@ -2970,6 +3034,7 @@ document.addEventListener('DOMContentLoaded',()=>{
 });
 
 function renderDashboard(){
+    if(document.getElementById("deletedHistoryPanel")?.open)renderDeletedHistory();
     renderEntryHistory();
 
     const tbody =
