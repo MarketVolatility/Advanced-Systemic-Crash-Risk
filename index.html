@@ -1627,7 +1627,7 @@ async function analysisFullHistoryPrompt(){
             const value=display[key],direction=previous?historyChangeDirection(key,number(value),number(previous[key])):'';
             return clean(value)+(direction==='history-improved'?' [GREEN]':direction==='history-worsened'?' [DARK PINK]':'');
         });
-        lines.push([row.entryLabel||(row.reference?'Historical reference':row.savedAt===currentEntryTime?'Current':'Past'),day,row.savedAt?new Date(row.savedAt).toLocaleTimeString():'Unsaved',row.reference?'Embedded reference':row.savedAt?'Personal saved entry':'Unsaved preview',...cells].map(clean).join('\t'));
+        lines.push([customHistoryLabel(row.entryLabel)||(row.reference?'Historical reference':row.savedAt===currentEntryTime?'Current':'Past'),day,row.savedAt?new Date(row.savedAt).toLocaleTimeString():'Unsaved',row.reference?'Embedded reference':row.savedAt?'Personal saved entry':'Unsaved preview',...cells].map(clean).join('\t'));
     }
     return 'ENTIRE HISTORY TABLE — '+rows.length+' rows, newest first, all pages and multiple entries per day included.\nTab-separated columns. [GREEN] means the app’s green improvement outline; [DARK PINK] means its dark-pink deterioration outline. No tag means no colored outline (unchanged, missing, direction-neutral or no preceding entry). These text tags preserve the visual outline information when pasted into an AI assistant. Compare each row with the immediately following, older row. Outlines describe direction under dashboard conventions, not a change in awarded risk points or a forecast. Dates/times are entry dates, not necessarily market observation dates. Manual calculated-field overrides are preserved as displayed; the current snapshot and 14-day score analysis use model calculations. Unsaved table edits are excluded; save them before generating this prompt. Embedded reference rows are retrospective, not point-in-time evidence.\n'+lines.join('\n')+'\nEND ENTIRE HISTORY TABLE';
 }
@@ -2761,6 +2761,10 @@ function historyOverrideInput(key,label,computed,entry,host,inputs,max){
     host.title=input.title;host.appendChild(input);inputs[key]=input;
 }
 
+function customHistoryLabel(label){
+    const text=typeof label==='string'?label.trim():'';
+    return /^(current(?: \(unsaved\))?|past|historical reference)$/i.test(text)?'':text;
+}
 function updateEntryDateTime(entry,dateText,timeText,values=entry.values,historyOverrides=entry.historyOverrides||{},entryLabel=entry.entryLabel){
     if(validateForcedInputs(values)){alert(validateForcedInputs(values));return false;}
     if(!validSnapshot(values)){ alert("Use a number or null for every indicator."); return false; }
@@ -2775,7 +2779,7 @@ function updateEntryDateTime(entry,dateText,timeText,values=entry.values,history
     if(year<1 || !Number.isFinite(date.getTime()) || date.getFullYear()!==year || date.getMonth()!==month-1 || date.getDate()!==day || date.getHours()!==hour || date.getMinutes()!==minute || date.getSeconds()!==second){
         alert('Enter a valid local date and time.'); return false;
     }
-    const replacement={...entry,savedAt:date.toISOString(),updatedAt:new Date().toISOString(),values:{...values},historyOverrides,entryLabel};
+    const replacement={...entry,savedAt:date.toISOString(),updatedAt:new Date().toISOString(),values:{...values},historyOverrides,entryLabel:customHistoryLabel(entryLabel)||undefined};
     if(entry.reference){replacement.sourceReferenceDate=entry.observationDate;delete replacement.reference;delete replacement.observationDate;delete replacement.id;}
     const updated=(entryHistory.includes(entry)?entryHistory.map(row=>row===entry?replacement:row):[replacement,...entryHistory]).sort((a,b)=>Date.parse(b.savedAt)-Date.parse(a.savedAt));
     try { writeMarketHistory(JSON.stringify(updated)); }
@@ -2965,7 +2969,7 @@ function renderHistoryTable(prefix,columns,scoreLabel,maximum,isRegime){
         const timeText=date ? [date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':') : '—';
         const entryCell=document.createElement('td');
         entryCell.textContent=entry.reference?'Historical reference':isCurrent ? (date ? 'Current' : 'Current (unsaved)') : 'Past';
-        const labelInput=document.createElement('input');labelInput.type='text';labelInput.className='history-date-input';labelInput.value=entry.entryLabel??entryCell.textContent;labelInput.setAttribute('aria-label','Entry label');entryCell.replaceChildren();entryCell.appendChild(labelInput);tr.appendChild(entryCell);
+        const labelInput=document.createElement('input');labelInput.type='text';labelInput.className='history-date-input';labelInput.value=customHistoryLabel(entry.entryLabel)||entryCell.textContent;labelInput.setAttribute('aria-label','Entry label');entryCell.replaceChildren();entryCell.appendChild(labelInput);tr.appendChild(entryCell);
         const numberInputs={},overrideInputs={};
         const dateCell=document.createElement('td'),timeCell=document.createElement('td');
         if(date){
