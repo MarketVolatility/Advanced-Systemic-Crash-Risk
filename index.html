@@ -599,6 +599,40 @@ button.secondary {
 .subsection-fold[open]>summary{margin-bottom:14px}
 .subsection-fold>summary:focus-visible{outline:2px solid #947454;outline-offset:4px;border-radius:3px}
 </style>
+<style>
+.user-menu{flex-wrap:wrap}
+#desktopLayoutBtn[aria-pressed="true"],#mobileLayoutBtn[aria-pressed="true"]{color:var(--green);border-color:var(--green);background:rgba(34,197,94,.12)}
+html[data-platform="desktop"] body{min-width:1200px}
+html[data-platform="desktop"] header{flex-direction:row;align-items:center}
+html[data-platform="desktop"] .signal-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+html[data-platform="mobile"] body{min-width:0;padding:12px}
+html[data-platform="mobile"] header{flex-direction:column;align-items:stretch;gap:12px}
+html[data-platform="mobile"] header>div{text-align:left!important}
+html[data-platform="mobile"] .user-menu{gap:8px}
+html[data-platform="mobile"] .user-email{flex-basis:100%;overflow-wrap:anywhere}
+html[data-platform="mobile"] .summary-grid,html[data-platform="mobile"] .signal-grid,html[data-platform="mobile"] .overview-grid,html[data-platform="mobile"] .funding-fields{grid-template-columns:minmax(0,1fr)}
+html[data-platform="mobile"] .control-panel{padding:14px;min-width:0}
+html[data-platform="mobile"] .user-menu button{min-height:44px}
+html[data-platform="mobile"] input,html[data-platform="mobile"] textarea,html[data-platform="mobile"] select{font-size:16px}
+html[data-platform="mobile"] .dashboard-nav{flex-wrap:wrap}
+html[data-platform="mobile"] table{font-size:12px}
+html[data-platform="mobile"] th,html[data-platform="mobile"] td{padding:10px 8px}
+</style>
+<script>
+function setPlatformLayout(mode,persist=true){
+    if(mode!=='desktop'&&mode!=='mobile')return;
+    document.documentElement.dataset.platform=mode;
+    document.querySelector('meta[name="viewport"]').content=mode==='desktop'?'width=1200':'width=device-width, initial-scale=1.0';
+    if(persist){try{localStorage.setItem('crash-risk-platform-layout',mode);}catch{}}
+    for(const name of ['desktop','mobile'])document.getElementById(name+'LayoutBtn')?.setAttribute('aria-pressed',String(name===mode));
+    window.dispatchEvent(new Event('resize'));
+}
+(function(){let mode;try{mode=localStorage.getItem('crash-risk-platform-layout');}catch{}
+    if(!['desktop','mobile'].includes(mode))mode=window.matchMedia('(max-width:800px)').matches?'mobile':'desktop';
+    setPlatformLayout(mode,false);
+    document.addEventListener('DOMContentLoaded',()=>setPlatformLayout(document.documentElement.dataset.platform,false));
+})();
+</script>
 </head>
 
 <body>
@@ -680,6 +714,8 @@ button.secondary {
         Risk-Weighted + Momentum + Cross-Asset
         <div class="user-menu">
             <span class="user-email" id="loggedInEmail"></span>
+            <button class="secondary" id="desktopLayoutBtn" aria-pressed="false" onclick="setPlatformLayout('desktop')">Desktop</button>
+            <button class="secondary" id="mobileLayoutBtn" aria-pressed="false" onclick="setPlatformLayout('mobile')">Mobile</button>
             <button class="secondary" id="syncNowBtn" onclick="syncNow()">Sync now</button>
             <button class="secondary" onclick="openTroubleshootSync()">Troubleshoot Sync</button>
             <button class="secondary logout-btn" onclick="logoutUser()">Log out</button>
@@ -1284,7 +1320,6 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
             <button class="secondary" onclick="exportCloudComparison()">Export local and cloud backup for AI comparison</button>
             <button class="secondary" id="overwriteCloudBtn" onclick="showCloudOverwrite()">Overwrite cloud with local</button>
             <button class="secondary" id="restoreCloudBtn" onclick="document.getElementById('restoreCloudFile').click()">Restore previous cloud backup from AI comparison file</button>
-            <button class="secondary" onclick="toggleDeletedHistory()">View deleted History</button>
             <input id="restoreCloudFile" type="file" accept=".json,application/json" hidden onchange="importCloudRestore(this)">
 </div>
 <details id="deletedHistoryPanel" style="margin-top:16px" ontoggle="if(this.open)renderDeletedHistory()">
@@ -2587,7 +2622,7 @@ async function deleteHistoryEntry(entry){
     const savedIndex = entry.savedAt ? entryHistory.indexOf(entry) : -1;
     if(entry.savedAt && savedIndex < 0) return;
     const label = entry.savedAt ? new Date(entry.savedAt).toLocaleString() : 'the unsaved current row';
-    if(!window.confirm('Delete '+label+' from history? Saved rows can be restored under Troubleshoot Sync → View deleted History.')) return;
+    if(!window.confirm('Delete '+label+' from history? Saved rows can be restored under Troubleshoot Sync → Existing and deleted History.')) return;
     if(!entry.savedAt){
         historyPreviewHidden = true;
         renderEntryHistory();
