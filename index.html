@@ -633,6 +633,84 @@ function setPlatformLayout(mode,persist=true){
     document.addEventListener('DOMContentLoaded',()=>setPlatformLayout(document.documentElement.dataset.platform,false));
 })();
 </script>
+<style>
+th.column-toggle-header,td.column-toggle-header{padding-right:34px!important;min-height:32px;height:32px}
+.column-visibility-toggle{position:absolute;right:3px;top:3px;width:25px;height:25px;min-height:25px;padding:0!important;margin:0!important;line-height:21px;font-size:18px;font-weight:700;border:1px solid var(--border);border-radius:4px;background:var(--card-bg);color:var(--text-main);cursor:pointer;z-index:2}
+.column-visibility-toggle:focus-visible{outline:2px solid var(--green);outline-offset:2px}
+table .column-is-collapsed{width:32px!important;min-width:32px!important;max-width:32px!important;padding:0!important;font-size:0!important;overflow:hidden;white-space:nowrap!important}
+table .column-is-collapsed>*{display:none!important}
+table .column-is-collapsed>.column-visibility-toggle{display:block!important}
+table .column-is-collapsed::before,table .column-is-collapsed::after{display:none!important}
+table .column-is-collapsed{color:transparent!important}
+@media print{.column-visibility-toggle{display:none!important}}
+</style>
+<script>
+// Presentation-only controls; no market values or account storage are changed.
+const tableColumnVisibility=new WeakMap();
+function applyTableColumnControls(table){
+    const top=table.tHead?.rows[0]||table.rows[0];
+    if(!top)return;
+    let hidden=tableColumnVisibility.get(table);
+    if(!hidden){hidden=new Set();tableColumnVisibility.set(table,hidden);}
+    let offset=0;
+    for(const cell of top.cells){
+        const start=offset,span=cell.colSpan||1;offset+=span;
+        let button=Array.from(cell.children).find(n=>n.classList.contains('column-visibility-toggle'));
+        if(!button){
+            const label=cell.textContent.trim()||'Column '+(start+1);
+            button=document.createElement('button');button.type='button';button.className='column-visibility-toggle';button.dataset.columnLabel=label;
+            button.addEventListener('click',event=>{
+                event.preventDefault();event.stopPropagation();
+                const collapse=!hidden.has(start);
+                for(let i=start;i<start+span;i++)collapse?hidden.add(i):hidden.delete(i);
+                applyTableColumnControls(table);
+            });
+            if(getComputedStyle(cell).position==='static')cell.style.position='relative';
+            cell.classList.add('column-toggle-header');cell.appendChild(button);
+        }
+        const collapsed=hidden.has(start);
+        button.textContent=collapsed?'+':'−';
+        button.title=(collapsed?'Show ':'Hide ')+button.dataset.columnLabel;
+        button.setAttribute('aria-label',button.title);button.setAttribute('aria-expanded',String(!collapsed));
+    }
+    // Track occupied columns for rowspans as well as grouped/empty-state colspans.
+    const occupied=[];
+    for(const row of table.rows){
+        let col=0;
+        for(const cell of row.cells){
+            while(occupied[col]>0)col++;
+            const span=cell.colSpan||1;
+            const collapsed=Array.from({length:span},(_,i)=>col+i).every(i=>hidden.has(i));
+            cell.classList.toggle('column-is-collapsed',collapsed);
+            if(cell.rowSpan>1)for(let i=col;i<col+span;i++)occupied[i]=cell.rowSpan;
+            col+=span;
+        }
+        for(let i=0;i<occupied.length;i++)if(occupied[i]>0)occupied[i]--;
+    }
+}
+document.addEventListener('DOMContentLoaded',()=>{
+    const pending=new Set();let scheduled=false;
+    const observer=new MutationObserver(records=>{
+        for(const record of records){
+            // Ignore our own button labels. Rebuilt headers and rows are handled below.
+            if(record.target.closest?.('.column-visibility-toggle'))continue;
+            const table=record.target.closest?.('table');if(table)pending.add(table);
+            for(const node of record.addedNodes)if(node.nodeType===1){
+                if(node.matches('table'))pending.add(node);
+                node.querySelectorAll('table').forEach(t=>pending.add(t));
+            }
+        }
+        if(!pending.size||scheduled)return;
+        scheduled=true;requestAnimationFrame(()=>{
+            scheduled=false;observer.disconnect();
+            try{for(const table of pending)if(table.isConnected)applyTableColumnControls(table);}
+            finally{pending.clear();observer.observe(document.body,{childList:true,subtree:true});}
+        });
+    });
+    document.querySelectorAll('table').forEach(applyTableColumnControls);
+    observer.observe(document.body,{childList:true,subtree:true});
+});
+</script>
 </head>
 
 <body>
