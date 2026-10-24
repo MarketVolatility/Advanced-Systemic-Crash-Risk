@@ -1209,16 +1209,14 @@ placeholder="15.72, 8.19, 12.4, 268, 8, 22, 102, 4.80, 18, 1.2, 7.6, 94.73, 12.5
 <p class="table-note">Add a weekly release below or paste researched JSON. Edit a row to append a correction while retaining its original version. The red × deletes a release and its corrections after confirmation. Saved locally per account and included in the existing eight-minute sync and Sync now. Export before deleting if you need a permanent audit copy.</p>
 <div class="history-repair" aria-labelledby="fundingQuickHeading">
 <h3 id="fundingQuickHeading">Quick Paste Update · dollar funding</h3><p class="table-note" id="dollarUpdateTime"></p>
-<p class="table-note">Copy the prompt to your AI, paste its JSON response below, then select Fill entry boxes. Review the source and select Save funding entry to add it to history. This updates the dollar funding fields only.</p>
+<p class="table-note">Copy the prompt to your AI, paste its JSON response below, then select Parse and Update to validate and save directly to the dollar funding table.</p>
 <button type="button" onclick="generateFundingQuickPrompt()">Generate latest-data prompt</button> <button type="button" onclick="copyFundingQuickPrompt()">Copy prompt</button>
 <textarea id="fundingQuickPrompt" class="paste-box" rows="5" readonly aria-label="AI prompt for latest dollar funding release"></textarea>
 <label for="fundingQuickPaste">Paste AI response (one JSON object)</label>
 <textarea id="fundingQuickPaste" class="paste-box" rows="5" placeholder='{"observationDate":"YYYY-MM-DD","publishedAt":"ISO timestamp with timezone","balance":null,"testBalance":null,"testEvidence":"","source":""}'></textarea>
-<button type="button" onclick="fillFundingFromAI()">Validate &amp; fill entry boxes</button>
+<button type="button" onclick="fillFundingFromAI()">Parse and Update</button> <button type="button" id="fundingCancelEdit" hidden onclick="resetFundingForm()">Cancel correction</button>
 <p id="fundingQuickStatus" class="table-note" role="status"></p>
 </div>
-<div class="funding-fields" id="fundingFields"></div>
-<button type="button" id="fundingSave" onclick="saveFundingForm()">Save funding entry</button> <button type="button" onclick="resetFundingForm()">Cancel edit / clear</button>
 <details><summary>Bulk historical research, import and export</summary>
 <button type="button" onclick="fundingPrompt()">Generate AI research prompt</button> <button type="button" onclick="copyFundingPrompt()">Copy prompt</button>
 <textarea id="fundingPrompt" class="paste-box" rows="4" readonly aria-label="Funding research prompt"></textarea>
@@ -3936,18 +3934,21 @@ function persistFunding(next){
     localStorage.setItem(fundingKey(),JSON.stringify(next));fundingRecords=next;renderFunding();
 }
 function fundingId(){return 'funding-'+Date.now()+'-'+Math.random().toString(36).slice(2);}
-function saveFundingForm(){
-    try{
-        const raw=Object.fromEntries(fundingFields.map(([k])=>{const v=document.getElementById('funding_'+k).value.trim();return [k,['balance','testBalance'].includes(k)?(v===''?null:Number(v)):v];}));
-        const r=validateFunding(raw),now=new Date().toISOString();
-        if(fundingEdit){const old=fundingRecords.find(v=>v.id===fundingEdit);if(!old)throw Error('Entry changed. Start editing again.');r.publishedAt=now;r.observationDate=old.observationDate;r.supersedes=old.id;}
-        r.id=fundingId();r.savedAt=now;
-        if(fundingRecords.some(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt))throw Error('This observation and publication already exist. Edit the existing row.');
-        persistFunding([...fundingRecords,r]);resetFundingForm();setAppFeedback('fundingStatus','Funding entry saved. Queued for normal account sync.');
-    }catch(e){setAppFeedback('fundingStatus',e.message);}
+function resetFundingForm(){
+    fundingEdit=null;
+    document.getElementById('fundingQuickPaste').value='';
+    document.getElementById('fundingCancelEdit').hidden=true;
+    setAppFeedback('fundingQuickStatus','');
 }
-function resetFundingForm(){fundingEdit=null;fundingFields.forEach(([k])=>{document.getElementById('funding_'+k).value='';document.getElementById('funding_'+k).disabled=false;});document.getElementById('fundingSave').textContent='Save funding entry';}
-function editFunding(r){fundingEdit=r.id;fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');document.getElementById('funding_observationDate').disabled=true;document.getElementById('funding_publishedAt').value=new Date().toISOString();document.getElementById('funding_publishedAt').disabled=true;document.getElementById('fundingSave').textContent='Save correction (available from now)';setAppFeedback('fundingStatus','The original release is retained. Corrections take effect now to avoid changing what was known earlier.');}
+function editFunding(r){
+    fundingEdit=r.id;
+    const raw=Object.fromEntries(fundingFields.map(([k])=>[k,r[k]??(k==='testBalance'?null:'')]));
+    raw.publishedAt=new Date().toISOString();
+    document.getElementById('fundingQuickPaste').value=JSON.stringify(raw,null,2);
+    document.getElementById('fundingCancelEdit').hidden=false;
+    setAppFeedback('fundingQuickStatus','Editing '+r.observationDate+'. Update the JSON and select Parse and Update. The original release is retained; the correction takes effect when saved.','warning');
+    document.getElementById('fundingQuickPaste').focus();
+}
 function deleteFunding(r){if(!confirm('Delete the funding observation '+r.observationDate+' and all its saved versions?'))return;try{persistFunding(fundingRecords.filter(v=>v.observationDate!==r.observationDate));resetFundingForm();setAppFeedback('fundingStatus','Funding observation deleted successfully.','success');}catch(e){setAppFeedback('fundingStatus',e.message);}}
 function importFunding(){
     try{const data=JSON.parse(document.getElementById('fundingImport').value);if(!Array.isArray(data)||data.length>10000)throw Error('Provide an array of at most 10,000 releases.');
@@ -3966,7 +3967,6 @@ function renderFunding(){
     renderFreshness();
     const lastSaved=fundingRecords.map(r=>r.savedAt).filter(Boolean).sort().at(-1);const stamp=document.getElementById("dollarUpdateTime");if(stamp)stamp.textContent=lastSaved?"Last saved update: "+displayUpdateTime(lastSaved):"Last saved update: none — embedded reference history only.";
     const body=document.getElementById('fundingRows');if(!body)return;
-    const fieldHost=document.getElementById('fundingFields');if(!fieldHost.children.length)fundingFields.forEach(([k,label,type])=>{const l=document.createElement('label');l.textContent=label;const input=document.createElement('input');input.id='funding_'+k;input.type=type;if(type==='number'){input.min='0';input.step='any';}l.appendChild(input);fieldHost.appendChild(l);});
     const time=Date.now();
     const records=fundingDisplayRecords();
     const visible=fundingVersionsAt(records,time),latest=visible.at(-1),fresh=latest&&time-Date.parse(latest.observationDate)<=14*86400000;
@@ -4023,11 +4023,23 @@ function fillFundingFromAI(){
         if(keys.some(k=>!Object.hasOwn(raw,k))||Object.keys(raw).some(k=>!keys.includes(k)))throw Error('The response must contain exactly observationDate, publishedAt, balance, testBalance, testEvidence and source.');
         if(raw.observationDate===null||raw.publishedAt===null||raw.balance===null)throw Error('The AI could not verify the observation date, publication timestamp or balance. Research those missing fields before saving.');
         const r=validateFunding(raw);
-        // Validate the entire response before changing an in-progress form or edit.
+        const now=new Date().toISOString();
+        if(fundingEdit){
+            const old=fundingRecords.find(v=>v.id===fundingEdit);
+            if(!old)throw Error('Entry changed. Start editing again.');
+            if(r.observationDate!==old.observationDate)throw Error('A correction must keep the original observation date.');
+            r.publishedAt=now;r.supersedes=old.id;
+        }
+        const existing=fundingRecords.find(v=>v.observationDate===r.observationDate&&v.publishedAt===r.publishedAt);
+        if(existing){
+            if(fundingFields.some(([k])=>(existing[k]??'')!==(r[k]??'')))throw Error('Conflicting values for an existing publication. Use Edit on that row to save a correction.');
+            setAppFeedback(status,'This funding release is already saved. No duplicate added.','success');return;
+        }
+        r.id=fundingId();r.savedAt=now;
+        persistFunding([...fundingRecords,r]);
         resetFundingForm();
-        fundingFields.forEach(([k])=>document.getElementById('funding_'+k).value=r[k]??'');
-        status.textContent='Entry boxes filled. Review the source and publication time, then click Save funding entry. No history has been changed yet.';
-    }catch(e){status.textContent='Entry boxes unchanged: '+e.message;}
+        setAppFeedback(status,'Funding entry saved successfully to the table. Queued for normal account sync.','success');
+    }catch(e){setAppFeedback(status,'Not saved: '+e.message,'error');}
 }
 document.addEventListener('DOMContentLoaded',generateFundingQuickPrompt);
 
