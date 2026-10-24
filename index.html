@@ -539,6 +539,12 @@ button.secondary {
 .history-value-input {width:100px; background:var(--bg-color); border:1px solid var(--border); border-radius:5px; padding:7px; font:inherit; text-align:right;}
 .history-date-save {padding:7px 10px; margin-left:6px; font-size:12px;}
 .history-normal {color:#fff;}
+/* CP sorting uses the same muted header typography as History, not action-button styling. */
+#cpSavedHead .cp-sort-label {display:block; width:100%; margin:0; padding:0 18px 0 0; border:0; border-radius:0; background:transparent; box-shadow:none; color:inherit; font:inherit; text-transform:inherit; letter-spacing:inherit; text-align:inherit; white-space:normal; cursor:pointer;}
+#cpSavedHead .cp-sort-label:hover {background:transparent; color:var(--text-main);}
+#cpSavedHead .cp-sort-label:focus-visible {outline:2px solid var(--text-muted); outline-offset:3px;}
+#cpSavedBody td:last-child {text-align:left;}
+
 .history-amber {color:var(--amber);}
 .history-red {color:var(--red);}
 .history-current {background:rgba(59,130,246,.08);}
@@ -3121,7 +3127,7 @@ function renderSavedCpTable(){
     const change=fn=>{if(cpSavedView.dirty&&!confirm('Discard unsaved CP table edits?'))return;fn();renderSavedCpTable();};
     head.replaceChildren();const heading=document.createElement('tr');
     columns.forEach(([key,label])=>{const th=document.createElement('th');th.scope='col';
-        const button=document.createElement('button');button.type='button';button.textContent=label+(cpSavedView.key===key?(cpSavedView.direction<0?' ▼':' ▲'):'');
+        const button=document.createElement('button');button.type='button';button.className='cp-sort-label';button.textContent=label+(cpSavedView.key===key?(cpSavedView.direction<0?' ▼':' ▲'):'');
         th.setAttribute('aria-sort',cpSavedView.key===key?(cpSavedView.direction<0?'descending':'ascending'):'none');
         button.onclick=()=>change(()=>{cpSavedView.direction=cpSavedView.key===key?-cpSavedView.direction:-1;cpSavedView.key=key;cpSavedView.page=0;});th.appendChild(button);heading.appendChild(th);
     });const actionHead=document.createElement('th');actionHead.scope='col';actionHead.textContent='Actions';heading.appendChild(actionHead);head.appendChild(heading);
@@ -3131,7 +3137,7 @@ function renderSavedCpTable(){
         const tr=document.createElement('tr'),inputs={};
         columns.forEach(([key,label])=>{const td=document.createElement('td');
             if(key==='savedAt')td.textContent=new Date(entry.savedAt).toLocaleString();
-            else {const input=document.createElement('input');input.type='number';input.step=key==='cp_date'?'1':'any';input.className='history-value-input';input.value=entry.values[key];input.setAttribute('aria-label',label);inputs[key]=input;td.appendChild(input);}
+            else {const input=document.createElement('input');input.type='number';input.step=key==='cp_date'?'1':'any';input.className='history-value-input history-normal';input.value=entry.values[key];input.setAttribute('aria-label',label);inputs[key]=input;td.appendChild(input);}
             tr.appendChild(td);
         });
         const actions=document.createElement('td');
@@ -3141,7 +3147,7 @@ function renderSavedCpTable(){
             const date=new Date(entry.savedAt),time=[date.getHours(),date.getMinutes(),date.getSeconds()].map(n=>String(n).padStart(2,'0')).join(':');
             if(updateEntryDateTime(entry,localCalendarDate(date),time,values))setAppFeedback('cpAiStatus','CP values saved successfully to this table and History.','success');
         };
-        const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.onclick=()=>{for(const [key,input] of Object.entries(inputs))input.value=entry.values[key];};
+        const cancel=document.createElement('button');cancel.type='button';cancel.textContent='Cancel';cancel.className='secondary history-date-save';cancel.onclick=()=>{for(const [key,input] of Object.entries(inputs))input.value=entry.values[key];};
         actions.append(save,cancel);tr.appendChild(actions);body.appendChild(tr);
     });
     if(!rows.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=6;td.textContent='No saved CP entries yet. Apply a CP update to save one.';tr.appendChild(td);body.appendChild(tr);}
