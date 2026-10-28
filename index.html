@@ -1715,6 +1715,22 @@ table td.column-is-collapsed::after {display:none;}
  background:color-mix(in srgb,currentColor 22%,#17272a);
 }
 
+/* Keep dense numeric tables easy to scan and keyboard navigation visible. */
+.workspace-screen table td,
+.workspace-screen table input {font-variant-numeric:tabular-nums;}
+.workspace-screen table input:focus-visible {
+ outline:2px solid #c7e5dc;
+ outline-offset:2px;
+}
+.workspace-screen .data-table-scroll:focus-visible {
+ outline:2px solid #79dfb5;
+ outline-offset:3px;
+}
+@media (prefers-reduced-motion:reduce) {
+ html.workspace-enabled {scroll-behavior:auto;}
+ .workspace-screen * {transition:none!important;animation:none!important;}
+}
+
 </style>
 </head>
 
@@ -2324,7 +2340,7 @@ placeholder="Paste your 35 comma-separated values here…" aria-label="35 market
 <p>There is no 2-point tier. A ratio falling from 4.00 to 3.76 changes by −6%, adding 3 points. This measures relative underperformance: both indexes can fall without triggering it, or Nasdaq can rise but lag enough to trigger it. The Nasdaq Composite remains a comparison index and earns no points.</p>
 <p>The latest 21 matched session observations are used, skipping dates missing either index. The baseline is 20 matched observations before the endpoint and may be more than 20 trading sessions earlier. Fewer than 21 matched observations gives a 0–3 range, never an invented baseline. Historical nontrading dates use their recorded trading-session snapshot. Mixed-date pasted prices remain a limitation.</p>
 <p>Score bands: 0–4 Normal Risk; 5–9 Correction Risk; 10–15 Systemic Stress; 16–22 High Stress; 23–30 High Risk; 31–50 Systemic Risk. Thresholds are heuristics, not validated crash probabilities. Historical calculations use downloaded data vintages, not publication-time backtests. Dollar swaps, 200DMA velocity and percentile watch alerts remain unscored.</p>
-<p>Sources: <a href="https://www.federalreserve.gov/releases/cp/about.htm">Federal Reserve CP methodology</a>, <a href="https://fred.stlouisfed.org/series/NASDAQ100">Nasdaq-100 via FRED</a>. Legacy FRA–OIS thresholds are not carried over following the <a href="https://www.newyorkfed.org/rruc/libor-transition-background">LIBOR transition</a>.</p>
+<p>Sources: <a href="https://www.federalreserve.gov/releases/cp/about.htm">Federal Reserve CP methodology</a>, <a href="https://fred.stlouisfed.org/series/NASDAQ100">Nasdaq-100 via FRED</a>. FRA–OIS thresholds are not carried over following the <a href="https://www.newyorkfed.org/rruc/libor-transition-background">LIBOR transition</a>.</p>
 </section>
 <section class="control-panel" id="systemicRiskReference" aria-labelledby="systemicRiskReferenceHeading">
 <h2 class="panel-title" id="systemicRiskReferenceHeading">Advanced Systemic Crash Risk Dashboard Explained</h2>
@@ -2829,7 +2845,7 @@ Scored indicator contributions:
 ${JSON.stringify(factors, null, 2)}
 Forced-selling components (in addition to USDJPY):
 ${JSON.stringify(forcedPoints(values, day), null, 2)}
-Raw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent; cp_financial_date, cp_nonfinancial_date and cp_treasury_date are individual observation dates in YYYYMMDD, falling back to legacy cp_date when absent. Different-date spreads are asynchronous comparisons, not same-session funding spreads):
+Raw dashboard inputs (null means unavailable; changes are percentages except yield/OAS changes in basis points; margin debt in USD millions; CP rates in percent; cp_financial_date, cp_nonfinancial_date and cp_treasury_date are individual observation dates in YYYYMMDD, falling back to cp_date when absent. Different-date spreads are asynchronous comparisons, not same-session funding spreads):
 ${JSON.stringify(values, null, 2)}
 Derived CP and Nasdaq inputs:
 ${JSON.stringify(model50Inputs(values, day), null, 2)}
@@ -3159,14 +3175,14 @@ async function writeAppStorage(key, value) {
 }
 async function initializeAccountStorage(owner) {
   if (!window.indexedDB) return;
-  const key = "crash-risk-analysis-v1:" + owner, legacy = localStorage.getItem(key);
-  if (legacy !== null) {
-    validateAnalysisHistory(JSON.parse(legacy));
-    await recoveryDatabase("readwrite", (store) => store.put({ key, value: legacy }));
+  const key = "crash-risk-analysis-v1:" + owner, storedAnalysis = localStorage.getItem(key);
+  if (storedAnalysis !== null) {
+    validateAnalysisHistory(JSON.parse(storedAnalysis));
+    await recoveryDatabase("readwrite", (store) => store.put({ key, value: storedAnalysis }));
     const checked = await recoveryDatabase("readonly", (store) => store.get(key));
-    if (checked?.value !== legacy) throw Error("Analysis storage migration could not be verified. Original data kept.");
-    if (localStorage.getItem(key) !== legacy) throw Error("Analysis changed during migration. Retry loading.");
-    largeStorageCache.set(key, legacy);
+    if (checked?.value !== storedAnalysis) throw Error("Analysis storage migration could not be verified. Original data kept.");
+    if (localStorage.getItem(key) !== storedAnalysis) throw Error("Analysis changed during migration. Retry loading.");
+    largeStorageCache.set(key, storedAnalysis);
     localStorage.removeItem(key);
   } else {
     const saved = await recoveryDatabase("readonly", (store) => store.get(key));
@@ -5058,7 +5074,7 @@ function applyCpResponse() {
   const raw = requiredElement("cpAiResponse").value.trim().split(",");
   const nums = raw.map((x) => Number(x.trim()));
   if (![4, 6].includes(raw.length) || raw.some((x) => !x.trim()) || !nums.every(Number.isFinite)) {
-    setAppFeedback("cpAiStatus", "Use six numeric fields: financial date, rate, nonfinancial date, rate, Treasury date, rate. Legacy four-field same-date input is also accepted.");
+    setAppFeedback("cpAiStatus", "Use six numeric fields: financial date, rate, nonfinancial date, rate, Treasury date, rate. Four-field same-date input is also accepted.");
     return;
   }
   const values = { ...currentData, cp_date: nums.length === 6 ? Math.max(nums[0], nums[2], nums[4]) : nums[0], cp_financial_date: nums[0], cp_nonfinancial_date: nums.length === 6 ? nums[2] : nums[0], cp_treasury_date: nums.length === 6 ? nums[4] : nums[0], cp_financial: nums[1], cp_nonfinancial: nums.length === 6 ? nums[3] : nums[2], cp_treasury: nums.length === 6 ? nums[5] : nums[3] };
