@@ -1696,8 +1696,22 @@ table td.history-improved,table td.history-worsened {position:relative;box-shado
 table td.history-worsened {--comparison-edge:#fb7185;}
 table td.history-improved::after,table td.history-worsened::after {content:"";position:absolute;inset:5px;border:2px solid var(--comparison-edge);border-radius:5px;pointer-events:none;}
 table td:is(.history-improved,.history-worsened):has(input)::after {display:none;}
+.workspace-screen table td:is(.history-improved,.history-worsened) input,
 table td:is(.history-improved,.history-worsened) input {border:2px solid var(--comparison-edge);box-shadow:none;}
 table td.column-is-collapsed::after {display:none;}
+
+/* Tint each risk value with its own text hue; neutral values keep the dark surface. */
+.workspace-screen table td:is(.history-amber,.history-red),
+.workspace-screen table td:has(input:is(.history-amber,.history-red)) {
+ background:color-mix(in srgb,var(--risk-tint) 22%,#17272a);
+}
+.workspace-screen table td.history-amber,
+.workspace-screen table td:has(input.history-amber) {--risk-tint:#f5bb4b;}
+.workspace-screen table td.history-red,
+.workspace-screen table td:has(input.history-red) {--risk-tint:#ff7a8a;}
+.workspace-screen table td input:is(.history-amber,.history-red) {
+ background:color-mix(in srgb,currentColor 22%,#17272a);
+}
 
 </style>
 </head>
