@@ -572,9 +572,80 @@ var DashboardCore = (() => {
     else location.hash = target;
   }
 
+  // src/ui/table-comparisons.ts
+  var higherBetter = /breadth|above.*dma|vs.*dma|distance|term structure|3m.*1m|s&p.*close|nasdaq.*close|relative momentum|sp500|nasdaq100|sp_high|sp_low|dma50|dma200|vix_term|jpy3d|daily change|carry.*momentum/i;
+  var lowerBetter = /total.*50|volatility.*10|credit.*14|macro.*8|equity.*12|forced selling.*6|financial.*(?:nonfinancial|treasury)|score|points|minimum|maximum|vix|move|oas|yield|wti|margin|debt|spread|balance|weekly change|hike/i;
+  var nonMeasure = /date|time|month|year|ceiling|maximum possible|reference|source|entry|delete|restore|status/i;
+  function headerLabel(cell) {
+    return cell.querySelector(".column-visibility-toggle")?.dataset.columnLabel ?? cell.textContent ?? "";
+  }
+  function numericCell(cell) {
+    const input = cell.querySelector("input");
+    if (input && !["number", "text"].includes(input.type)) return null;
+    const text = (input?.value ?? cell.textContent ?? "").trim().replaceAll(",", "").replaceAll("\u2212", "-");
+    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)\s*[%×]?$/.test(text)) return null;
+    const value = Number(text.replace(/[%×]$/, ""));
+    return Number.isFinite(value) ? value : null;
+  }
+  function rowTime(row, headers) {
+    if (row.dataset.comparisonDate) {
+      const t = Date.parse(row.dataset.comparisonDate);
+      return Number.isFinite(t) ? t : null;
+    }
+    for (let i = 0; i < headers.length; i++) {
+      if (!/date|time|session/i.test(headers[i] ?? "") || /cp|deleted|published|publication|comparison|meeting|reference/i.test(headers[i] ?? "")) continue;
+      const cell = row.cells[i];
+      if (!cell) continue;
+      const text = cell.querySelector("input")?.value ?? cell.textContent ?? "";
+      const match = text.match(/\d{4}-\d{2}-\d{2}(?:T[\d:.]+(?:Z|[+-]\d\d:\d\d))?/);
+      if (match) {
+        const t = Date.parse(match[0]);
+        if (Number.isFinite(t)) return t;
+      }
+    }
+    return null;
+  }
+  function applyTableComparisons(table) {
+    const head = table.tHead?.rows[0];
+    if (!head) return;
+    const headers = [...head.cells].map(headerLabel);
+    for (const body of table.tBodies) {
+      const rows = [...body.rows].map((row) => ({ row, time: rowTime(row, headers) })).filter((r) => r.time !== null).sort((a, b) => a.time - b.time);
+      for (let r = 0; r < rows.length; r++) {
+        const current = rows[r], previous = rows[r - 1];
+        for (let c = 0; c < current.row.cells.length; c++) {
+          const cell = current.row.cells[c];
+          if (cell.dataset.comparisonExplicit === "true") continue;
+          cell.classList.remove("history-improved", "history-worsened");
+          if (cell.dataset.comparisonTitle) {
+            cell.title = cell.title.replace(cell.dataset.comparisonTitle, "");
+            delete cell.dataset.comparisonTitle;
+          }
+          const label = headers[c] ?? "";
+          if (!previous || nonMeasure.test(label) || cell.colSpan !== 1) continue;
+          const meeting = headers.findIndex((h) => /meeting|decision date/i.test(h));
+          if (meeting >= 0) {
+            const value = (row) => row.cells[meeting]?.querySelector("input")?.value ?? row.cells[meeting]?.textContent;
+            if (value(current.row) !== value(previous.row)) continue;
+          }
+          const older = previous.row.cells[c];
+          if (!older) continue;
+          const a = numericCell(cell), b = numericCell(older);
+          if (a === null || b === null || Math.abs(a - b) < 1e-8) continue;
+          const direction = higherBetter.test(label) ? 1 : lowerBetter.test(label) ? -1 : 1;
+          cell.classList.add((a - b) * direction > 0 ? "history-improved" : "history-worsened");
+          const note = ` \xB7 ${a > b ? "Increased" : "Decreased"} from ${b} to ${a} versus ${new Date(previous.time).toISOString().slice(0, 10)}${!higherBetter.test(label) && !lowerBetter.test(label) ? "; numeric direction only, not a risk assessment" : ""}.`;
+          cell.dataset.comparisonTitle = note;
+          cell.title += note;
+        }
+      }
+    }
+  }
+
   // src/ui/table-controls.ts
   var tableColumnVisibility = /* @__PURE__ */ new WeakMap();
   function applyTableColumnControls(table) {
+    applyTableComparisons(table);
     const top = table.tHead?.rows[0] || table.rows[0];
     if (!top) return;
     const hidden = tableColumnVisibility.get(table) ?? /* @__PURE__ */ new Set();
@@ -646,6 +717,13 @@ var DashboardCore = (() => {
           observer.observe(document.body, { childList: true, subtree: true });
         }
       });
+    });
+    document.addEventListener("input", (event) => {
+      const target = event.target;
+      if (target instanceof Element) {
+        const table = target.closest("table");
+        if (table) applyTableComparisons(table);
+      }
     });
     document.querySelectorAll("table").forEach(applyTableColumnControls);
     observer.observe(document.body, { childList: true, subtree: true });
@@ -805,8 +883,6 @@ document.addEventListener("DOMContentLoaded", () => DashboardCore.initializeTabl
 
 .forced-history-scroll{max-height:520px;overflow:auto;position:relative}.forced-history-scroll table{border-collapse:separate;border-spacing:0}.forced-history-scroll thead th{position:sticky;top:0;z-index:4;background:var(--card-bg2,#1e293b);box-shadow:0 1px 0 var(--border)}.forced-history-scroll thead th:first-child{z-index:5}
 /* Direction of change is separate from the existing risk-number colour. */
-.history-table td.history-improved{box-shadow:inset 0 0 0 2px var(--green,#10b981);}
-.history-table td.history-worsened{box-shadow:inset 0 0 0 2px #b44875;}
 
 
 :root {
@@ -1614,6 +1690,14 @@ html.workspace-enabled {scroll-behavior:auto;}
 .workspace-enabled ::-webkit-scrollbar-track {background:#101c25;}
 .workspace-enabled ::-webkit-scrollbar-thumb {background:#4a6570;border:3px solid #101c25;border-radius:8px;}
 .workspace-enabled ::-webkit-scrollbar-corner {background:#101c25;}
+
+/* Comparison edges sit inside the cell grid; severity text retains its own color. */
+table td.history-improved,table td.history-worsened {position:relative;box-shadow:none;--comparison-edge:#35d49a;}
+table td.history-worsened {--comparison-edge:#fb7185;}
+table td.history-improved::after,table td.history-worsened::after {content:"";position:absolute;inset:5px;border:2px solid var(--comparison-edge);border-radius:5px;pointer-events:none;}
+table td:is(.history-improved,.history-worsened):has(input)::after {display:none;}
+table td:is(.history-improved,.history-worsened) input {border:2px solid var(--comparison-edge);box-shadow:none;}
+table td.column-is-collapsed::after {display:none;}
 
 </style>
 </head>
@@ -2974,6 +3058,7 @@ function renderAnalysisHistory() {
   body.replaceChildren();
   for (const r of [...analysisRecords].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
     const tr = document.createElement("tr");
+    tr.dataset.comparisonDate = r.createdAt;
     for (const text of [new Date(r.createdAt).toLocaleString(), r.day, analysisRange(r.total), ...r.categories.map(analysisRange), r.responseSavedAt ? new Date(r.responseSavedAt).toLocaleString() : "Pending"]) {
       const td2 = document.createElement("td");
       td2.textContent = text;
@@ -4028,7 +4113,7 @@ async function renderRestoreTables() {
         const values = "values" in row ? row.values : void 0;
         const rest = { ...row };
         delete rest.values;
-        return values ? { ...rest, ...values } : { ...row };
+        return values ? { ...rest, ...kind === "market" && "savedAt" in row && "values" in row ? historyComparisonValues(row, true) : {}, ...values } : { ...row };
       };
       const fields = [...new Set(items.flatMap((x) => Object.keys(flat(x.row))))];
       const details = document.createElement("details"), summary = document.createElement("summary");
@@ -4070,7 +4155,7 @@ async function renderRestoreTables() {
       table.appendChild(head);
       const body = document.createElement("tbody");
       table.appendChild(body);
-      for (const item of items.slice(page * 50, page * 50 + 50)) {
+      for (const [offset, item] of items.slice(page * 50, page * 50 + 50).entries()) {
         const tr = document.createElement("tr");
         const cell = (text) => {
           const td = document.createElement("td");
@@ -4092,10 +4177,25 @@ async function renderRestoreTables() {
         cell("").appendChild(restore);
         cell(item.current ? "Existing" : "Deleted");
         cell(item.deletedAt || "\u2014");
+        tr.dataset.comparisonDate = restoreSortTime(item.row);
+        const prior = items[page * 50 + offset + 1], previous = prior ? flat(prior.row) : {};
         const data = flat(item.row);
         for (const key of fields) {
           const value = data[key], td = cell("");
           td.className = "history-normal";
+          if (kind === "market" && "values" in item.row && "savedAt" in item.row) {
+            const values = item.row.values, day = localCalendarDate(new Date(item.row.savedAt));
+            if (key === "composite") {
+              const score = Number(value);
+              td.className = typeof value === "string" && /^\d+$/.test(value) ? score >= 16 ? "history-red" : score >= 5 ? "history-amber" : "history-normal" : "history-normal";
+            } else if (key === "cpPoints" || key === "nasdaqPoints") {
+              const score = Number(value);
+              td.className = typeof value === "string" && /^\d+$/.test(value) ? score >= 3 ? "history-red" : score > 0 ? "history-amber" : "history-normal" : "history-normal";
+            } else if (historyColumns.some(([field]) => field === key)) td.className = historyRisk(key, values[key], values).className;
+            else if (forcedColumns.some(([field]) => field === key)) td.className = forcedFieldRisk(key, values, day);
+            const number = (v) => typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : v;
+            applyHistoryChangeOutline(td, key, number(value), number(previous[key]), prior ? restoreSortTime(prior.row) : "");
+          }
           if (value != null && (typeof value === "object" || String(value).length > 200)) {
             const d = document.createElement("details"), label = document.createElement("summary"), pre = document.createElement("pre");
             label.textContent = "View complete " + key;
@@ -4418,10 +4518,22 @@ function historyComparisonValues(entry, displayMode = false) {
   return values;
 }
 function applyHistoryChangeOutline(cell, key, current, previous, previousDate) {
+  cell.dataset.comparisonExplicit = "true";
+  if (cell.dataset.comparisonTitle) {
+    cell.title = cell.title.replace(cell.dataset.comparisonTitle, "");
+    delete cell.dataset.comparisonTitle;
+  }
+  const input = cell.querySelector("input");
+  if (input && !input.dataset.comparisonBound) {
+    input.dataset.comparisonBound = "true";
+    input.addEventListener("input", () => applyHistoryChangeOutline(cell, key, input.value.trim() === "" ? null : Number(input.value), previous, previousDate));
+  }
+  cell.classList.remove("history-improved", "history-worsened");
   const cls = historyChangeDirection(key, current, previous);
   if (!cls) return;
   cell.className += (cell.className ? " " : "") + cls;
-  cell.title += (cell.title ? " \xB7 " : "") + (cls === "history-improved" ? "Improved" : "Worsened") + " versus preceding entry (" + previousDate + "): " + previous + " \u2192 " + current + ". Direction follows the dashboard risk convention.";
+  cell.dataset.comparisonTitle = (cell.title ? " \xB7 " : "") + (cls === "history-improved" ? "Improved" : "Worsened") + " versus preceding entry (" + previousDate + "): " + previous + " \u2192 " + current + ". Direction follows the dashboard risk convention.";
+  cell.title += cell.dataset.comparisonTitle;
 }
 const historyPageSize = 50;
 const historyPages = /* @__PURE__ */ Object.create(null);
@@ -4718,7 +4830,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
       tr.appendChild(td);
     });
     const previousEntry = entries[start + index + 1];
-    if (prefix === "history" && previousEntry) {
+    if (previousEntry) {
       if (!comparisonCache.has(previousEntry)) comparisonCache.set(previousEntry, historyComparisonValues(previousEntry));
       const previous = comparisonCache.get(previousEntry), previousDate = previousEntry.observationDate || new Date(previousEntry.savedAt || Date.now()).toLocaleString();
       for (const [key, input] of Object.entries({ ...numberInputs, ...overrideInputs })) {
@@ -6402,6 +6514,7 @@ function renderFunding() {
   body.replaceChildren();
   [...visible].sort((a, b) => b.observationDate.localeCompare(a.observationDate)).forEach((r) => {
     const tr = document.createElement("tr");
+    tr.dataset.comparisonDate = r.observationDate;
     const cell = (text) => {
       const td = document.createElement("td");
       td.textContent = text;
