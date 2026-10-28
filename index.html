@@ -1701,9 +1701,11 @@ table td:is(.history-improved,.history-worsened) input {border:2px solid var(--c
 table td.column-is-collapsed::after {display:none;}
 
 /* Tint each risk value with its own text hue; neutral values keep the dark surface. */
-.workspace-screen table td:is(.history-amber,.history-red),
-.workspace-screen table td:has(input:is(.history-amber,.history-red)) {
- background:color-mix(in srgb,var(--risk-tint) 22%,#17272a);
+.workspace-screen table td:is(.history-amber,.history-red):not(:has(input)) {
+ background-image:linear-gradient(color-mix(in srgb,var(--risk-tint) 22%,#17272a),color-mix(in srgb,var(--risk-tint) 22%,#17272a));
+ background-size:calc(100% - 10px) calc(100% - 10px);
+ background-position:center;
+ background-repeat:no-repeat;
 }
 .workspace-screen table td.history-amber,
 .workspace-screen table td:has(input.history-amber) {--risk-tint:#f5bb4b;}
