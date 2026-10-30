@@ -2463,6 +2463,14 @@ placeholder="Paste 39 comma-separated values: 35 market fields + 4 dates…" ari
 <details class="overview-details dashboard-section" name="dashboard-panels" id="troubleshootSyncPanel">
 <summary tabindex="-1" id="troubleshootSyncHeading">Troubleshoot Sync</summary>
 <div class="control-panel">
+<h3>Account backup and restore</h3>
+<p class="table-note">Download all saved dashboard histories, AI analyses and documents, recovery copies, cached FRED data, saved FRED key and layout settings. Keep the private backup file and a copy of index.html outside this browser. Save edits and sync first to include cloud changes. Passwords and login sessions are not included. If your login account is lost, register a new account before restoring; a deleted login service must be recovered by its administrator.</p>
+<div class="btn-container">
+<button type="button" data-onclick="backupAccount">Backup Account</button>
+<button type="button" data-onclick="chooseAccountRestore">Restore Account</button>
+<input type="file" id="restoreAccountFile" accept=".json,application/json" hidden data-onchange="restoreAccount">
+</div>
+<p id="accountBackupStatus" role="status" aria-live="polite" class="table-note"></p>
 <div style="display:flex;flex-wrap:wrap;gap:8px;">
             <button class="secondary" data-onclick="exportCloudComparison-46">Export local and cloud backup for AI comparison</button>
             <button class="secondary" id="overwriteCloudBtn" data-onclick="showCloudOverwrite-47">Overwrite cloud with local</button>
@@ -3599,7 +3607,7 @@ async function applyRestoredLocalSnapshot(owner, snapshot) {
     } catch {
       rollbackFailed = true;
     }
-    throw Error("Cloud restored, but local storage could not be restored. Sync remains paused. " + (rollbackFailed ? "Recover the preserved backup before continuing." : "Previous local data was kept; free browser storage outside this site and retry.") + " " + errorMessage(error));
+    throw Error("Local storage could not be restored. Sync remains paused. " + (rollbackFailed ? "Recover the preserved backup before continuing." : "Previous local data was kept; free browser storage outside this site and retry.") + " " + errorMessage(error));
   }
 }
 function compareRestoreSnapshot(local, imported) {
@@ -3798,6 +3806,107 @@ async function syncNow() {
     }
   } finally {
     manualSyncPending = false;
+  }
+}
+
+let accountBackupBusy = false;
+async function createAccountBackup() {
+  const owner = historyOwner;
+  if (!owner) throw Error("Sign in before backing up your account.");
+  const snapshot = localSnapshot(owner);
+  validateSyncSnapshot(snapshot);
+  const recovery = await recoveryBackups(owner);
+  if (owner !== historyOwner) throw Error("Account changed; backup cancelled.");
+  if (snapshotFingerprint(snapshot) !== snapshotFingerprint(localSnapshot(owner))) throw Error("Saved data changed during backup. Try again.");
+  return { format: "crash-risk-account-backup-v1", createdAt: (/* @__PURE__ */ new Date()).toISOString(), owner, email: requiredElement("loggedInEmail").textContent || "", snapshot, recovery, fredKey: localStorage.getItem(fredKeyStorage()), layout: localStorage.getItem("crash-risk-platform-layout"), instructions: "Keep this private file and a copy of index.html outside browser/cloud storage. Sign in or register a new account, then use Sync & backups > Restore Account. Saved browser data, documents, recovery copies, FRED key and layout are included. Unsaved edits and cloud-only changes not loaded into this browser are excluded: sync before backup if needed. Passwords and login sessions are excluded. Recreating a deleted authentication service requires its administrator; this file cannot recreate that service. After restore, review the data and use Sync now or Overwrite cloud with local to repopulate cloud storage." };
+}
+function parseAccountBackup(text) {
+  const file = providerObject(JSON.parse(text));
+  if (file.format !== "crash-risk-account-backup-v1" || typeof file.owner !== "string" || !file.owner || typeof file.createdAt !== "string" || !Number.isFinite(Date.parse(file.createdAt)) || typeof file.email !== "string") throw Error("Select a valid Backup Account JSON file.");
+  const snapshot = providerObject(file.snapshot);
+  for (const key of Object.keys(snapshotKeys(""))) if (!Object.hasOwn(snapshot, key)) throw Error("Incomplete backup: missing " + key + ".");
+  validateSyncSnapshot(snapshot);
+  if (!file.recovery || typeof file.recovery !== "object" || Array.isArray(file.recovery)) throw Error("Incomplete backup: missing recovery records.");
+  const recovery = providerObject(file.recovery);
+  for (const [key, value] of Object.entries(recovery)) {
+    if (!(key.startsWith("crash-risk-recovery-v1:" + file.owner + ":") || key === "crash-risk-history-backup-v1:" + file.owner) || typeof value !== "string") throw Error("Invalid recovery record.");
+  }
+  if (file.fredKey !== null && typeof file.fredKey !== "string") throw Error("Invalid FRED key.");
+  if (file.layout !== null && !["desktop", "mobile"].includes(String(file.layout))) throw Error("Invalid layout setting.");
+  return { ...file, snapshot, recovery };
+}
+async function backupAccount() {
+  if (accountBackupBusy) return;
+  accountBackupBusy = true;
+  try {
+    const backup = await createAccountBackup(), url = URL.createObjectURL(new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" })), link = document.createElement("a");
+    link.href = url;
+    link.download = "crash-risk-account-" + backup.createdAt.replaceAll(":", "-") + ".json";
+    document.body.append(link);
+    try {
+      link.click();
+    } finally {
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1e3);
+    }
+    setAppFeedback("accountBackupStatus", "Account backup download started. Keep this private file and index.html somewhere outside this browser.");
+  } catch (error) {
+    setAppFeedback("accountBackupStatus", "Backup failed: " + errorMessage(error), "error");
+  } finally {
+    accountBackupBusy = false;
+  }
+}
+async function restoreAccountData(backup, owner) {
+  backup = parseAccountBackup(JSON.stringify(backup));
+  if (!owner || historyOwner !== owner) throw Error("Sign in to the destination account first.");
+  if (cloudOverwritePending || manualSyncPending || syncChoiceResolve || syncPushPending) throw Error("Finish the current sync operation before restoring.");
+  stopAutoSync();
+  syncReadyOwner = null;
+  syncChoiceDeferred = true;
+  const previous = await createAccountBackup();
+  await saveRecoverySnapshot(owner, "before-account-restore-" + Date.now(), previous);
+  if (historyOwner !== owner) throw Error("Account changed; restore cancelled.");
+  const key = fredKeyStorage(), oldKey = localStorage.getItem(key), oldLayout = localStorage.getItem("crash-risk-platform-layout");
+  try {
+    const tag = "account-import-" + Date.now() + ":";
+    for (const [source, value] of Object.entries(backup.recovery)) {
+      const suffix = source.startsWith("crash-risk-recovery-v1:") ? source.slice(("crash-risk-recovery-v1:" + backup.owner + ":").length) : "previous-market-history";
+      const target = "crash-risk-recovery-v1:" + owner + ":" + tag + suffix;
+      if (window.indexedDB) await recoveryDatabase("readwrite", (store) => store.put({ key: target, value }));
+      else localStorage.setItem(target, value);
+    }
+    if (historyOwner !== owner) throw Error("Account changed; restore cancelled.");
+    if (backup.fredKey === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, backup.fredKey);
+    if (backup.layout === null) localStorage.removeItem("crash-risk-platform-layout");
+    else localStorage.setItem("crash-risk-platform-layout", backup.layout);
+    await applyRestoredLocalSnapshot(owner, backup.snapshot);
+  } catch (error) {
+    if (oldKey === null) localStorage.removeItem(key);
+    else localStorage.setItem(key, oldKey);
+    if (oldLayout === null) localStorage.removeItem("crash-risk-platform-layout");
+    else localStorage.setItem("crash-risk-platform-layout", oldLayout);
+    throw error;
+  }
+  loadEntryHistory(owner);
+  renderDashboard();
+  if (backup.layout === "desktop" || backup.layout === "mobile") setPlatformLayout(backup.layout);
+}
+async function restoreAccount(input) {
+  const file = input.files?.[0], owner = historyOwner;
+  input.value = "";
+  if (!file || accountBackupBusy) return;
+  accountBackupBusy = true;
+  try {
+    const backup = parseAccountBackup(await file.text());
+    if (!owner || owner !== historyOwner) throw Error("Sign in to the destination account first.");
+    if (!confirm("Restore account data from " + backup.createdAt + " (" + backup.email + ") into " + requiredElement("loggedInEmail").textContent + "? This replaces saved dashboard data in this browser. A recovery copy is kept first. Cloud sync stays paused.")) return;
+    await restoreAccountData(backup, owner);
+    setAppFeedback("accountBackupStatus", "Account data restored. Review the histories, then use Sync now or Overwrite cloud with local to restore cloud storage. Automatic sync is paused.");
+  } catch (error) {
+    setAppFeedback("accountBackupStatus", "Account restore failed: " + errorMessage(error), "error");
+  } finally {
+    accountBackupBusy = false;
   }
 }
 
@@ -6908,6 +7017,15 @@ function renderLiquidityDiagnostics() {
 document.addEventListener("DOMContentLoaded", renderLiquidityDiagnostics);
 
 const dashboardActions = {
+  "backupAccount": () => {
+    void backupAccount();
+  },
+  "chooseAccountRestore": () => {
+    requiredElement("restoreAccountFile").click();
+  },
+  "restoreAccount": (_event, element) => {
+    if (element instanceof HTMLInputElement) void restoreAccount(element);
+  },
   "handleLogin-1": (event, element) => {
     if (event instanceof SubmitEvent) handleLogin(event);
   },
