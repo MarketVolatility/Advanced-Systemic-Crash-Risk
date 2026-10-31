@@ -67,6 +67,12 @@ var DashboardCore = (() => {
     yenMomentumPoints: () => yenMomentumPoints
   });
 
+  // src/core/defined.ts
+  function requiredValue(value) {
+    if (value === null || value === void 0) throw new Error("Required value is missing.");
+    return value;
+  }
+
   // src/core/types.ts
   var INPUT_KEYS = [
     "vix",
@@ -129,7 +135,7 @@ var DashboardCore = (() => {
   }
   function sellingVolumeRange(v) {
     const validRange = isFiniteNumber(v.sp500) && isFiniteNumber(v.sp_high) && isFiniteNumber(v.sp_low) && v.sp_high > v.sp_low && v.sp500 >= v.sp_low && v.sp500 <= v.sp_high;
-    const nearLow = validRange ? (v.sp500 - v.sp_low) / (v.sp_high - v.sp_low) <= 0.25 : null;
+    const nearLow = validRange ? (requiredValue(v.sp500) - requiredValue(v.sp_low)) / (requiredValue(v.sp_high) - requiredValue(v.sp_low)) <= 0.25 : null;
     const negative = isFiniteNumber(v.sp500_chg) ? v.sp500_chg < 0 : null;
     const selling = negative === true || nearLow === true ? true : negative === false && nearLow === false ? false : null;
     const ratio = isFiniteNumber(v.volume) && v.volume > 0 && isFiniteNumber(v.volume_avg) && v.volume_avg > 0 ? v.volume / v.volume_avg : null;
@@ -292,7 +298,7 @@ var DashboardCore = (() => {
         const iso = raw.slice(0, 4) + "-" + raw.slice(4, 6) + "-" + raw.slice(6, 8);
         if (!/^\d{8}$/.test(raw) || !Number.isFinite(Date.parse(iso)) || new Date(iso).toISOString().slice(0, 10) !== iso) return { ok: false, error: "All four dates must be real calendar dates in YYYYMMDD format." };
       }
-      const equity = dates[0];
+      const equity = requiredValue(dates[0]);
       values.equitySessionDate = equity.slice(0, 4) + "-" + equity.slice(4, 6) + "-" + equity.slice(6, 8);
       values.cp_financial_date = Number(dates[1]);
       values.cp_nonfinancial_date = Number(dates[2]);
@@ -336,7 +342,7 @@ var DashboardCore = (() => {
   }
   function setPlatformLayout(mode, persist = true) {
     if (!isPlatform(mode)) return;
-    document.documentElement.dataset.platform = mode;
+    document.documentElement.dataset["platform"] = mode;
     const viewport = document.querySelector('meta[name="viewport"]');
     if (viewport) viewport.content = "width=device-width, initial-scale=1.0";
     if (persist) {
@@ -356,7 +362,7 @@ var DashboardCore = (() => {
     }
     const mode = isPlatform(saved) ? saved : window.matchMedia("(max-width:800px)").matches ? "mobile" : "desktop";
     setPlatformLayout(mode, false);
-    document.addEventListener("DOMContentLoaded", () => setPlatformLayout(document.documentElement.dataset.platform ?? mode, false));
+    document.addEventListener("DOMContentLoaded", () => setPlatformLayout(document.documentElement.dataset["platform"] ?? mode, false));
   }
 
   // src/ui/workspace.ts
@@ -429,7 +435,7 @@ var DashboardCore = (() => {
       }
       const link = element("a", "workspace-nav-link");
       link.href = "#" + screen.target;
-      link.dataset.screen = screen.id;
+      link.dataset["screen"] = screen.id;
       const icon = element("span", "workspace-nav-icon", screen.icon);
       icon.setAttribute("aria-hidden", "true");
       link.append(icon, element("span", "", screen.title));
@@ -440,7 +446,7 @@ var DashboardCore = (() => {
     main.id = "workspaceMain";
     for (const screen of screens) {
       const section = element("section", "workspace-screen");
-      section.dataset.screen = screen.id;
+      section.dataset["screen"] = screen.id;
       section.setAttribute("aria-labelledby", "screen-title-" + screen.id);
       section.append(addHeader(screen));
       containers.set(screen.id, section);
@@ -570,10 +576,10 @@ var DashboardCore = (() => {
       parent = parent.parentElement;
     }
     for (const link of document.querySelectorAll(".workspace-nav-link")) {
-      if (link.dataset.screen === active.dataset.screen) link.setAttribute("aria-current", "page");
+      if (link.dataset["screen"] === active.dataset["screen"]) link.setAttribute("aria-current", "page");
       else link.removeAttribute("aria-current");
     }
-    const screen = screens.find((s) => s.id === active.dataset.screen);
+    const screen = screens.find((s) => s.id === active.dataset["screen"]);
     document.title = (screen?.title ?? "Overview") + " \xB7 Systemic";
     if (focus) {
       active.querySelector(".workspace-title")?.focus({ preventScroll: true });
@@ -591,7 +597,7 @@ var DashboardCore = (() => {
   var lowerBetter = /total.*50|volatility.*10|credit.*14|macro.*8|equity.*12|forced selling.*6|financial.*(?:nonfinancial|treasury)|score|points|minimum|maximum|vix|move|oas|yield|wti|margin|debt|spread|balance|weekly change|hike/i;
   var nonMeasure = /date|time|month|year|ceiling|maximum possible|reference|source|entry|delete|restore|status/i;
   function headerLabel(cell) {
-    return cell.querySelector(".column-visibility-toggle")?.dataset.columnLabel ?? cell.textContent ?? "";
+    return cell.querySelector(".column-visibility-toggle")?.dataset["columnLabel"] ?? cell.textContent ?? "";
   }
   function numericCell(cell) {
     const input = cell.querySelector("input");
@@ -602,8 +608,8 @@ var DashboardCore = (() => {
     return Number.isFinite(value) ? value : null;
   }
   function rowTime(row, headers) {
-    if (row.dataset.comparisonDate) {
-      const t = Date.parse(row.dataset.comparisonDate);
+    if (row.dataset["comparisonDate"]) {
+      const t = Date.parse(row.dataset["comparisonDate"]);
       return Number.isFinite(t) ? t : null;
     }
     for (let i = 0; i < headers.length; i++) {
@@ -626,14 +632,14 @@ var DashboardCore = (() => {
     for (const body of table.tBodies) {
       const rows = [...body.rows].map((row) => ({ row, time: rowTime(row, headers) })).filter((r) => r.time !== null).sort((a, b) => a.time - b.time);
       for (let r = 0; r < rows.length; r++) {
-        const current = rows[r], previous = rows[r - 1];
+        const current = requiredValue(rows[r]), previous = rows[r - 1];
         for (let c = 0; c < current.row.cells.length; c++) {
-          const cell = current.row.cells[c];
-          if (cell.dataset.comparisonExplicit === "true") continue;
+          const cell = requiredValue(current.row.cells[c]);
+          if (cell.dataset["comparisonExplicit"] === "true") continue;
           cell.classList.remove("history-improved", "history-worsened");
-          if (cell.dataset.comparisonTitle) {
-            cell.title = cell.title.replace(cell.dataset.comparisonTitle, "");
-            delete cell.dataset.comparisonTitle;
+          if (cell.dataset["comparisonTitle"]) {
+            cell.title = cell.title.replace(cell.dataset["comparisonTitle"], "");
+            delete cell.dataset["comparisonTitle"];
           }
           const label = headers[c] ?? "";
           if (!previous || nonMeasure.test(label) || cell.colSpan !== 1) continue;
@@ -649,7 +655,7 @@ var DashboardCore = (() => {
           const direction = higherBetter.test(label) ? 1 : lowerBetter.test(label) ? -1 : 1;
           cell.classList.add((a - b) * direction > 0 ? "history-improved" : "history-worsened");
           const note = ` \xB7 ${a > b ? "Increased" : "Decreased"} from ${b} to ${a} versus ${new Date(previous.time).toISOString().slice(0, 10)}${!higherBetter.test(label) && !lowerBetter.test(label) ? "; numeric direction only, not a risk assessment" : ""}.`;
-          cell.dataset.comparisonTitle = note;
+          cell.dataset["comparisonTitle"] = note;
           cell.title += note;
         }
       }
@@ -674,7 +680,7 @@ var DashboardCore = (() => {
         button = document.createElement("button");
         button.type = "button";
         button.className = "column-visibility-toggle";
-        button.dataset.columnLabel = label;
+        button.dataset["columnLabel"] = label;
         button.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
@@ -688,7 +694,7 @@ var DashboardCore = (() => {
       }
       const collapsed = hidden.has(start);
       button.textContent = collapsed ? "+" : "\u2212";
-      button.title = (collapsed ? "Show " : "Hide ") + button.dataset.columnLabel;
+      button.title = (collapsed ? "Show " : "Hide ") + button.dataset["columnLabel"];
       button.setAttribute("aria-label", button.title);
       button.setAttribute("aria-expanded", String(!collapsed));
     }
@@ -755,14 +761,14 @@ var DashboardCore = (() => {
       const key = (root.id || "section") + ":" + (heading.id || (heading.textContent || "").trim());
       const fold = document.createElement("details");
       fold.className = "subsection-fold";
-      fold.dataset.headingLevel = String(level);
+      fold.dataset["headingLevel"] = String(level);
       const summary = document.createElement("summary");
       parent.insertBefore(fold, heading);
       summary.appendChild(heading);
       fold.appendChild(summary);
       while (fold.nextSibling) {
         const next = fold.nextSibling;
-        const nextLevel = next instanceof HTMLElement ? next.matches("h2,h3,h4") ? Number(next.tagName.slice(1)) : Number(next.dataset?.headingLevel) || 0 : 0;
+        const nextLevel = next instanceof HTMLElement ? next.matches("h2,h3,h4") ? Number(next.tagName.slice(1)) : Number(next.dataset?.["headingLevel"]) || 0 : 0;
         if (nextLevel && nextLevel <= level) break;
         fold.appendChild(next);
       }
@@ -2498,6 +2504,36 @@ function errorMessage(error) {
 function finiteNumber(value) {
   return Number.isFinite(value);
 }
+function parseJson(text) {
+  return JSON.parse(text);
+}
+function unknownArray(value) {
+  return Array.isArray(value);
+}
+function checkedString(value) {
+  if (typeof value !== "string") throw Error("Expected text.");
+  return value;
+}
+function checkedNumber(value) {
+  if (!finiteNumber(value)) throw Error("Expected a finite number.");
+  return value;
+}
+function nullableString(value) {
+  return value == null ? null : checkedString(value);
+}
+function nullableNumber(value) {
+  return value == null ? null : checkedNumber(value);
+}
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !unknownArray(value);
+}
+function optionalTextFields(value, keys) {
+  return keys.every((key) => value[key] === void 0 || typeof value[key] === "string");
+}
+function requiredValue(value) {
+  if (value === null || value === void 0) throw Error("Required value is missing.");
+  return value;
+}
 
 function requiredElement(id) {
   const element = document.getElementById(id);
@@ -2668,10 +2704,10 @@ function editAnalysisRow(id, tr) {
     td.replaceChildren();
     const input = document.createElement("input");
     input.type = i === 0 || i === 8 ? "datetime-local" : i === 1 ? "date" : "text";
-    input.value = values[i];
+    input.value = requiredValue(values[i]);
     input.step = "1";
-    input.setAttribute("aria-label", ["Request time", "Entry date", "Total score", ...analysisNames, "Response saved time"][i]);
-    input.className = i > 1 && i < 8 ? "history-value-input " + analysisCellColor(i === 2 ? row.total : row.categories[i - 3], i === 2 ? 50 : [10, 14, 8, 12, 6][i - 3]) : "history-date-input";
+    input.setAttribute("aria-label", requiredValue(["Request time", "Entry date", "Total score", ...analysisNames, "Response saved time"][i]));
+    input.className = i > 1 && i < 8 ? "history-value-input " + analysisCellColor(i === 2 ? row.total : requiredValue(row.categories[i - 3]), i === 2 ? 50 : requiredValue([10, 14, 8, 12, 6][i - 3])) : "history-date-input";
     input.title = i > 1 && i < 8 ? "Score or range; incomplete ranges stay white." : "Edit and click Save on this row.";
     if (i === 8 && !row.response.trim()) {
       input.type = "text";
@@ -2682,7 +2718,7 @@ function editAnalysisRow(id, tr) {
     td.appendChild(input);
     inputs.push(input);
   });
-  const actions = tr.children[9];
+  const actions = requiredValue(tr.children[9]);
   const save = document.createElement("button");
   save.textContent = "Save";
   save.type = "button";
@@ -2696,11 +2732,11 @@ function editAnalysisRow(id, tr) {
         if (low > high || high > max) throw Error("Score is outside its category maximum.");
         return { low, high };
       };
-      const total = parse(inputs[2].value, 50), categories = row.categories.map((c, i) => ({ ...c, ...parse(inputs[i + 3].value, [10, 14, 8, 12, 6][i]) }));
+      const total = parse(requiredValue(inputs[2]).value, 50), categories = row.categories.map((c, i) => ({ ...c, ...parse(requiredValue(inputs[i + 3]).value, requiredValue([10, 14, 8, 12, 6][i])) }));
       if (total.low !== categories.reduce((n, c) => n + c.low, 0) || total.high !== categories.reduce((n, c) => n + c.high, 0)) throw Error("Total must equal the sum of the five category scores (including both range bounds).");
-      if (!inputs[0].value || !inputs[1].value) throw Error("Request time and entry date are required.");
-      if (row.response.trim() && !inputs[8].value) throw Error("A saved response needs a saved time.");
-      const updated = { ...row, createdAt: new Date(inputs[0].value).toISOString(), day: inputs[1].value, total, categories, responseSavedAt: row.response.trim() && inputs[8].value ? new Date(inputs[8].value).toISOString() : null, editedAt: (/* @__PURE__ */ new Date()).toISOString(), originalSnapshot: row.originalSnapshot || { createdAt: row.createdAt, day: row.day, total: row.total, categories: row.categories, responseSavedAt: row.responseSavedAt } };
+      if (!requiredValue(inputs[0]).value || !requiredValue(inputs[1]).value) throw Error("Request time and entry date are required.");
+      if (row.response.trim() && !requiredValue(inputs[8]).value) throw Error("A saved response needs a saved time.");
+      const updated = { ...row, createdAt: new Date(requiredValue(inputs[0]).value).toISOString(), day: requiredValue(inputs[1]).value, total, categories, responseSavedAt: row.response.trim() && requiredValue(inputs[8]).value ? new Date(requiredValue(inputs[8]).value).toISOString() : null, editedAt: (/* @__PURE__ */ new Date()).toISOString(), originalSnapshot: row.originalSnapshot || { createdAt: row.createdAt, day: row.day, total: row.total, categories: row.categories, responseSavedAt: row.responseSavedAt } };
       if (await persistAnalyses(analysisRecords.map((r) => r.id === id ? updated : r))) analysisMessage("History row updated. Original prompt and market inputs are retained; table edits do not recalculate the dashboard.");
     } catch (e) {
       analysisMessage(errorMessage(e));
@@ -2731,16 +2767,17 @@ function analysisRange(r) {
   return r.low === r.high ? String(r.low) : r.low + "\u2013" + r.high;
 }
 function validateAnalysisHistory(rows) {
-  const validRange = (value, max) => {
-    if (!value || typeof value !== "object") return false;
-    const r = value;
-    return finiteNumber(r.low) && finiteNumber(r.high) && r.low >= 0 && r.high >= r.low && r.high <= max;
+  const textOrNull = (v) => v === null || typeof v === "string";
+  const validRange = (value, max) => isRecord(value) && finiteNumber(value["low"]) && finiteNumber(value["high"]) && value["low"] >= 0 && value["high"] >= value["low"] && value["high"] <= max;
+  const categories = (v) => unknownArray(v) && v.length === 5 && v.every((c, i) => isRecord(c) && typeof c["name"] === "string" && finiteNumber(c["maximum"]) && validRange(c, requiredValue([10, 14, 8, 12, 6][i])));
+  const snapshot = (v) => isRecord(v) && typeof v["createdAt"] === "string" && typeof v["day"] === "string" && validRange(v["total"], 50) && categories(v["categories"]) && textOrNull(v["responseSavedAt"]);
+  const record = (r) => {
+    if (!isRecord(r) || !snapshot(r) || typeof r["id"] !== "string" || !finiteNumber(Date.parse(checkedString(r["createdAt"]))) || !["prompt", "questions", "response"].every((k) => typeof r[k] === "string") || !textOrNull(r["entryTime"]) || !validMarketValues(r["values"]) || !optionalTextFields(r, ["editedAt"])) return false;
+    const word = r["word"];
+    if (word != null && (!isRecord(word) || !["text", "base64", "name"].every((k) => typeof word[k] === "string") || !optionalTextFields(word, ["xml"]) || !["styles", "numbering"].every((k) => word[k] === void 0 || textOrNull(word[k])))) return false;
+    return (r["originalSnapshot"] === void 0 || snapshot(r["originalSnapshot"])) && (r["recentScores"] === void 0 || unknownArray(r["recentScores"]));
   };
-  if (!Array.isArray(rows) || rows.some((value) => {
-    if (!value || typeof value !== "object") return true;
-    const r = value;
-    return typeof r.id !== "string" || typeof r.createdAt !== "string" || !finiteNumber(Date.parse(r.createdAt)) || typeof r.day !== "string" || typeof r.prompt !== "string" || typeof r.questions !== "string" || typeof r.response !== "string" || !validRange(r.total, 50) || !Array.isArray(r.categories) || r.categories.length !== 5 || r.categories.some((c, i) => !validRange(c, [10, 14, 8, 12, 6][i]));
-  })) throw Error("Invalid analysis history");
+  if (!unknownArray(rows) || !rows.every(record)) throw Error("Invalid analysis history");
   return rows;
 }
 function loadAnalyses() {
@@ -2755,7 +2792,7 @@ function loadAnalyses() {
   requiredElement("analysisSnapshotLabel").textContent = "";
   analysisMessage("");
   try {
-    analysisRecords = validateAnalysisHistory(JSON.parse(readAppStorage(analysisKey()) || "[]"));
+    analysisRecords = validateAnalysisHistory(parseJson(readAppStorage(analysisKey()) || "[]"));
   } catch {
     analysisLoadError = true;
     analysisMessage("Stored analyses could not be loaded. Saving is disabled to protect the existing data.");
@@ -2789,7 +2826,7 @@ function analysisHasEdits() {
 function analysisRecentScores(endDay = localCalendarDate(/* @__PURE__ */ new Date())) {
   const latestByDay = /* @__PURE__ */ new Map();
   for (const row of historyDisplayEntries()) {
-    const day = row.reference ? row.observationDate : localCalendarDate(new Date(row.savedAt));
+    const day = row.reference ? requiredValue(row.observationDate) : localCalendarDate(new Date(row.savedAt));
     if (!latestByDay.has(day)) latestByDay.set(day, row);
   }
   const days = [];
@@ -2801,22 +2838,22 @@ function analysisRecentScores(endDay = localCalendarDate(/* @__PURE__ */ new Dat
       days.push({ day, source: "No entry available", total: null, categories: null, factors: null });
       continue;
     }
-    const categories = Object.values(regimeCharts).map((c, i) => ({ name: analysisNames[i], maximum: c.maximum, ...c.forced ? forcedCategoryRange(row.values, day) : historicalScoreRange(row.values, c.keys, day) }));
+    const categories = Object.values(regimeCharts).map((c, i) => ({ name: requiredValue(analysisNames[i]), maximum: c.maximum, ...c.forced ? forcedCategoryRange(row.values, day) : historicalScoreRange(row.values, c.keys, day) }));
     const factors = Object.values(regimeCharts).flatMap((c) => c.keys.map((key) => ({ name: metricConfig[key].name, maximum: metricConfig[key].maxPoints, ...metricPointRange(key, row.values, day) })));
     const forced = forcedPoints(row.values, day);
     factors.push({ name: "Margin leverage pressure", maximum: 2, low: forced.leverage ?? 0, high: forced.leverage ?? 2 }, { name: "Selling volume pressure", maximum: 2, low: forced.pressureLow, high: forced.pressureHigh });
-    days.push({ day, source: row.reference ? "Embedded historical reference" : "Personal saved entry", savedAt: row.savedAt, total: compositeRange(row.values, day), categories, factors, values: JSON.parse(JSON.stringify(row.values)), derived: model50Inputs(row.values, day) });
+    days.push({ day, source: row.reference ? "Embedded historical reference" : "Personal saved entry", savedAt: row.savedAt, total: compositeRange(row.values, day), categories, factors, values: { ...row.values }, derived: model50Inputs(row.values, day) });
   }
   return days;
 }
 function analysisRecentScorePrompt(days) {
   const headers = ["Date", "Source", "Total /50", "Volatility /10", "Credit /14", "Macro /8", "Equity Structure /12", "Forced Selling /6"];
-  const table = [headers.join(" | "), headers.map(() => "---").join(" | "), ...days.map((r) => [r.day, r.source, ...r.total ? [analysisRange(r.total), ...r.categories.map(analysisRange)] : Array(6).fill("Unavailable")].join(" | "))].join("\n");
+  const table = [headers.join(" | "), headers.map(() => "---").join(" | "), ...days.map((r) => [r.day, r.source, ...r.total ? [analysisRange(r.total), ...requiredValue(r.categories).map(analysisRange)] : Array(6).fill("Unavailable")].join(" | "))].join("\n");
   const available = days.filter((r) => r.factors), factorNames = available[0]?.factors || [];
   const detailHeaders = ["Date", ...factorNames.map((f) => f.name + " /" + f.maximum)];
   const details = factorNames.length ? [detailHeaders.join(" | "), detailHeaders.map(() => "---").join(" | "), ...days.map((r) => [r.day, ...r.factors ? r.factors.map(analysisRange) : factorNames.map(() => "Unavailable")].join(" | "))].join("\n") : "No indicator-level history available in this window.";
   const rawHistory = days.map((r) => ({ entryDate: r.day, source: r.source, values: r.values ?? null, derived: r.derived ?? null }));
-  return `LAST 14 CALENDAR DAYS OF RISK SCORES (${days[0].day} through ${days.at(-1).day}, inclusive; ending on the request date)
+  return `LAST 14 CALENDAR DAYS OF RISK SCORES (${requiredValue(days[0]).day} through ${requiredValue(days.at(-1)).day}, inclusive; ending on the request date)
 ${table}
 
 INDICATOR CONTRIBUTIONS WITHIN THE FIVE CATEGORIES (points, not raw market values)
@@ -2834,7 +2871,7 @@ async function analysisFullHistoryPrompt() {
   const clean = (value) => String(value ?? "Unavailable").replace(/[\t\r\n]+/g, " ");
   const computed = [];
   for (let i = 0; i < rows.length; i++) {
-    const row = rows[i], display = historyComparisonValues(row, true), day = row.observationDate || localCalendarDate(new Date(row.savedAt || Date.now()));
+    const row = requiredValue(rows[i]), display = historyComparisonValues(row, true), day = row.observationDate || localCalendarDate(new Date(row.savedAt || Date.now()));
     for (const [key, value] of Object.entries(row.historyOverrides || {})) display[key] = value && typeof value === "object" ? analysisRange(value) : value;
     for (const key of ["sp500", ...marketColumns.map((c) => c[0])]) if (finiteNumber(display[key])) display[key] = display[key].toFixed(2);
     computed.push({ row, day, display });
@@ -2842,7 +2879,7 @@ async function analysisFullHistoryPrompt() {
   }
   const lines = [["Entry", "Date", "Time", "Source", ...specs.map((c) => c[1])].join("	")];
   for (let i = 0; i < computed.length; i++) {
-    const { row, day, display } = computed[i], previous = computed[i + 1]?.display;
+    const { row, day, display } = requiredValue(computed[i]), previous = computed[i + 1]?.display;
     const number = (v) => v !== null && v !== void 0 && String(v).trim() !== "" && Number.isFinite(Number(v)) ? Number(v) : null;
     const cells = specs.map(([key]) => {
       const value = display[key], direction = previous ? historyChangeDirection(key, number(value), number(previous[key])) : "";
@@ -2859,8 +2896,8 @@ async function generateAnalysisPrompt() {
   }
   if (analysisHasEdits() && !window.confirm("Replace unsaved prompt or response edits with a new request?")) return;
   const createdAt = (/* @__PURE__ */ new Date()).toISOString(), day = currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(/* @__PURE__ */ new Date());
-  const values = JSON.parse(JSON.stringify(currentData)), total = compositeRange(values, day);
-  const categories = Object.values(regimeCharts).map((c, i) => ({ name: analysisNames[i], maximum: c.maximum, ...c.forced ? forcedCategoryRange(values, day) : historicalScoreRange(values, c.keys, day) }));
+  const values = { ...currentData }, total = compositeRange(values, day);
+  const categories = Object.values(regimeCharts).map((c, i) => ({ name: requiredValue(analysisNames[i]), maximum: c.maximum, ...c.forced ? forcedCategoryRange(values, day) : historicalScoreRange(values, c.keys, day) }));
   const questions = requiredElement("analysisQuestions").value.trim() || analysisDefaultQuestions;
   const factors = Object.values(regimeCharts).flatMap((c) => c.keys.map((k) => ({ indicator: metricConfig[k].name, ...metricPointRange(k, values, day), maximum: metricConfig[k].maxPoints })));
   const recentScores = analysisRecentScores(localCalendarDate(new Date(createdAt)));
@@ -2978,7 +3015,7 @@ function exportAnalysisWord() {
   const blob = original ? new Blob([Uint8Array.from(atob(original), (c) => c.charCodeAt(0))], { type: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" }) : analysisWordBlob(prompt, response);
   const url = URL.createObjectURL(blob), a = document.createElement("a");
   a.href = url;
-  a.download = original ? analysisWordDraft.name : "AI-analysis-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".docx";
+  a.download = original ? requiredValue(analysisWordDraft).name : "AI-analysis-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".docx";
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 1e3);
   analysisMessage(original ? "Original Word document downloaded with its formatting unchanged." : "Word document exported with the displayed prompt and response.");
@@ -3124,15 +3161,15 @@ function renderAnalysisHistory() {
   body.replaceChildren();
   for (const r of [...analysisRecords].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt))) {
     const tr = document.createElement("tr");
-    tr.dataset.comparisonDate = r.createdAt;
-    for (const text of [new Date(r.createdAt).toLocaleString(), r.day, analysisRange(r.total), ...r.categories.map(analysisRange), r.responseSavedAt ? new Date(r.responseSavedAt).toLocaleString() : "Pending"]) {
+    tr.dataset["comparisonDate"] = r.createdAt;
+    for (const text of [new Date(r.createdAt).toLocaleString(), r.day, analysisRange(r.total), ...requiredValue(r.categories).map(analysisRange), r.responseSavedAt ? new Date(r.responseSavedAt).toLocaleString() : "Pending"]) {
       const td2 = document.createElement("td");
       td2.textContent = text;
       tr.appendChild(td2);
     }
     if (r.editedAt) {
-      tr.cells[0].textContent += " \xB7 Edited";
-      tr.cells[0].title = "Edited " + new Date(r.editedAt).toLocaleString() + ". Original snapshot retained.";
+      requiredValue(tr.cells[0]).textContent += " \xB7 Edited";
+      requiredValue(tr.cells[0]).title = "Edited " + new Date(r.editedAt).toLocaleString() + ". Original snapshot retained.";
     }
     const td = document.createElement("td"), button = document.createElement("button");
     button.type = "button";
@@ -3211,16 +3248,16 @@ async function initializeAccountStorage(owner) {
   if (!window.indexedDB) return;
   const key = "crash-risk-analysis-v1:" + owner, storedAnalysis = localStorage.getItem(key);
   if (storedAnalysis !== null) {
-    validateAnalysisHistory(JSON.parse(storedAnalysis));
+    validateAnalysisHistory(parseJson(storedAnalysis));
     await recoveryDatabase("readwrite", (store) => store.put({ key, value: storedAnalysis }));
-    const checked = await recoveryDatabase("readonly", (store) => store.get(key));
+    const checked = await readRecoveryRecord(key);
     if (checked?.value !== storedAnalysis) throw Error("Analysis storage migration could not be verified. Original data kept.");
     if (localStorage.getItem(key) !== storedAnalysis) throw Error("Analysis changed during migration. Retry loading.");
     largeStorageCache.set(key, storedAnalysis);
     localStorage.removeItem(key);
   } else {
-    const saved = await recoveryDatabase("readonly", (store) => store.get(key));
-    if (saved?.value != null) validateAnalysisHistory(JSON.parse(saved.value));
+    const saved = await readRecoveryRecord(key);
+    if (saved?.value != null) validateAnalysisHistory(parseJson(saved.value));
     largeStorageCache.set(key, saved?.value ?? null);
   }
   const keys = [];
@@ -3232,7 +3269,7 @@ async function initializeAccountStorage(owner) {
     const value = localStorage.getItem(k);
     if (value == null) continue;
     await recoveryDatabase("readwrite", (store) => store.put({ key: k, value }));
-    const checked = await recoveryDatabase("readonly", (store) => store.get(k));
+    const checked = await readRecoveryRecord(k);
     if (checked?.value === value && localStorage.getItem(k) === value) localStorage.removeItem(k);
   }
 }
@@ -3245,16 +3282,22 @@ function validateSyncSnapshot(value) {
   for (const field of Object.keys(snapshotKeys(""))) {
     if (data[field] == null) continue;
     if (typeof data[field] !== "string") throw Error("Invalid " + field);
-    const rows = JSON.parse(data[field]);
+    const rows = parseJson(data[field]);
     if (field === "fredHistory") {
       validateFredData(rows);
       continue;
     }
-    if (!Array.isArray(rows)) throw Error("Invalid " + field);
+    if (!unknownArray(rows)) throw Error("Invalid " + field);
     if (field === "entryHistory" && rows.some((row) => !readableHistoryRow(row))) throw Error("Invalid market history; original copies preserved");
     if (field === "fedWatchHistory") rows.forEach(validateFedWatch);
     if (field === "fundingHistory") rows.forEach(validateFunding);
     if (field === "analysisHistory") validateAnalysisHistory(rows);
+  }
+}
+function validateCompleteSnapshot(value) {
+  validateSyncSnapshot(value);
+  for (const key of Object.keys(snapshotKeys(""))) {
+    if (value[key] !== null && typeof value[key] !== "string") throw Error("Incomplete snapshot: " + key);
   }
 }
 function snapshotFingerprint(data) {
@@ -3281,33 +3324,42 @@ async function cloudMatchesSavedBaseline(owner, data) {
     return false;
   }
 }
+function checkedRecoveryRecord(value) {
+  if (!isRecord(value) || typeof value["key"] !== "string" || typeof value["value"] !== "string") throw Error("Invalid recovery record; original storage preserved.");
+  return { key: value["key"], value: value["value"] };
+}
+async function readRecoveryRecord(key) {
+  const value = await recoveryDatabase("readonly", (store) => store.get(key));
+  return value === void 0 ? void 0 : checkedRecoveryRecord(value);
+}
 function recoveryDatabase(mode, operation) {
   return new Promise((resolve, reject) => {
     let db, transaction, finished = false;
-    const finish = (error, result) => {
+    const finish = (outcome) => {
       if (finished) return;
       finished = true;
       clearTimeout(timer);
       if (db) db.close();
-      error ? reject(error) : resolve(result);
+      outcome.ok ? resolve(outcome.result) : reject(outcome.error);
     };
+    const fail = (error) => finish({ ok: false, error });
     const timer = setTimeout(() => {
       try {
         transaction?.abort();
       } catch {
       }
-      finish(Error("Backup storage timed out. Cloud was not overwritten."));
+      fail(Error("Backup storage timed out. Cloud was not overwritten."));
     }, 15e3);
     let request;
     try {
       request = window.indexedDB.open("crash-risk-recovery-v1", 1);
     } catch (error) {
-      finish(error);
+      fail(error);
       return;
     }
     request.onupgradeneeded = () => request.result.createObjectStore("snapshots", { keyPath: "key" });
-    request.onerror = () => finish(request.error || Error("Backup storage could not open."));
-    request.onblocked = () => finish(Error("Backup storage is blocked by another tab. Close other dashboard tabs and retry."));
+    request.onerror = () => fail(request.error || Error("Backup storage could not open."));
+    request.onblocked = () => fail(Error("Backup storage is blocked by another tab. Close other dashboard tabs and retry."));
     request.onsuccess = () => {
       db = request.result;
       if (finished) {
@@ -3317,11 +3369,11 @@ function recoveryDatabase(mode, operation) {
       try {
         transaction = db.transaction("snapshots", mode);
         const result = operation(transaction.objectStore("snapshots"));
-        transaction.oncomplete = () => finish(null, result.result);
-        transaction.onerror = () => finish(transaction.error || Error("Backup could not be saved."));
-        transaction.onabort = () => finish(transaction.error || Error("Backup was cancelled."));
+        transaction.oncomplete = () => finish({ ok: true, result: result.result });
+        transaction.onerror = () => fail(transaction?.error || Error("Backup could not be saved."));
+        transaction.onabort = () => fail(transaction?.error || Error("Backup was cancelled."));
       } catch (error) {
-        finish(error);
+        fail(error);
       }
     };
   });
@@ -3331,7 +3383,7 @@ async function saveRecoverySnapshot(owner, label, data) {
   if (localStorage.getItem(key)) return;
   const value = JSON.stringify({ savedAt: (/* @__PURE__ */ new Date()).toISOString(), data });
   if (window.indexedDB) {
-    const existing = await recoveryDatabase("readonly", (store) => store.get(key));
+    const existing = await readRecoveryRecord(key);
     if (!existing) await recoveryDatabase("readwrite", (store) => store.put({ key, value }));
   } else localStorage.setItem(key, value);
 }
@@ -3339,10 +3391,12 @@ async function recoveryBackups(owner) {
   const backups = {}, prefix = "crash-risk-recovery-v1:" + owner + ":";
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key?.startsWith(prefix) || key === "crash-risk-history-backup-v1:" + owner) backups[key] = localStorage.getItem(key);
+    if (key?.startsWith(prefix) || key === "crash-risk-history-backup-v1:" + owner) backups[key] = requiredValue(localStorage.getItem(key));
   }
   if (window.indexedDB) {
-    const records = await recoveryDatabase("readonly", (store) => store.getAll());
+    const raw = await recoveryDatabase("readonly", (store) => store.getAll());
+    if (!unknownArray(raw)) throw Error("Invalid recovery database; original storage preserved.");
+    const records = raw.map(checkedRecoveryRecord);
     for (const record of records) if ((record.key.startsWith(prefix) || record.key === "crash-risk-history-backup-v1:" + owner) && !Object.hasOwn(backups, record.key)) backups[record.key] = record.value;
   }
   return backups;
@@ -3361,9 +3415,12 @@ async function cloudComparisonData() {
     const manual = label.startsWith("before-manual-overwrite-");
     if (!manual && !["cloud-before-conflict", "cloud-first-seen", "cloud-conflict"].includes(label)) continue;
     try {
-      const record = JSON.parse(value);
-      if (!Number.isFinite(Date.parse(record.savedAt))) continue;
-      candidates.push({ manual, label, savedAt: record.savedAt, cloud: manual ? record.data.cloud : record.data, localAtBackup: manual ? record.data.local : null, cloudUpdatedAt: manual ? record.data.cloudUpdatedAt : null });
+      const record = providerObject(parseJson(value)), savedAt = checkedString(record["savedAt"]);
+      if (!Number.isFinite(Date.parse(savedAt))) continue;
+      const data = providerObject(record["data"]), cloud = manual ? data["cloud"] : data, localAtBackup = manual ? data["local"] : null;
+      if (cloud != null) validateSyncSnapshot(cloud);
+      if (localAtBackup != null) validateSyncSnapshot(localAtBackup);
+      candidates.push({ manual, label, savedAt, cloud: cloud ?? null, localAtBackup: localAtBackup ?? null, cloudUpdatedAt: manual ? nullableString(data["cloudUpdatedAt"]) : null });
     } catch {
     }
   }
@@ -3371,7 +3428,7 @@ async function cloudComparisonData() {
   const last = candidates[0];
   const decode = (snapshot) => snapshot == null ? null : Object.fromEntries(Object.entries(snapshot).map(([key, value]) => {
     try {
-      return [key, typeof value === "string" ? JSON.parse(value) : value];
+      return [key, typeof value === "string" ? parseJson(value) : value];
     } catch {
       return [key, { unreadableRaw: value }];
     }
@@ -3423,11 +3480,12 @@ function syncCopySummary(snapshot) {
   let newest = 0, marketCount = 0;
   for (const field of Object.keys(snapshotKeys(""))) {
     try {
-      const rows = JSON.parse(snapshot?.[field] || "null");
-      if (!Array.isArray(rows)) continue;
+      const rows = parseJson(snapshot?.[field] || "null");
+      if (!unknownArray(rows)) continue;
       if (field === "entryHistory") marketCount = rows.length;
-      for (const row of rows) for (const key of ["updatedAt", "savedAt", "createdAt", "fetchedAt"]) {
-        const stamp = Date.parse(row?.[key]);
+      for (const row of rows) if (isRecord(row)) for (const key of ["updatedAt", "savedAt", "createdAt", "fetchedAt"]) {
+        const value = row[key];
+        const stamp = typeof value === "string" ? Date.parse(value) : NaN;
         if (Number.isFinite(stamp)) newest = Math.max(newest, stamp);
       }
     } catch {
@@ -3613,18 +3671,18 @@ async function applyRestoredLocalSnapshot(owner, snapshot) {
 function compareRestoreSnapshot(local, imported) {
   const canonical = (value) => JSON.stringify(normalize(value));
   function normalize(value) {
-    if (Array.isArray(value)) return value.map(normalize);
+    if (unknownArray(value)) return value.map(normalize);
     if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, normalize(value[key])]));
     return value;
   }
   const labels = { entryHistory: "Market history", analysisHistory: "AI analyses", fundingHistory: "Funding records", fedWatchHistory: "Fed Watch", fredHistory: "FRED data" };
   const differences = [];
   for (const field of Object.keys(snapshotKeys(""))) {
-    const a = local[field] == null ? null : JSON.parse(local[field]), b = imported[field] == null ? null : JSON.parse(imported[field]);
+    const a = local[field] == null ? null : parseJson(local[field]), b = imported[field] == null ? null : parseJson(imported[field]);
     if (canonical(a) === canonical(b)) continue;
     const count = (value) => {
-      if (Array.isArray(value)) return value.length;
-      if (value && typeof value === "object" && "rows" in value && Array.isArray(value.rows)) return value.rows.length;
+      if (unknownArray(value)) return value.length;
+      if (value && typeof value === "object" && "rows" in value && unknownArray(value.rows)) return value.rows.length;
       return 0;
     };
     differences.push(labels[field] + ": local " + count(a) + " records; imported " + count(b) + " records. Content differs.");
@@ -3632,17 +3690,17 @@ function compareRestoreSnapshot(local, imported) {
   return differences;
 }
 function parseCloudRestore(text) {
-  const file = JSON.parse(text);
-  if (file?.format !== "crash-risk-cloud-local-comparison-v1") throw Error("Select a crash-risk-local-cloud-comparison JSON file.");
-  const cloud = file.lastPreservedCloud;
-  if (!cloud || typeof cloud !== "object" || Array.isArray(cloud)) throw Error("This file contains no previous cloud record to restore.");
+  const file = providerObject(parseJson(text));
+  if (file["format"] !== "crash-risk-cloud-local-comparison-v1") throw Error("Select a crash-risk-local-cloud-comparison JSON file.");
+  const cloud = providerObject(file["lastPreservedCloud"]);
+  if (!cloud || typeof cloud !== "object" || unknownArray(cloud)) throw Error("This file contains no previous cloud record to restore.");
   const snapshot = {};
   for (const field of Object.keys(snapshotKeys(""))) {
     if (!Object.hasOwn(cloud, field)) throw Error("The previous cloud copy is incomplete: missing " + field + ".");
-    if (field !== "fredHistory" && !Array.isArray(cloud[field])) throw Error("Invalid " + field + " in previous cloud copy.");
+    if (field !== "fredHistory" && !unknownArray(cloud[field])) throw Error("Invalid " + field + " in previous cloud copy.");
     snapshot[field] = cloud[field] === null ? null : JSON.stringify(cloud[field]);
   }
-  validateSyncSnapshot(snapshot);
+  validateCompleteSnapshot(snapshot);
   return snapshot;
 }
 async function importCloudRestore(input) {
@@ -3676,7 +3734,7 @@ function showCloudOverwrite(restoreSnapshot = null) {
     const snapshot = localSnapshot(historyOwner);
     validateSyncSnapshot(snapshot);
     if (restoreSnapshot) validateSyncSnapshot(restoreSnapshot);
-    const rows = JSON.parse((restoreSnapshot || snapshot).entryHistory ?? "[]");
+    const rows = validatedMarketHistory(parseJson((restoreSnapshot || snapshot).entryHistory ?? "[]"));
     const differences = restoreSnapshot ? compareRestoreSnapshot(snapshot, restoreSnapshot) : [];
     cloudOverwriteSelection = { owner: historyOwner, fingerprint: snapshotFingerprint(snapshot), restoreSnapshot, differences };
     setAppFeedback("cloudRestoreDifferences", restoreSnapshot ? differences.length ? "Imported data differs from current local data:\n" + differences.join("\n") + "\nEnter your password and select Restore to approve replacing these differences." : "The imported copy matches current local data." : "");
@@ -3717,7 +3775,7 @@ async function overwriteCloudWithLocal(event) {
     setAppFeedback(status, "Verifying your password\u2026");
     const { data: identity, error: identityError } = await awaitSyncRequest(client.auth.getUser());
     if (identityError || identity?.user?.id !== owner || !identity.user.email) throw Error("Please sign in again before replacing cloud data.");
-    const verified = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "crash-risk-overwrite-verification" } });
+    const verified = requiredValue(window.supabase).createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false, storageKey: "crash-risk-overwrite-verification" } });
     const { data: login, error: loginError } = await awaitSyncRequest(verified.auth.signInWithPassword({ email: identity.user.email, password }));
     password = "";
     if (loginError || login?.user?.id !== owner || !login.session) throw Error("Password verification failed. No cloud data was replaced.");
@@ -3821,19 +3879,20 @@ async function createAccountBackup() {
   return { format: "crash-risk-account-backup-v1", createdAt: (/* @__PURE__ */ new Date()).toISOString(), owner, email: requiredElement("loggedInEmail").textContent || "", snapshot, recovery, fredKey: localStorage.getItem(fredKeyStorage()), layout: localStorage.getItem("crash-risk-platform-layout"), instructions: "Keep this private file and a copy of index.html outside browser/cloud storage. Sign in or register a new account, then use Sync & backups > Restore Account. Saved browser data, documents, recovery copies, FRED key and layout are included. Unsaved edits and cloud-only changes not loaded into this browser are excluded: sync before backup if needed. Passwords and login sessions are excluded. Recreating a deleted authentication service requires its administrator; this file cannot recreate that service. After restore, review the data and use Sync now or Overwrite cloud with local to repopulate cloud storage." };
 }
 function parseAccountBackup(text) {
-  const file = providerObject(JSON.parse(text));
-  if (file.format !== "crash-risk-account-backup-v1" || typeof file.owner !== "string" || !file.owner || typeof file.createdAt !== "string" || !Number.isFinite(Date.parse(file.createdAt)) || typeof file.email !== "string") throw Error("Select a valid Backup Account JSON file.");
-  const snapshot = providerObject(file.snapshot);
+  const file = providerObject(parseJson(text));
+  if (file["format"] !== "crash-risk-account-backup-v1" || typeof file["owner"] !== "string" || !file["owner"] || typeof file["createdAt"] !== "string" || !Number.isFinite(Date.parse(file["createdAt"])) || typeof file["email"] !== "string") throw Error("Select a valid Backup Account JSON file.");
+  const snapshot = providerObject(file["snapshot"]);
   for (const key of Object.keys(snapshotKeys(""))) if (!Object.hasOwn(snapshot, key)) throw Error("Incomplete backup: missing " + key + ".");
-  validateSyncSnapshot(snapshot);
-  if (!file.recovery || typeof file.recovery !== "object" || Array.isArray(file.recovery)) throw Error("Incomplete backup: missing recovery records.");
-  const recovery = providerObject(file.recovery);
-  for (const [key, value] of Object.entries(recovery)) {
-    if (!(key.startsWith("crash-risk-recovery-v1:" + file.owner + ":") || key === "crash-risk-history-backup-v1:" + file.owner) || typeof value !== "string") throw Error("Invalid recovery record.");
+  validateCompleteSnapshot(snapshot);
+  if (!file["recovery"] || typeof file["recovery"] !== "object" || unknownArray(file["recovery"])) throw Error("Incomplete backup: missing recovery records.");
+  const recovery = {};
+  for (const [key, value] of Object.entries(providerObject(file["recovery"]))) {
+    if (!(key.startsWith("crash-risk-recovery-v1:" + file["owner"] + ":") || key === "crash-risk-history-backup-v1:" + file["owner"]) || typeof value !== "string") throw Error("Invalid recovery record.");
+    recovery[key] = value;
   }
-  if (file.fredKey !== null && typeof file.fredKey !== "string") throw Error("Invalid FRED key.");
-  if (file.layout !== null && !["desktop", "mobile"].includes(String(file.layout))) throw Error("Invalid layout setting.");
-  return { ...file, snapshot, recovery };
+  if (file["fredKey"] !== null && typeof file["fredKey"] !== "string") throw Error("Invalid FRED key.");
+  if (file["layout"] !== null && !["desktop", "mobile"].includes(String(file["layout"]))) throw Error("Invalid layout setting.");
+  return { ...file, format: "crash-risk-account-backup-v1", owner: file["owner"], createdAt: file["createdAt"], email: file["email"], snapshot, recovery, fredKey: file["fredKey"], layout: nullableString(file["layout"]), instructions: typeof file["instructions"] === "string" ? file["instructions"] : "" };
 }
 async function backupAccount() {
   if (accountBackupBusy) return;
@@ -4062,7 +4121,10 @@ async function checkExistingSession() {
   }
 }
 
-const metricConfig = DashboardCore.metricConfig;
+const metricConfig = Object.assign(DashboardCore.metricConfig, {
+  cp_stress: { name: "Commercial-paper funding stress", maxPoints: 3, format: (n) => n.toFixed(0) + " points" },
+  leadership: { name: "Nasdaq 100 / S&P 500 20-matched-observation momentum", maxPoints: 3, format: (n) => n.toFixed(2) + "%" }
+});
 
 let currentData = {
   vix: 15.72,
@@ -4115,15 +4177,30 @@ function writeMarketHistory(raw) {
   localStorage.setItem(historyKey(), raw);
 }
 let historyReadBlocked = false;
+function validMarketValues(value) {
+  if (!isRecord(value)) return false;
+  return DashboardCore.INPUT_KEYS.every((key) => value[key] === void 0 || value[key] === null || finiteNumber(value[key])) && optionalTextFields(value, ["equitySessionDate"]) && ["cp_financial_date", "cp_nonfinancial_date", "cp_treasury_date"].every((key) => value[key] === void 0 || finiteNumber(value[key]));
+}
 function validSnapshot(value) {
-  if (!value || typeof value !== "object") return false;
-  const values = value;
+  if (!validMarketValues(value)) return false;
+  const values = providerObject(value);
   return historyColumns.every(([key]) => Object.hasOwn(values, key) && (values[key] === null || finiteNumber(values[key]))) && ["sp500", "nasdaq", "nasdaq100"].every((key) => values[key] == null || finiteNumber(values[key]) && values[key] > 0);
 }
 function readableHistoryRow(value) {
-  if (!value || typeof value !== "object") return false;
+  if (!isRecord(value)) return false;
   const row = value;
-  return typeof row.savedAt === "string" && finiteNumber(Date.parse(row.savedAt)) && validSnapshot(row.values);
+  if (typeof row["savedAt"] !== "string" || !finiteNumber(Date.parse(row["savedAt"])) || !validSnapshot(row["values"]) || !optionalTextFields(row, ["id", "observationDate", "updatedAt", "entryLabel", "sourceReferenceDate", "cpCheckedAt", "reconciledAt"]) || row["reference"] !== void 0 && typeof row["reference"] !== "boolean") return false;
+  const overrides = row["historyOverrides"];
+  if (overrides === void 0) return true;
+  if (!isRecord(overrides) || !optionalTextFields(overrides, ["scoredCpDate"]) || overrides["nasdaqMomentum"] !== void 0 && !finiteNumber(overrides["nasdaqMomentum"])) return false;
+  return ["composite", "cpPoints", "nasdaqPoints"].every((k) => {
+    const range = overrides[k];
+    return range === void 0 || isRecord(range) && finiteNumber(range["low"]) && finiteNumber(range["high"]);
+  });
+}
+function validatedMarketHistory(value) {
+  if (!unknownArray(value) || !value.every(readableHistoryRow)) throw Error("Invalid market history; original copies preserved");
+  return value;
 }
 function loadEntryHistory(userId) {
   historyPreviewHidden = false;
@@ -4139,8 +4216,8 @@ function loadEntryHistory(userId) {
   currentData = { ...defaultData };
   try {
     const raw = localStorage.getItem(historyKey());
-    const saved = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(saved)) throw new Error("Invalid stored history");
+    const saved = raw ? parseJson(raw) : [];
+    if (!unknownArray(saved)) throw new Error("Invalid stored history");
     const readable = saved.filter(readableHistoryRow);
     if (readable.length !== saved.length) {
       historyReadBlocked = true;
@@ -4148,8 +4225,8 @@ function loadEntryHistory(userId) {
     }
     entryHistory = readable.sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
     if (entryHistory.length) {
-      currentData = { ...entryHistory[0].values };
-      currentEntryTime = entryHistory[0].savedAt;
+      currentData = { ...requiredValue(entryHistory[0]).values };
+      currentEntryTime = requiredValue(entryHistory[0]).savedAt;
     }
   } catch (error) {
     historyReadBlocked = true;
@@ -4175,14 +4252,16 @@ function restoreActive(kind) {
   return tables[kind];
 }
 function restoreIdentity(kind, row) {
-  if (kind === "market") return row.savedAt;
-  if (kind === "analysis") return row.id;
-  if (kind === "funding") {
-    const r2 = row;
-    return r2.id || r2.observationDate + "|" + r2.publishedAt;
-  }
-  const r = row;
-  return JSON.stringify([r.meetingDate, r.observedAt, r.publishedAt, r.source]);
+  if (kind === "market" && "savedAt" in row) return row.savedAt;
+  if (kind === "analysis" && "id" in row) return row.id;
+  if (kind === "funding" && "balance" in row) return row.id || row.observationDate + "|" + row.publishedAt;
+  if (kind === "fed" && "meetingDate" in row) return JSON.stringify([row.meetingDate, row.observedAt, row.publishedAt, row.source]);
+  throw Error("Recovery record does not match its table.");
+}
+function validatedRestoreRow(kind, value) {
+  if (kind === "market") return requiredValue(validatedMarketHistory([value])[0]);
+  if (kind === "analysis") return requiredValue(validateAnalysisHistory([value])[0]);
+  return kind === "fed" ? validateFedWatch(value) : validateFunding(value);
 }
 async function archiveDeletedRows(kind, rows) {
   if (!historyOwner) throw Error("Sign in before deleting rows.");
@@ -4192,34 +4271,41 @@ async function archiveDeletedRows(kind, rows) {
 }
 async function writeRestoredRows(kind, rows) {
   if (kind === "market") {
-    const next = rows.slice().sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
+    const next = validatedMarketHistory(rows).slice().sort((a, b) => Date.parse(b.savedAt) - Date.parse(a.savedAt));
     writeMarketHistory(JSON.stringify(next));
     entryHistory = next;
     currentEntryTime = next[0]?.savedAt || null;
-    currentData = next.length ? { ...next[0].values } : { ...defaultData };
+    currentData = next.length ? { ...requiredValue(next[0]).values } : { ...defaultData };
     historyPreviewHidden = !next.length;
     model50Cache = null;
     renderDashboard();
   } else if (kind === "analysis") {
-    if (!await persistAnalyses(rows)) throw Error("Analysis storage could not be saved.");
-    if (!rows.some((r) => r.id === activeAnalysisId)) {
+    const checked = validateAnalysisHistory(rows);
+    if (!await persistAnalyses(checked)) throw Error("Analysis storage could not be saved.");
+    if (!checked.some((r) => r.id === activeAnalysisId)) {
       activeAnalysisId = null;
       analysisWordDraft = null;
       requiredElement("analysisResponse").value = "";
       refreshAnalysisPreview();
     }
   } else if (kind === "fed") {
-    persistFedWatch(rows);
+    persistFedWatch(rows.map(validateFedWatch));
     renderFedWatch();
-  } else persistFunding(rows);
+  } else persistFunding(rows.map(validateFunding));
 }
 async function restoreArchiveEntries(owner) {
   const backups = await recoveryBackups(owner), items = [];
   for (const [key, raw] of Object.entries(backups)) {
     try {
-      const record = JSON.parse(raw), d = record.data;
-      if ((key.includes(":row-trash-") || key.includes(":deleted-history-")) && ["market", "analysis", "fed", "funding"].includes(d?.kind) && Array.isArray(d.rows)) d.rows.forEach((row) => items.push({ kind: d.kind, row, deletedAt: d.deletedAt, key }));
-      else if (key.includes(":deleted-history-") && d?.entryHistory) JSON.parse(d.entryHistory).forEach((row) => items.push({ kind: "market", row, deletedAt: d.deletedAt, key }));
+      const record = providerObject(parseJson(raw)), d = providerObject(record["data"]), kind = d["kind"];
+      const metadata = typeof d["deletedAt"] === "string" ? { deletedAt: d["deletedAt"], key } : { key };
+      if ((key.includes(":row-trash-") || key.includes(":deleted-history-")) && unknownArray(d["rows"])) {
+        const rows = d["rows"];
+        if (kind === "market") validatedMarketHistory(rows).forEach((row) => items.push({ kind, row, ...metadata }));
+        else if (kind === "analysis") validateAnalysisHistory(rows).forEach((row) => items.push({ kind, row, ...metadata }));
+        else if (kind === "fed") rows.map(validateFedWatch).forEach((row) => items.push({ kind, row, ...metadata }));
+        else if (kind === "funding") rows.map(validateFunding).forEach((row) => items.push({ kind, row, ...metadata }));
+      } else if (key.includes(":deleted-history-") && typeof d["entryHistory"] === "string") validatedMarketHistory(parseJson(d["entryHistory"])).forEach((row) => items.push({ kind: "market", row, ...metadata }));
     } catch {
     }
   }
@@ -4229,7 +4315,7 @@ async function removeArchiveRow(owner, kind, row) {
   const entries = await restoreArchiveEntries(owner), id = restoreIdentity(kind, row);
   for (const key of new Set(entries.filter((x) => x.kind === kind && restoreIdentity(kind, x.row) === id).map((x) => x.key).filter((key2) => !!key2))) {
     const remaining = entries.filter((x) => x.key === key && !(x.kind === kind && restoreIdentity(kind, x.row) === id));
-    const value = remaining.length ? JSON.stringify({ savedAt: (/* @__PURE__ */ new Date()).toISOString(), data: { kind: remaining[0].kind, rows: remaining.map((x) => x.row), deletedAt: remaining[0].deletedAt } }) : null;
+    const value = remaining.length ? JSON.stringify({ savedAt: (/* @__PURE__ */ new Date()).toISOString(), data: { kind: requiredValue(remaining[0]).kind, rows: remaining.map((x) => x.row), deletedAt: requiredValue(remaining[0]).deletedAt } }) : null;
     if (window.indexedDB) {
       if (value) await recoveryDatabase("readwrite", (store) => store.put({ key, value }));
       else await recoveryDatabase("readwrite", (store) => store.delete(key));
@@ -4250,7 +4336,7 @@ async function restoreRowAction(kind, row, permanent = false) {
     if (permanent) {
       if (existing) await writeRestoredRows(kind, current.filter((r) => restoreIdentity(kind, r) !== id));
     } else if (existing) throw Error("An entry with the same identity already exists. No data was replaced.");
-    else await writeRestoredRows(kind, [...current, JSON.parse(JSON.stringify(row))]);
+    else await writeRestoredRows(kind, [...current, validatedRestoreRow(kind, parseJson(JSON.stringify(row)))]);
     if (historyOwner !== owner) throw Error("Account changed; stopped.");
     await removeArchiveRow(owner, kind, row);
     await renderRestoreTables();
@@ -4264,7 +4350,7 @@ async function restoreRowAction(kind, row, permanent = false) {
 async function renderRestoreTables() {
   const host = requiredElement("restoreTables");
   if (!host) return;
-  const openTables = new Set([...host.children].filter((d) => d instanceof HTMLDetailsElement && d.open).map((d) => d.dataset.title));
+  const openTables = new Set([...host.children].filter((d) => d instanceof HTMLDetailsElement && d.open).map((d) => d.dataset["title"]));
   const owner = historyOwner, version = ++restoreRenderVersion;
   host.replaceChildren();
   if (!owner) return;
@@ -4279,13 +4365,13 @@ async function renderRestoreTables() {
       const flat = (row) => {
         const values = "values" in row ? row.values : void 0;
         const rest = { ...row };
-        delete rest.values;
+        delete rest["values"];
         return values ? { ...rest, ...kind === "market" && "savedAt" in row && "values" in row ? historyComparisonValues(row, true) : {}, ...values } : { ...row };
       };
       const fields = [...new Set(items.flatMap((x) => Object.keys(flat(x.row))))];
       const details = document.createElement("details"), summary = document.createElement("summary");
       summary.textContent = title + " \xB7 " + items.length + " rows";
-      details.dataset.title = title;
+      details.dataset["title"] = title;
       details.open = openTables.has(title);
       details.appendChild(summary);
       host.appendChild(details);
@@ -4344,7 +4430,7 @@ async function renderRestoreTables() {
         cell("").appendChild(restore);
         cell(item.current ? "Existing" : "Deleted");
         cell(item.deletedAt || "\u2014");
-        tr.dataset.comparisonDate = restoreSortTime(item.row);
+        tr.dataset["comparisonDate"] = restoreSortTime(item.row);
         const prior = items[page * 50 + offset + 1], previous = prior ? flat(prior.row) : {};
         const data = flat(item.row);
         for (const key of fields) {
@@ -4420,7 +4506,7 @@ async function deleteHistoryEntry(entry) {
   historyStorageError = "";
   if (wasCurrent) {
     currentEntryTime = remaining[0]?.savedAt || null;
-    currentData = remaining.length ? { ...remaining[0].values } : { ...defaultData };
+    currentData = remaining.length ? { ...requiredValue(remaining[0]).values } : { ...defaultData };
     historyPreviewHidden = !remaining.length;
   }
   renderDashboard();
@@ -4434,7 +4520,7 @@ const historyOverrideFields = [["composite", "Composite Crash Risk Score", 50], 
 function parseHistoryOverrides(inputs, existing, day) {
   const result = { ...existing };
   for (const [key, label, max] of historyOverrideFields) {
-    const input = inputs[key], raw = input.value.trim();
+    const input = requiredValue(inputs[key]), raw = input.value.trim();
     if (!raw) {
       delete result[key];
       continue;
@@ -4446,7 +4532,7 @@ function parseHistoryOverrides(inputs, existing, day) {
       result[key] = raw;
     } else if (key === "composite" || key === "cpPoints" || key === "nasdaqPoints") {
       const m = raw.match(/^(\d+)(?:\s*[–-]\s*(\d+))?$/);
-      if (!m || Number(m[1]) > Number(m[2] ?? m[1]) || Number(m[2] ?? m[1]) > max) throw Error(label + " must be a whole number or range from 0 to " + max + ".");
+      if (!m || Number(m[1]) > Number(m[2] ?? m[1]) || Number(m[2] ?? m[1]) > requiredValue(max)) throw Error(label + " must be a whole number or range from 0 to " + max + ".");
       result[key] = { low: Number(m[1]), high: Number(m[2] ?? m[1]) };
     } else {
       const n = Number(raw);
@@ -4532,8 +4618,8 @@ function updateEntryDateTime(entry, dateText, timeText, values = entry.values, h
   entryHistory = updated;
   historyStorageError = "";
   if (entryHistory.length) {
-    currentEntryTime = entryHistory[0].savedAt;
-    currentData = { ...entryHistory[0].values };
+    currentEntryTime = requiredValue(entryHistory[0]).savedAt;
+    currentData = { ...requiredValue(entryHistory[0]).values };
   }
   renderDashboard();
   return true;
@@ -4584,7 +4670,7 @@ function setAllChartRanges(range) {
   if (!["1w", "1m", "3m", "6m", "9m", "1y", "2y", "3y", "4y", "5y"].includes(range)) return;
   const chartIds = ["riskChart", ...Object.keys(regimeCharts)];
   chartIds.forEach((id) => {
-    document.querySelector("#" + id + "Range").value = range;
+    requiredValue(document.querySelector("#" + id + "Range")).value = range;
   });
   chartIds.forEach((id) => renderRiskChart(id));
   requiredElement("fundingRange").value = range;
@@ -4599,8 +4685,8 @@ function renderRiskChart(chartId = "riskChart") {
   const red = config ? Math.ceil(maximum * 0.67) : 16;
   const scoreFor = config?.forced ? forcedCategoryScore : config ? (values, day) => historicalScoreRange(values, config.keys, day).low : compositeScore;
   if (config && !config.forced) scoreFor.range = (values, day) => historicalScoreRange(values, config.keys, day);
-  const svg = document.querySelector("#" + chartId);
-  const { start, end, points } = chartEntries(document.querySelector("#" + chartId + "Range").value, /* @__PURE__ */ new Date(), scoreFor);
+  const svg = requiredValue(document.querySelector("#" + chartId));
+  const { start, end, points } = chartEntries(requiredValue(document.querySelector("#" + chartId + "Range")).value, /* @__PURE__ */ new Date(), scoreFor);
   svg.replaceChildren();
   const add = (tag, attrs, text) => {
     const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
@@ -4630,11 +4716,11 @@ function renderRiskChart(chartId = "riskChart") {
     title.textContent = label;
     dot.appendChild(title);
     dot.onfocus = () => {
-      document.getElementById(chartId + "Summary").textContent = label;
+      requiredValue(document.getElementById(chartId + "Summary")).textContent = label;
     };
   });
   drawSp500Overlay(svg, sp500ChartPoints(start, end), x);
-  document.getElementById(chartId + "Summary").textContent = points.length ? points.length + " history entries (saved + reference) \xB7 Latest score in this range: " + points.at(-1).score + (points.at(-1).high !== points.at(-1).score ? "\u2013" + points.at(-1).high : "") + " / " + maximum : "No history entries in this time range. Select a wider range or save an entry.";
+  requiredValue(document.getElementById(chartId + "Summary")).textContent = points.length ? points.length + " history entries (saved + reference) \xB7 Latest score in this range: " + requiredValue(points.at(-1)).score + (requiredValue(points.at(-1)).high !== requiredValue(points.at(-1)).score ? "\u2013" + requiredValue(points.at(-1)).high : "") + " / " + maximum : "No history entries in this time range. Select a wider range or save an entry.";
 }
 function renderEntryHistory() {
   renderRiskChart();
@@ -4674,38 +4760,38 @@ function historyComparisonValues(entry, displayMode = false) {
   const day = entry.observationDate || localCalendarDate(new Date(entry.savedAt || Date.now()));
   const bounds = compositeRange(entry.values, day), cells = model50Cells(entry.values, day);
   const values = { ...!entry.reference ? forcedInputsForDate(day) : {}, ...entry.values };
-  values.composite = displayMode ? analysisRange(bounds) : bounds.low === bounds.high ? bounds.low : null;
+  values["composite"] = displayMode ? analysisRange(bounds) : bounds.low === bounds.high ? bounds.low : null;
   for (let i = 1; i < historyOverrideFields.length; i++) {
-    const key = historyOverrideFields[i][0], text = cells[i - 1].text;
+    const key = requiredValue(historyOverrideFields[i])[0], text = requiredValue(cells[i - 1]).text;
     values[key] = displayMode ? text : text !== "" && Number.isFinite(Number(text)) ? Number(text) : null;
   }
   Object.assign(values, entry.historyOverrides || {});
-  if (!Number.isFinite(values.sp500) && !entry.reference) values.sp500 = sp500ForDate(day)?.close ?? null;
+  if (!Number.isFinite(values["sp500"]) && !entry.reference) values["sp500"] = sp500ForDate(day)?.close ?? null;
   for (const [key] of marketColumns) values[key] = marketForDate(key, day, entry.values)?.close ?? null;
   return values;
 }
 function applyHistoryChangeOutline(cell, key, current, previous, previousDate) {
-  cell.dataset.comparisonExplicit = "true";
-  if (cell.dataset.comparisonTitle) {
-    cell.title = cell.title.replace(cell.dataset.comparisonTitle, "");
-    delete cell.dataset.comparisonTitle;
+  cell.dataset["comparisonExplicit"] = "true";
+  if (cell.dataset["comparisonTitle"]) {
+    cell.title = cell.title.replace(cell.dataset["comparisonTitle"], "");
+    delete cell.dataset["comparisonTitle"];
   }
   const input = cell.querySelector("input");
-  if (input && !input.dataset.comparisonBound) {
-    input.dataset.comparisonBound = "true";
+  if (input && !input.dataset["comparisonBound"]) {
+    input.dataset["comparisonBound"] = "true";
     input.addEventListener("input", () => applyHistoryChangeOutline(cell, key, input.value.trim() === "" ? null : Number(input.value), previous, previousDate));
   }
   cell.classList.remove("history-improved", "history-worsened");
   const cls = historyChangeDirection(key, current, previous);
   if (!cls) return;
   cell.className += (cell.className ? " " : "") + cls;
-  cell.dataset.comparisonTitle = (cell.title ? " \xB7 " : "") + (cls === "history-improved" ? "Improved" : "Worsened") + " versus preceding entry (" + previousDate + "): " + previous + " \u2192 " + current + ". Direction follows the dashboard risk convention.";
-  cell.title += cell.dataset.comparisonTitle;
+  cell.dataset["comparisonTitle"] = (cell.title ? " \xB7 " : "") + (cls === "history-improved" ? "Improved" : "Worsened") + " versus preceding entry (" + previousDate + "): " + previous + " \u2192 " + current + ". Direction follows the dashboard risk convention.";
+  cell.title += cell.dataset["comparisonTitle"];
 }
 const historyPageSize = 50;
 const historyPages = /* @__PURE__ */ Object.create(null);
 function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
-  const head = document.getElementById(prefix + "Head");
+  const head = requiredValue(document.getElementById(prefix + "Head"));
   head.replaceChildren();
   const heading = document.createElement("tr");
   ["Delete", "Entry", "Date", "Time", scoreLabel + " (0\u2013" + maximum + ")", ...model50Headers, "S&P 500 close", ...marketColumns.map((c) => c[1]), ...liquidityColumns.map((c) => c[1] + " (" + c[2] + ")"), ...[...columns, ...forcedColumns].map(([, label, unit]) => label + " (" + unit + ")")].forEach((label) => {
@@ -4715,7 +4801,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
     heading.appendChild(th);
   });
   head.appendChild(heading);
-  const body = document.getElementById(prefix + "Body");
+  const body = requiredValue(document.getElementById(prefix + "Body"));
   body.replaceChildren();
   const newestEntries = historyDisplayEntries();
   const entries = currentEntryTime || historyPreviewHidden ? newestEntries : [{ savedAt: null, values: currentData }, ...newestEntries];
@@ -4785,7 +4871,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
     } else deleteCell.appendChild(deleteButton);
     tr.appendChild(deleteCell);
     const date = entry.savedAt ? new Date(entry.savedAt) : /* @__PURE__ */ new Date();
-    const dateText = entry.reference ? entry.observationDate : date ? [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-") : "\u2014";
+    const dateText = entry.reference ? requiredValue(entry.observationDate) : date ? [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-") : "\u2014";
     const timeText = date ? [date.getHours(), date.getMinutes(), date.getSeconds()].map((n) => String(n).padStart(2, "0")).join(":") : "\u2014";
     const entryCell = document.createElement("td");
     entryCell.textContent = entry.reference ? "Historical reference" : isCurrent ? date ? "Current" : "Current (unsaved)" : "Past";
@@ -4821,7 +4907,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
       saveButton.onclick = () => {
         const values = { ...entry.values };
         for (const [key] of columns) {
-          const raw = numberInputs[key].value.trim();
+          const raw = requiredValue(numberInputs[key]).value.trim();
           if (raw && !Number.isFinite(Number(raw))) {
             alert("Use a number, or leave unavailable indicators blank.");
             return;
@@ -4829,17 +4915,17 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
           values[key] = raw ? Number(raw) : null;
         }
         for (const [key] of forcedColumns) {
-          const raw = numberInputs[key].value.trim();
+          const raw = requiredValue(numberInputs[key]).value.trim();
           values[key] = raw === "" ? null : Number(raw);
         }
-        const spRaw = numberInputs.sp500.value.trim();
+        const spRaw = requiredValue(numberInputs.sp500).value.trim();
         if (spRaw && (!Number.isFinite(Number(spRaw)) || Number(spRaw) <= 0)) {
           alert("S&P 500 close must be a positive number, or blank if unavailable.");
           return;
         }
         values.sp500 = spRaw ? Number(spRaw) : null;
         for (const [key, label] of marketColumns) {
-          const raw = numberInputs[key].value.trim();
+          const raw = requiredValue(numberInputs[key]).value.trim();
           if (raw && (!Number.isFinite(Number(raw)) || Number(raw) <= 0)) {
             alert(label + " must be positive.");
             return;
@@ -4847,7 +4933,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
           values[key] = raw ? Number(raw) : null;
         }
         for (const [key] of liquidityColumns) {
-          const raw = numberInputs[key].value.trim();
+          const raw = requiredValue(numberInputs[key]).value.trim();
           values[key] = raw === "" ? null : Number(raw);
         }
         let overrides;
@@ -4878,7 +4964,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
     tr.appendChild(scoreCell);
     model50Cells(entry.values, date ? dateText : localCalendarDate(/* @__PURE__ */ new Date())).forEach((cell, i) => {
       const td = document.createElement("td");
-      const [key, label, max] = historyOverrideFields[i + 1];
+      const [key, label, max] = requiredValue(historyOverrideFields[i + 1]);
       historyOverrideInput(key, label, cell.text, entry, td, overrideInputs, max);
       tr.appendChild(td);
     });
@@ -4946,14 +5032,13 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
         input.className = "history-value-input " + risk.className;
         input.setAttribute("aria-label", key + " for " + dateText + " " + timeText);
         input.oninput = () => {
-          const raw = input.value.trim(), n = Number(raw);
           const edited = { ...entry.values };
           columns.forEach(([k]) => {
             const text = numberInputs[k]?.value.trim();
             edited[k] = text ? Number(text) : null;
           });
           columns.forEach(([k]) => {
-            numberInputs[k].className = "history-value-input " + (Number.isFinite(edited[k]) ? historyRisk(k, edited[k], edited).className : "history-normal");
+            requiredValue(numberInputs[k]).className = "history-value-input " + (Number.isFinite(edited[k]) ? historyRisk(k, edited[k], edited).className : "history-normal");
           });
         };
         numberInputs[key] = input;
@@ -4984,7 +5069,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
             values[k] = raw ? Number(raw) : null;
           });
           forcedColumns.forEach(([k]) => {
-            numberInputs[k].className = "history-value-input " + forcedFieldRisk(k, values, dateText);
+            requiredValue(numberInputs[k]).className = "history-value-input " + forcedFieldRisk(k, values, dateText);
           });
         };
         numberInputs[key] = input;
@@ -4999,7 +5084,7 @@ function renderHistoryTable(prefix, columns, scoreLabel, maximum, isRegime) {
     const previousEntry = entries[start + index + 1];
     if (previousEntry) {
       if (!comparisonCache.has(previousEntry)) comparisonCache.set(previousEntry, historyComparisonValues(previousEntry));
-      const previous = comparisonCache.get(previousEntry), previousDate = previousEntry.observationDate || new Date(previousEntry.savedAt || Date.now()).toLocaleString();
+      const previous = requiredValue(comparisonCache.get(previousEntry)), previousDate = previousEntry.observationDate || new Date(previousEntry.savedAt || Date.now()).toLocaleString();
       for (const [key, input] of Object.entries({ ...numberInputs, ...overrideInputs })) {
         const raw = String(input.value ?? "").trim(), value = raw !== "" ? Number(raw) : null;
         applyHistoryChangeOutline(input.parentNode, key, value, previous[key], previousDate);
@@ -5022,7 +5107,7 @@ function displayUpdateTime(value) {
   return pad(d.getDate()) + "/" + pad(d.getMonth() + 1) + "/" + d.getFullYear() + ", " + (d.getHours() % 12 || 12) + ":" + pad(d.getMinutes()) + ":" + pad(d.getSeconds()) + " " + (d.getHours() < 12 ? "AM" : "PM");
 }
 function displayObservationDate(value) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? value.slice(8, 10) + "/" + value.slice(5, 7) + "/" + value.slice(0, 4) : "Not available";
+  return /^\d{4}-\d{2}-\d{2}$/.test(value || "") ? requiredValue(value).slice(8, 10) + "/" + requiredValue(value).slice(5, 7) + "/" + requiredValue(value).slice(0, 4) : "Not available";
 }
 function latestCpCheckTime() {
   const times = [fredLiveData?.fetchedAt, ...entryHistory.map((r) => r.cpCheckedAt)].filter((t) => !!t && Number.isFinite(Date.parse(t)));
@@ -5044,7 +5129,7 @@ function renderFreshness() {
 function renderOpeningOverview() {
   renderSavedCpTable();
   const today = localCalendarDate(/* @__PURE__ */ new Date());
-  const cp = liquidityHistoryRows(), rotation = relativeMomentumRows(), latest = cp.filter((r) => r.date <= today && Number.isFinite(r.sector)).at(-1);
+  const cp = liquidityHistoryRows(), rotation = relativeMomentumRows();
   renderFreshness();
   const alerts = requiredElement("overviewAlerts");
   alerts.replaceChildren();
@@ -5145,7 +5230,7 @@ function renderSavedCpTable() {
         }
         values[key] = Number(input.value);
       }
-      values.cp_date = Math.max(...cpRateKeys.map((k) => values[`${k}_date`]));
+      values.cp_date = Math.max(...cpRateKeys.map((k) => requiredValue(values[`${k}_date`])));
       const error = validateLiquidityInputs(values);
       if (error) {
         setAppFeedback("cpAiStatus", error, "error");
@@ -5212,7 +5297,7 @@ function applyCpResponse() {
     setAppFeedback("cpAiStatus", "Use six numeric fields: financial date, rate, nonfinancial date, rate, Treasury date, rate. Four-field same-date input is also accepted.");
     return;
   }
-  const values = { ...currentData, cp_date: nums.length === 6 ? Math.max(nums[0], nums[2], nums[4]) : nums[0], cp_financial_date: nums[0], cp_nonfinancial_date: nums.length === 6 ? nums[2] : nums[0], cp_treasury_date: nums.length === 6 ? nums[4] : nums[0], cp_financial: nums[1], cp_nonfinancial: nums.length === 6 ? nums[3] : nums[2], cp_treasury: nums.length === 6 ? nums[5] : nums[3] };
+  const values = { ...currentData, cp_date: nums.length === 6 ? Math.max(requiredValue(nums[0]), requiredValue(nums[2]), requiredValue(nums[4])) : requiredValue(nums[0]), cp_financial_date: requiredValue(nums[0]), cp_nonfinancial_date: nums.length === 6 ? requiredValue(nums[2]) : requiredValue(nums[0]), cp_treasury_date: nums.length === 6 ? requiredValue(nums[4]) : requiredValue(nums[0]), cp_financial: requiredValue(nums[1]), cp_nonfinancial: nums.length === 6 ? requiredValue(nums[3]) : requiredValue(nums[2]), cp_treasury: nums.length === 6 ? requiredValue(nums[5]) : requiredValue(nums[3]) };
   const error = validateLiquidityInputs(values);
   if (error) {
     setAppFeedback("cpAiStatus", error);
@@ -5366,7 +5451,7 @@ function updateSummary(score, max) {
     sub = "Early threshold warnings; monitor subsequent observations.";
   }
   document.querySelectorAll(".matrix-row").forEach((x) => x.classList.remove("active"));
-  document.getElementById(scale).classList.add("active");
+  requiredValue(document.getElementById(scale)).classList.add("active");
   const status = requiredElement("statusTermDisp");
   status.innerText = text;
   status.className = `score-status ${cls}`;
@@ -5376,7 +5461,7 @@ function updateRegimes() {
   const day = currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : localCalendarDate(/* @__PURE__ */ new Date());
   const mapping = { volatilityChart: ["volRegime", "volDesc", "Volatility contained.", "Volatility rising.", "Volatility stress."], creditChart: ["creditRegime", "creditDesc", "Credit markets calm.", "Credit spreads widening.", "Credit stress / systemic warning."], macroChart: ["macroRegime", "macroDesc", "Macro shock limited.", "Rates/oil becoming restrictive.", "Major macro shock."], equityChart: ["equityRegime", "equityDesc", "Equity structure healthy.", "Equity breadth deteriorating.", "Major equity technical stress."], forcedChart: ["forcedRegime", "forcedDesc", "Forced-selling pressure limited.", "Carry-trade, leverage or volume pressure rising.", "Elevated forced-selling pressure."] };
   for (const [key, config] of Object.entries(regimeCharts)) {
-    const [id, desc, ...labels] = mapping[key], range = config.forced ? forcedCategoryRange(currentData, day) : historicalScoreRange(currentData, config.keys, day);
+    const [id, desc, ...labels] = requiredValue(mapping[key]), range = config.forced ? forcedCategoryRange(currentData, day) : historicalScoreRange(currentData, config.keys, day);
     setRegime(id, desc, range.low, config.maximum, ...labels);
     if (range.low !== range.high) {
       requiredElement(id).textContent = "INCOMPLETE " + range.low + "\u2013" + range.high + " / " + config.maximum;
@@ -5416,14 +5501,14 @@ function matchedEquitySession(values, day) {
     equitySessionLookup = /* @__PURE__ */ new Map();
     for (const [date, close] of nasdaqDaily.nasdaq100) {
       if (!sp.has(date)) continue;
-      const key = sp.get(date).toFixed(2) + "|" + close.toFixed(2);
+      const key = requiredValue(sp.get(date)).toFixed(2) + "|" + close.toFixed(2);
       const rows2 = equitySessionLookup.get(key) || [];
       rows2.push({ date, nasdaq: nd.get(date) });
       equitySessionLookup.set(key, rows2);
     }
   }
   const rows = equitySessionLookup.get(values.sp500.toFixed(2) + "|" + values.nasdaq100.toFixed(2)) || [];
-  return rows.findLast((r) => r.date <= day && Date.parse(day) - Date.parse(r.date) <= 4 * 864e5 && (!finiteNumber(values.nasdaq) || Math.abs(values.nasdaq - r.nasdaq) < 0.011))?.date || null;
+  return rows.findLast((r) => r.date <= day && Date.parse(day) - Date.parse(r.date) <= 4 * 864e5 && (!finiteNumber(values.nasdaq) || Math.abs(values.nasdaq - requiredValue(r.nasdaq)) < 0.011))?.date || null;
 }
 function entryEquityDay(row) {
   const day = row.observationDate || localCalendarDate(new Date(row.savedAt));
@@ -5457,9 +5542,9 @@ function appEquityRows(entries = entryHistory) {
 function prepareCompositeUpdate(values, day, now) {
   const next = { ...values }, notices = [], equities = appEquityRows().filter((r) => r.date <= day);
   const supplied = ["sp500", "nasdaq", "nasdaq100"].filter((k) => finiteNumber(next[k]));
-  const match = equities.filter((r) => (!next.equitySessionDate || r.date === next.equitySessionDate) && supplied.every((k) => finiteNumber(r[k]) && Math.abs(r[k] - next[k]) < 0.011) && ["sp500", "nasdaq", "nasdaq100"].every((k) => finiteNumber(r[k]))).at(-1);
+  const match = equities.filter((r) => (!next.equitySessionDate || r.date === next.equitySessionDate) && supplied.every((k) => finiteNumber(r[k]) && Math.abs(r[k] - requiredValue(next[k])) < 0.011) && ["sp500", "nasdaq", "nasdaq100"].every((k) => finiteNumber(r[k]))).at(-1);
   const sameDay = equities.find((r) => r.date === (next.equitySessionDate || day));
-  const source = match || (sameDay && supplied.every((k) => !finiteNumber(sameDay[k]) || Math.abs(sameDay[k] - next[k]) < 0.011) ? sameDay : null);
+  const source = match || (sameDay && supplied.every((k) => !finiteNumber(sameDay[k]) || Math.abs(sameDay[k] - requiredValue(next[k])) < 0.011) ? sameDay : null);
   if (source) {
     for (const k of ["sp500", "nasdaq", "nasdaq100"]) if (!finiteNumber(next[k])) next[k] = source[k] ?? null;
     next.equitySessionDate = source.date;
@@ -5468,7 +5553,7 @@ function prepareCompositeUpdate(values, day, now) {
   }
   for (const k of ["sp500", "nasdaq", "nasdaq100"]) if (!finiteNumber(next[k])) next[k] = null;
   if (hasSeparateCpDates(next) && !validateLiquidityInputs(next)) {
-    next.cp_date = Math.max(...cpObservationDates(next).map((d) => Number(d.replaceAll("-", ""))));
+    next.cp_date = Math.max(...cpObservationDates(next).map((d) => Number(requiredValue(d).replaceAll("-", ""))));
     notices.push("CP rates retained with their individual observation dates.");
     return { values: next, notices };
   }
@@ -5542,7 +5627,7 @@ function commitEntry(values, observationDate = null) {
   }
   entryHistory = reconciled.rows;
   currentEntryTime = savedAt;
-  currentData = { ...entryHistory[0].values };
+  currentData = { ...requiredValue(entryHistory[0]).values };
   model50Cache = null;
   historyPreviewHidden = false;
   historyStorageError = "";
@@ -5591,7 +5676,7 @@ function parseQuickPaste() {
       return;
     }
     cpRateKeys.forEach((key, index) => {
-      values[`${key}_date`] = Number(cpDates[index].replaceAll("-", ""));
+      values[`${key}_date`] = Number(requiredValue(cpDates[index]).replaceAll("-", ""));
     });
     values.cp_date = Math.max(...cpDates.map((date) => Number(date.replaceAll("-", ""))));
     const cpError = validateLiquidityInputs(values);
@@ -5602,9 +5687,9 @@ function parseQuickPaste() {
   }
   if (suppliedDates) {
     requiredElement("quickPasteEquityDate").value = String(session);
-    requiredElement("quickPasteFinancialDate").value = cpDates[0];
-    requiredElement("quickPasteNonfinancialDate").value = cpDates[1];
-    requiredElement("quickPasteTreasuryDate").value = cpDates[2];
+    requiredElement("quickPasteFinancialDate").value = requiredValue(cpDates[0]);
+    requiredElement("quickPasteNonfinancialDate").value = requiredValue(cpDates[1]);
+    requiredElement("quickPasteTreasuryDate").value = requiredValue(cpDates[2]);
   }
   commitEntry(values);
 }
@@ -5651,7 +5736,7 @@ function marketForDate(key, day, values) {
   let lo = 0, hi = rows.length;
   while (lo < hi) {
     const mid = lo + hi >>> 1;
-    if (rows[mid][0] <= day) lo = mid + 1;
+    if (requiredValue(rows[mid])[0] <= day) lo = mid + 1;
     else hi = mid;
   }
   const r = rows[lo - 1];
@@ -5674,7 +5759,7 @@ function sp500ForDate(day) {
   let lo = 0, hi = sp500Daily.length;
   while (lo < hi) {
     const mid = lo + hi >>> 1;
-    if (sp500Daily[mid][0] <= day) lo = mid + 1;
+    if (requiredValue(sp500Daily[mid])[0] <= day) lo = mid + 1;
     else hi = mid;
   }
   const row = sp500Daily[lo - 1];
@@ -5702,7 +5787,7 @@ function drawSp500Overlay(svg, points, x, options = {}) {
     add("text", { x: 55, y: legendY, fill: "#94a3b8", "font-size": 11 }, "No common session for three-index comparison");
     return;
   }
-  const defs = [["S&P 500", "#34d399", (p) => p.close, baseline.close], ["Nasdaq Composite", "#d946ff", (p) => p.quotes[0]?.close, baseline.quotes[0].close], ["Nasdaq 100", "#00bfff", (p) => p.quotes[1]?.close, baseline.quotes[1].close]];
+  const defs = [["S&P 500", "#34d399", (p) => p.close, requiredValue(baseline.close)], ["Nasdaq Composite", "#d946ff", (p) => p.quotes[0]?.close, requiredValue(baseline.quotes[0]).close], ["Nasdaq 100", "#00bfff", (p) => p.quotes[1]?.close, requiredValue(baseline.quotes[1]).close]];
   const selected = aligned.filter((p) => p.time >= baseline.time);
   const numbers = defs.flatMap((d) => selected.map((p) => d[2](p)).filter(finiteNumber).map((n) => n / d[3] * 100));
   const min = Math.min(...numbers), max = Math.max(...numbers), pad = Math.max((max - min) * 0.08, 1), low = min - pad, high = max + pad, y = (n) => bottom - (n - low) / (high - low) * (bottom - top);
@@ -5771,9 +5856,9 @@ function renderHistoricalStudies() {
     const section = document.createElement("section");
     section.className = "control-panel";
     section.innerHTML = `<h2 class="panel-title">${month.name} \u2014 daily values</h2><p class="table-note">${month.rows.length} calendar dates \xB7 50-point model: matched CP (stale rates retained) on ${month.rows.filter((r) => model50Inputs(r.values, r.date).cp).length} dates; Nasdaq relative momentum on ${month.rows.filter((r) => Number.isFinite(model50Inputs(r.values, r.date).momentum)).length} dates. Unavailable contributions remain ranges. White: no risk points; amber: intermediate risk; red: maximum risk. Debt month and debt amount inherit margin-leverage risk; volume and its average inherit selling-volume risk. White also denotes an unavailable risk classification. Score bounds follow composite thresholds. The three index closes are shown in the table; graphs compare S&amp;P 500 (green), Nasdaq Composite (bright purple) and Nasdaq 100 (bright blue) rebased to 100 on the first common session. All indicator cells contain numbers only; unavailable cells are blank. Scroll horizontally to see all market, margin and volume inputs.</p><div class="data-table-scroll history-scroll" tabindex="0" role="region" aria-label="${month.name} historical values"><table class="history-table"><thead><tr><th>Date</th><th>Composite minimum<br>(0\u201350)</th><th>Composite maximum<br>(0\u201350)</th>${model50Headers.map((h) => `<th>${h}</th>`).join("")}<th>S&amp;P 500 close</th>${marketColumns.map((c) => `<th>${c[1]}</th>`).join("")}${liquidityColumns.map((c) => `<th>${c[1]} (${c[2]})</th>`).join("")}${[...historyColumns, ...forcedColumns].map((c) => `<th>${c[1]}<br>(${c[2]})</th>`).join("")}</tr></thead><tbody>${[...month.rows].sort((a, b) => b.date.localeCompare(a.date)).map((row) => {
-      const range = historicalScoreRange(row.values, specs[0].keys, row.date);
+      const range = historicalScoreRange(row.values, requiredValue(specs[0]).keys, row.date);
       const cls = (n) => n >= 16 ? "history-red" : n >= 5 ? "history-amber" : "history-normal";
-      return `<tr><th scope="row" title="Trading-session snapshot: ${row.observationDate}">${row.date}</th><td class="${cls(range.low)}">${range.low}</td><td class="${cls(range.high)}">${range.high}</td>${model50Cells(row.values, row.date).map((c) => `<td class="${c.className}">${c.text}</td>`).join("")}<td class="history-normal">${row.sp500.toFixed(2)}</td>${marketCells(row.observationDate, row.values)}${liquidityColumns.map(([k]) => `<td class="${model50Cells(row.values, row.date)[1].className}">${row.values[k] ?? "\u2014"}</td>`).join("")}${historyColumns.map(([key]) => Number.isFinite(row.values[key]) ? `<td class="${historyRisk(key, row.values[key], row.values).className}" title="${historyRisk(key, row.values[key], row.values).points} risk points">${row.values[key]}</td>` : '<td aria-label="Unavailable" title="Unavailable"></td>').join("")}${forcedColumns.map(([key]) => {
+      return `<tr><th scope="row" title="Trading-session snapshot: ${row.observationDate}">${row.date}</th><td class="${cls(range.low)}">${range.low}</td><td class="${cls(range.high)}">${range.high}</td>${model50Cells(row.values, row.date).map((c) => `<td class="${c.className}">${c.text}</td>`).join("")}<td class="history-normal">${row.sp500.toFixed(2)}</td>${marketCells(row.observationDate, row.values)}${liquidityColumns.map(([k]) => `<td class="${requiredValue(model50Cells(row.values, row.date)[1]).className}">${row.values[k] ?? "\u2014"}</td>`).join("")}${historyColumns.map(([key]) => Number.isFinite(row.values[key]) ? `<td class="${historyRisk(key, row.values[key], row.values).className}" title="${historyRisk(key, row.values[key], row.values).points} risk points">${row.values[key]}</td>` : '<td aria-label="Unavailable" title="Unavailable"></td>').join("")}${forcedColumns.map(([key]) => {
         const n = row.values[key] ?? forcedInputsForDate(row.date)[key];
         return '<td class="' + forcedFieldRisk(key, row.values, row.date) + '">' + (finiteNumber(n) ? String(Math.round(n * 1e4) / 1e4) : "") + "</td>";
       }).join("")}</tr>`;
@@ -5789,9 +5874,9 @@ function renderHistoricalStudies() {
       const controls = `<div class="chart-month-controls" style="display:flex;gap:16px;flex-wrap:wrap;margin:12px 0"><label>Start month <select id="${id}-start" aria-label="${month.name} ${spec.name} start month">${monthOptions(months[0])}</select></label><label>End month <select id="${id}-end" aria-label="${month.name} ${spec.name} end month">${monthOptions(months.at(-1))}</select></label></div>`;
       const points = month.rows.map((r) => ({ ...r, ...spec.forced ? forcedCategoryRange(r.values, r.date) : historicalScoreRange(r.values, spec.keys, r.date) }));
       const uncertain = points.some((p) => p.low !== p.high);
-      panel.innerHTML = `<h2 class="panel-title">${month.name} \u2014 ${spec.name}</h2><p class="table-note">${month.rows.length} calendar dates \xB7 Maximum ${spec.maximum} points \xB7 ${uncertain ? "Solid line: minimum possible score; dashed line: maximum possible score. Blue shading spans the missing-data range." : "All required inputs available: one calculated score per date."} Hover or focus on a point for its date and score.</p>${controls}<p id="${id}-status" class="table-note" role="status">Fixed period: ${month.rows[0].date} to ${month.rows.at(-1).date}</p><div style="overflow-x:auto"><svg viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="${month.name} ${spec.name}${uncertain ? " possible score range" : " score"}"></svg></div>`;
+      panel.innerHTML = `<h2 class="panel-title">${month.name} \u2014 ${spec.name}</h2><p class="table-note">${month.rows.length} calendar dates \xB7 Maximum ${spec.maximum} points \xB7 ${uncertain ? "Solid line: minimum possible score; dashed line: maximum possible score. Blue shading spans the missing-data range." : "All required inputs available: one calculated score per date."} Hover or focus on a point for its date and score.</p>${controls}<p id="${id}-status" class="table-note" role="status">Fixed period: ${requiredValue(month.rows[0]).date} to ${requiredValue(month.rows.at(-1)).date}</p><div style="overflow-x:auto"><svg viewBox="0 0 960 340" style="display:block;width:100%;min-width:580px" role="img" aria-label="${month.name} ${spec.name}${uncertain ? " possible score range" : " score"}"></svg></div>`;
       host.appendChild(panel);
-      const svg = panel.querySelector("svg");
+      const svg = requiredValue(panel.querySelector("svg"));
       const add = (tag, attrs, text) => {
         const e = document.createElementNS("http://www.w3.org/2000/svg", tag);
         Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, String(v)));
@@ -5800,12 +5885,12 @@ function renderHistoricalStudies() {
         return e;
       };
       const allPoints = points;
-      const startSelect = panel.querySelector("#" + id + "-start"), endSelect = panel.querySelector("#" + id + "-end");
+      const startSelect = requiredValue(panel.querySelector("#" + id + "-start")), endSelect = requiredValue(panel.querySelector("#" + id + "-end"));
       const draw = () => {
         const points2 = allPoints.filter((p) => p.date.slice(0, 7) >= startSelect.value && p.date.slice(0, 7) <= endSelect.value);
         if (!points2.length) return;
         svg.replaceChildren();
-        panel.querySelector("#" + id + "-status").textContent = points2.length + " calendar dates \xB7 " + points2[0].date + " to " + points2.at(-1).date;
+        requiredValue(panel.querySelector("#" + id + "-status")).textContent = points2.length + " calendar dates \xB7 " + requiredValue(points2[0]).date + " to " + requiredValue(points2.at(-1)).date;
         const x = (i) => 55 + i / (points2.length - 1) * 810, y = (n) => 282 - n / spec.maximum * 258;
         const amber = si === 0 ? 5 : Math.ceil(spec.maximum * 0.34), red = si === 0 ? 16 : Math.ceil(spec.maximum * 0.67);
         [[0, amber, "#fff"], [amber, red, "#f59e0b"], [red, spec.maximum, "#ef4444"]].forEach(([lo, hi, c]) => add("rect", { x: 55, y: y(hi), width: 810, height: y(lo) - y(hi), fill: c, opacity: 0.05 }));
@@ -5816,7 +5901,7 @@ function renderHistoricalStudies() {
         });
         for (let n = 0; n <= 4; n++) {
           const i = Math.round(n * (points2.length - 1) / 4);
-          add("text", { x: x(i), y: 307, fill: "#94a3b8", "font-size": 11, "text-anchor": n === 0 ? "start" : n === 4 ? "end" : "middle" }, points2[i].date);
+          add("text", { x: x(i), y: 307, fill: "#94a3b8", "font-size": 11, "text-anchor": n === 0 ? "start" : n === 4 ? "end" : "middle" }, requiredValue(points2[i]).date);
         }
         add("text", { x: 55, y: 15, fill: "#94a3b8", "font-size": 12 }, "Score (0\u2013" + spec.maximum + ")");
         const coords = (key) => points2.map((p, i) => x(i) + "," + y(p[key]));
@@ -5829,7 +5914,7 @@ function renderHistoricalStudies() {
             const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
             title.textContent = label;
             dot.appendChild(title);
-            dot.onfocus = () => panel.querySelector("#" + id + "-status").textContent = label;
+            dot.onfocus = () => requiredValue(panel.querySelector("#" + id + "-status")).textContent = label;
           });
         }
         drawSp500Overlay(svg, points2.map((p, i) => ({ date: p.date, close: p.sp500, time: i })), x, { dashes: true });
@@ -5866,13 +5951,13 @@ function renderForcedSelling() {
   const host = document.getElementById("forcedSelling");
   if (!host) return;
   const selected = document.querySelector("#forcedPeriod")?.value || "current";
-  const sourceLatest = forcedData.daily.at(-1).date;
+  const sourceLatest = requiredValue(forcedData.daily.at(-1)).date;
   const displayed = historyDisplayEntries();
   const byDay = new Map([...displayed].reverse().map((r) => [r.observationDate || localCalendarDate(new Date(r.savedAt)), r]));
   const savedDates = displayed.map((r) => localCalendarDate(new Date(r.savedAt))).filter((d) => d <= localCalendarDate(/* @__PURE__ */ new Date()));
-  const latest = [sourceLatest, ...savedDates].sort().at(-1);
-  const start = selected === "current" ? String(Number(latest.slice(0, 4)) - 1) + latest.slice(4) : historicalMonths[Number(selected)].rows[0].date;
-  const end = selected === "current" ? latest : historicalMonths[Number(selected)].rows.at(-1).date;
+  const latest = requiredValue([sourceLatest, ...savedDates].sort().at(-1));
+  const start = selected === "current" ? String(Number(latest.slice(0, 4)) - 1) + latest.slice(4) : requiredValue(requiredValue(historicalMonths[Number(selected)]).rows[0]).date;
+  const end = selected === "current" ? latest : requiredValue(requiredValue(historicalMonths[Number(selected)]).rows.at(-1)).date;
   const series = new Map(forcedData.daily.map((v) => [v.date, { ...v }]));
   if (selected === "current") [...displayed].sort((a, b) => Date.parse(a.savedAt) - Date.parse(b.savedAt)).forEach((row) => {
     const day = localCalendarDate(new Date(row.savedAt));
@@ -5883,29 +5968,26 @@ function renderForcedSelling() {
   });
   const rows = [...series.values()].filter((v) => v.date >= start && v.date <= end).sort((a, b) => a.date.localeCompare(b.date)).map((v) => {
     const f = forcedSignal(v.date);
-    let base2 = null;
+    let base = null;
     if (selected !== "current") {
-      const r = historicalMonths[Number(selected)].rows.find((r2) => r2.date === v.date);
-      if (r) base2 = historicalScoreRange(r.values, historyColumns.map((c) => c[0]), r.date);
+      const r = requiredValue(historicalMonths[Number(selected)]).rows.find((r2) => r2.date === v.date);
+      if (r) base = historicalScoreRange(r.values, historyColumns.map((c) => c[0]), r.date);
     } else {
       const saved = byDay.get(v.date);
-      if (saved) base2 = compositeRange(saved.values, v.date);
+      if (saved) base = compositeRange(saved.values, v.date);
     }
     if (selected === "current") {
       const saved = byDay.get(v.date);
       if (saved) {
         const point = forcedPoints(saved.values, v.date), input = { ...forcedInputsForDate(v.date), ...saved.values };
-        return { ...v, ...f, ...point, jpy3d: jpyMomentum(saved.values, v.date), volume: v, margin: finiteNumber(input.margin_debt) ? { month: String(input.margin_month).slice(0, 4) + "-" + String(input.margin_month).slice(4), debt: input.margin_debt, yoy: input.margin_yoy, change3m: input.margin_3m } : null, base: base2 };
+        return { ...v, ...f, ...point, jpy3d: jpyMomentum(saved.values, v.date), volume: v, margin: finiteNumber(input.margin_debt) ? { month: String(input.margin_month).slice(0, 4) + "-" + String(input.margin_month).slice(4), debt: input.margin_debt, yoy: input.margin_yoy, change3m: input.margin_3m } : null, base };
       }
     }
-    return { ...v, ...f, jpy3d: momentumForDate(v.date)?.jpy3d ?? null, base: base2 };
+    return { ...v, ...f, jpy3d: momentumForDate(v.date)?.jpy3d ?? null, base };
   });
   const fmt = (v) => finiteNumber(v) ? v.toFixed(2) : "\u2014";
-  const asof = currentEntryTime ? localCalendarDate(new Date(currentEntryTime)) : latest;
-  const now = forcedSignal(asof);
-  const base = currentEntryTime ? compositeScore(currentData) : null;
-  host.innerHTML = `<section class="control-panel"><h2 class="panel-title">Margin leverage &amp; volume pressure</h2><p class="table-note">Forced Selling contributes up to 6 of 50 points: USDJPY carry-trade stress (2), margin leverage (2) and volume selling pressure (2). Category maximums: 10 + 14 + 8 + 12 + 6 = 50. Possible exhaustion is a separate observation, not a deduction from risk or confirmation of a market bottom.</p><p class="table-note">FINRA debt latest downloaded month: ${forcedData.margin.at(-1).month} \xB7 ${fmt(forcedData.margin.at(-1).debt / 1e3)} USD billion. Sourced volume data through ${sourceLatest}; saved entries can extend the current chart. Embedded data downloaded September 24, 2026; no automatic refresh.</p><p class="table-note">Currency scoring and equity diagnostic: USDJPY change over 3 available FX sessions now supplies the currency score (amber \u2264\u22121.5%, red \u2264\u22123%). The separate unscored diagnostic is 5-session change in S&amp;P distance from its 200DMA, amber \u2264\u22123 pp, red \u2264\u22125 pp only while below the 200DMA. These chosen thresholds flag potential pressure, not measured margin liquidations. Missing or stale inputs stay blank. FX uses <a href="https://fred.stlouisfed.org/series/DEXJPUS">FRED DEXJPUS daily observations</a>, not live prices. Select a historical study below to compare the same diagnostics.</p><label for="forcedPeriod">Study period </label><select id="forcedPeriod" style="background:#1e293b;color:white;padding:8px"><option value="current">Latest year / saved entries</option>${historicalMonths.map((m, i) => `<option value="${i}">${m.name}</option>`).join("")}</select><details class="table-note"><summary>Method, scoring and sources</summary><p><a href="https://www.finra.org/rules-guidance/key-topics/margin-accounts/margin-statistics">FINRA monthly debit balances</a> are aggregate customer margin debt, not total broker or system leverage. Raw units are USD millions. The debt chart uses the reference month. Daily scoring assumes availability on the first day of the second month after the reference month (e.g. January \u2192 March 1). This is a lag assumption, not verified historical release dates; the downloaded series may contain revisions. FINRA\u2019s reporting coverage changed in 2010.</p><p>Leverage pressure (0\u20132): maximum of debt year-over-year growth \u226520% (1), \u226540% (2), and three-month contraction \u2264\u22125% (1), \u2264\u221210% (2). This distinguishes leverage buildup and deleveraging without adding both twice. Selling pressure (0\u20132): on a lower closing-price day or a close in the bottom 25% of its range, volume \u22651.5\xD7 its preceding 20-session average adds 1 point; \u22652\xD7 adds 2. Composite Crash Risk = the 18 original indicator scores + these two components, maximum 50. Existing severity boundaries (4, 8, 12, 16 and 26) are retained; they are heuristic, not calibrated probabilities. These chosen thresholds are heuristics, not statistically calibrated.</p><p><a href="https://finance.yahoo.com/quote/%5EGSPC/history/">Yahoo Finance ^GSPC daily OHLC and reported volume</a> supplies the volume proxy; an index itself is not traded and volume coverage can vary over time. Average excludes the current day. Possible exhaustion (green marker): \u22652\xD7 volume, a low at or below the previous 20-session low, close in the top 30% of the day\u2019s range and above the open. It does not subtract risk points or confirm a bottom. A volume spike can accompany continued selling. No future observations are used in these rules.</p></details><h3>Monthly margin debt \xB7 USD billion</h3><div class="indicator-intro"><p>Margin debt measures customer borrowing against securities held in margin accounts at FINRA member firms. The graph displays these monthly debit balances in <strong>USD billions</strong>. It captures one part of market leverage, rather than all borrowing across the financial system.</p><p>Rising balances can accompany greater use of borrowed money, but also reflect a growing market. When prices fall, leveraged investors may face margin calls and need to add collateral or reduce positions. Falling debt can therefore reflect deleveraging, although the aggregate figure does not establish whether sales were voluntary or forced.</p><p class="table-note">Read the level alongside its year-over-year and three-month changes, price trends and credit conditions. Monthly reporting arrives with a lag, so this is structural context rather than a real-time liquidation signal. The debt chart uses the reference month; historical scoring applies the stated availability assumption.</p></div><div style="overflow-x:auto"><svg id="marginDebtPlot" viewBox="0 0 960 340" style="width:100%;min-width:580px" role="img" aria-label="Monthly FINRA margin debt"></svg></div><h3>Daily volume / preceding 20-session average</h3><div class="indicator-intro"><p>This ratio compares the session\u2019s reported S&amp;P 500 volume with the average of the <strong>preceding 20 trading sessions, excluding that session</strong>. A reading of 1.0 means volume equals that average; 1.5 means 50% higher, and 2.0 means twice the average.</p><p>Elevated volume shows unusually heavy trading, but cannot by itself identify who traded or why. Interpret it alongside the price change and where the index closed within its daily range. Heavy volume on a declining day or near the session low can suggest selling pressure; it does not prove forced liquidation or confirm a market bottom.</p><p class="table-note">The app consistently uses Yahoo\u2019s reported ^GSPC volume as a proxy; the index itself is not directly traded. Its 1.5\xD7 and 2.0\xD7 thresholds are heuristic warning levels. A possible exhaustion marker needs the additional price conditions described below and remains an unconfirmed reversal signal.</p></div><p class="table-note">White: below 1.5\xD7 \xB7 Amber: \u22651.5\xD7 \xB7 Red: \u22652\xD7 \xB7 Green: possible exhaustion reversal. Manually entered volume updates selling pressure; reversal markers require the sourced OHLC data. Dashed lines: 1.5\xD7 and 2\xD7. Three equity indexes share a rebased right-hand axis (first common session = 100).</p><div style="overflow-x:auto"><svg id="volumeExhaustionPlot" viewBox="0 0 960 340" style="width:100%;min-width:580px" role="img" aria-label="Daily relative volume and possible exhaustion markers"></svg></div><div class="velocity-guide"><p><strong>200DMA distance 5-session change (pp)</strong> is tracked in the table below. Velocity may identify accelerating stress sooner, but it can also spike near a market bottom. Slowing deterioration does not necessarily mean conditions are safe. Its number changes color as a flag without changing the score.</p><ul><li><span class="history-normal">White:</span> Neither warning threshold is met.</li><li><span class="history-amber">Amber:</span> \u2264 \u22123 pp, while the S&amp;P 500 is below its 200DMA.</li><li><span class="history-red">Red:</span> \u2264 \u22125 pp, while below its 200DMA.</li></ul><p class="table-note">Saved Quick Paste values, including USDJPY momentum, update this table immediately. The latest saved entry supplies each day\u2019s row. 200DMA velocity still needs five-session source history; unavailable or stale diagnostics remain blank.</p></div><p class="table-note">Newest dates first. Scroll within the table; column headings stay visible.</p><div class="data-table-scroll history-scroll forced-history-scroll" tabindex="0" role="region" aria-label="Forced selling history, newest dates first"><table class="history-table"><thead><tr><th>Date</th><th>S&amp;P 500 close</th>${marketColumns.map((c) => `<th>${c[1]}</th>`).join("")}<th>USDJPY 3-session change (%)</th><th>200DMA distance 5-session change (pp)</th><th>Debt reference month</th><th>Debt (USD million)</th><th>Debt YoY %</th><th>Debt 3M %</th><th>Reported volume</th><th>Prior 20D average</th><th>Volume ratio</th><th>Possible exhaustion</th><th>Added points min</th><th>Added points max</th><th>Composite minimum /50</th><th>Composite maximum /50</th></tr></thead><tbody>${[...rows].sort((a, b) => b.date.localeCompare(a.date)).map((r) => `<tr><td>${r.date}</td><td class="history-normal">${fmt(r.close)}</td>${marketCells(r.date, marketValuesForDay(r.date))}<td class="${momentumClass(r.jpy3d, "fx")}">${fmt(r.jpy3d)}</td><td class="${momentumClass(momentumForDate(r.date)?.dmaVelocity, "equity", momentumForDate(r.date)?.dma200)}">${fmt(momentumForDate(r.date)?.dmaVelocity)}</td><td class="${pointColor(r.leverage)}">${r.margin?.month ?? "\u2014"}</td><td class="${pointColor(r.leverage)}">${fmt(r.margin?.debt)}</td><td class="${pointColor(finiteNumber(r.margin?.yoy) ? r.margin.yoy >= 40 ? 2 : r.margin.yoy >= 20 ? 1 : 0 : null)}">${fmt(r.margin?.yoy)}</td><td class="${pointColor(finiteNumber(r.margin?.change3m) ? r.margin.change3m <= -10 ? 2 : r.margin.change3m <= -5 ? 1 : 0 : null)}">${fmt(r.margin?.change3m)}</td><td class="${pointColor(r.volume?.pressure)}">${fmt(r.volume?.volume)}</td><td class="${pointColor(r.volume?.pressure)}">${fmt(r.volume?.average)}</td><td class="${(r.ratio ?? 0) >= 2 ? "history-red" : (r.ratio ?? 0) >= 1.5 ? "history-amber" : "history-normal"}">${fmt(r.ratio)}</td><td>${r.candidate ? "Possible" : "\u2014"}</td><td class="${r.low >= 3 ? "history-red" : r.low >= 2 ? "history-amber" : "history-normal"}">${r.low}</td><td class="${r.high >= 3 ? "history-red" : r.high >= 2 ? "history-amber" : "history-normal"}">${r.high}</td><td class="${compositeColor(r.base?.low)}">${r.base ? r.base.low : "\u2014"}</td><td class="${compositeColor(r.base?.high)}">${r.base ? r.base.high : "\u2014"}</td></tr>`).join("")}</tbody></table></div></section>`;
-  const periodControl = document.querySelector("#forcedPeriod");
+  host.innerHTML = `<section class="control-panel"><h2 class="panel-title">Margin leverage &amp; volume pressure</h2><p class="table-note">Forced Selling contributes up to 6 of 50 points: USDJPY carry-trade stress (2), margin leverage (2) and volume selling pressure (2). Category maximums: 10 + 14 + 8 + 12 + 6 = 50. Possible exhaustion is a separate observation, not a deduction from risk or confirmation of a market bottom.</p><p class="table-note">FINRA debt latest downloaded month: ${requiredValue(forcedData.margin.at(-1)).month} \xB7 ${fmt(requiredValue(forcedData.margin.at(-1)).debt / 1e3)} USD billion. Sourced volume data through ${sourceLatest}; saved entries can extend the current chart. Embedded data downloaded September 24, 2026; no automatic refresh.</p><p class="table-note">Currency scoring and equity diagnostic: USDJPY change over 3 available FX sessions now supplies the currency score (amber \u2264\u22121.5%, red \u2264\u22123%). The separate unscored diagnostic is 5-session change in S&amp;P distance from its 200DMA, amber \u2264\u22123 pp, red \u2264\u22125 pp only while below the 200DMA. These chosen thresholds flag potential pressure, not measured margin liquidations. Missing or stale inputs stay blank. FX uses <a href="https://fred.stlouisfed.org/series/DEXJPUS">FRED DEXJPUS daily observations</a>, not live prices. Select a historical study below to compare the same diagnostics.</p><label for="forcedPeriod">Study period </label><select id="forcedPeriod" style="background:#1e293b;color:white;padding:8px"><option value="current">Latest year / saved entries</option>${historicalMonths.map((m, i) => `<option value="${i}">${m.name}</option>`).join("")}</select><details class="table-note"><summary>Method, scoring and sources</summary><p><a href="https://www.finra.org/rules-guidance/key-topics/margin-accounts/margin-statistics">FINRA monthly debit balances</a> are aggregate customer margin debt, not total broker or system leverage. Raw units are USD millions. The debt chart uses the reference month. Daily scoring assumes availability on the first day of the second month after the reference month (e.g. January \u2192 March 1). This is a lag assumption, not verified historical release dates; the downloaded series may contain revisions. FINRA\u2019s reporting coverage changed in 2010.</p><p>Leverage pressure (0\u20132): maximum of debt year-over-year growth \u226520% (1), \u226540% (2), and three-month contraction \u2264\u22125% (1), \u2264\u221210% (2). This distinguishes leverage buildup and deleveraging without adding both twice. Selling pressure (0\u20132): on a lower closing-price day or a close in the bottom 25% of its range, volume \u22651.5\xD7 its preceding 20-session average adds 1 point; \u22652\xD7 adds 2. Composite Crash Risk = the 18 original indicator scores + these two components, maximum 50. Existing severity boundaries (4, 8, 12, 16 and 26) are retained; they are heuristic, not calibrated probabilities. These chosen thresholds are heuristics, not statistically calibrated.</p><p><a href="https://finance.yahoo.com/quote/%5EGSPC/history/">Yahoo Finance ^GSPC daily OHLC and reported volume</a> supplies the volume proxy; an index itself is not traded and volume coverage can vary over time. Average excludes the current day. Possible exhaustion (green marker): \u22652\xD7 volume, a low at or below the previous 20-session low, close in the top 30% of the day\u2019s range and above the open. It does not subtract risk points or confirm a bottom. A volume spike can accompany continued selling. No future observations are used in these rules.</p></details><h3>Monthly margin debt \xB7 USD billion</h3><div class="indicator-intro"><p>Margin debt measures customer borrowing against securities held in margin accounts at FINRA member firms. The graph displays these monthly debit balances in <strong>USD billions</strong>. It captures one part of market leverage, rather than all borrowing across the financial system.</p><p>Rising balances can accompany greater use of borrowed money, but also reflect a growing market. When prices fall, leveraged investors may face margin calls and need to add collateral or reduce positions. Falling debt can therefore reflect deleveraging, although the aggregate figure does not establish whether sales were voluntary or forced.</p><p class="table-note">Read the level alongside its year-over-year and three-month changes, price trends and credit conditions. Monthly reporting arrives with a lag, so this is structural context rather than a real-time liquidation signal. The debt chart uses the reference month; historical scoring applies the stated availability assumption.</p></div><div style="overflow-x:auto"><svg id="marginDebtPlot" viewBox="0 0 960 340" style="width:100%;min-width:580px" role="img" aria-label="Monthly FINRA margin debt"></svg></div><h3>Daily volume / preceding 20-session average</h3><div class="indicator-intro"><p>This ratio compares the session\u2019s reported S&amp;P 500 volume with the average of the <strong>preceding 20 trading sessions, excluding that session</strong>. A reading of 1.0 means volume equals that average; 1.5 means 50% higher, and 2.0 means twice the average.</p><p>Elevated volume shows unusually heavy trading, but cannot by itself identify who traded or why. Interpret it alongside the price change and where the index closed within its daily range. Heavy volume on a declining day or near the session low can suggest selling pressure; it does not prove forced liquidation or confirm a market bottom.</p><p class="table-note">The app consistently uses Yahoo\u2019s reported ^GSPC volume as a proxy; the index itself is not directly traded. Its 1.5\xD7 and 2.0\xD7 thresholds are heuristic warning levels. A possible exhaustion marker needs the additional price conditions described below and remains an unconfirmed reversal signal.</p></div><p class="table-note">White: below 1.5\xD7 \xB7 Amber: \u22651.5\xD7 \xB7 Red: \u22652\xD7 \xB7 Green: possible exhaustion reversal. Manually entered volume updates selling pressure; reversal markers require the sourced OHLC data. Dashed lines: 1.5\xD7 and 2\xD7. Three equity indexes share a rebased right-hand axis (first common session = 100).</p><div style="overflow-x:auto"><svg id="volumeExhaustionPlot" viewBox="0 0 960 340" style="width:100%;min-width:580px" role="img" aria-label="Daily relative volume and possible exhaustion markers"></svg></div><div class="velocity-guide"><p><strong>200DMA distance 5-session change (pp)</strong> is tracked in the table below. Velocity may identify accelerating stress sooner, but it can also spike near a market bottom. Slowing deterioration does not necessarily mean conditions are safe. Its number changes color as a flag without changing the score.</p><ul><li><span class="history-normal">White:</span> Neither warning threshold is met.</li><li><span class="history-amber">Amber:</span> \u2264 \u22123 pp, while the S&amp;P 500 is below its 200DMA.</li><li><span class="history-red">Red:</span> \u2264 \u22125 pp, while below its 200DMA.</li></ul><p class="table-note">Saved Quick Paste values, including USDJPY momentum, update this table immediately. The latest saved entry supplies each day\u2019s row. 200DMA velocity still needs five-session source history; unavailable or stale diagnostics remain blank.</p></div><p class="table-note">Newest dates first. Scroll within the table; column headings stay visible.</p><div class="data-table-scroll history-scroll forced-history-scroll" tabindex="0" role="region" aria-label="Forced selling history, newest dates first"><table class="history-table"><thead><tr><th>Date</th><th>S&amp;P 500 close</th>${marketColumns.map((c) => `<th>${c[1]}</th>`).join("")}<th>USDJPY 3-session change (%)</th><th>200DMA distance 5-session change (pp)</th><th>Debt reference month</th><th>Debt (USD million)</th><th>Debt YoY %</th><th>Debt 3M %</th><th>Reported volume</th><th>Prior 20D average</th><th>Volume ratio</th><th>Possible exhaustion</th><th>Added points min</th><th>Added points max</th><th>Composite minimum /50</th><th>Composite maximum /50</th></tr></thead><tbody>${[...rows].sort((a, b) => b.date.localeCompare(a.date)).map((r) => `<tr><td>${r.date}</td><td class="history-normal">${fmt(r.close)}</td>${marketCells(r.date, marketValuesForDay(r.date))}<td class="${momentumClass(r.jpy3d, "fx")}">${fmt(r.jpy3d)}</td><td class="${momentumClass(momentumForDate(r.date)?.dmaVelocity, "equity", momentumForDate(r.date)?.dma200)}">${fmt(momentumForDate(r.date)?.dmaVelocity)}</td><td class="${pointColor(r.leverage)}">${r.margin?.month ?? "\u2014"}</td><td class="${pointColor(r.leverage)}">${fmt(r.margin?.debt)}</td><td class="${pointColor(finiteNumber(r.margin?.yoy) ? r.margin.yoy >= 40 ? 2 : r.margin.yoy >= 20 ? 1 : 0 : null)}">${fmt(r.margin?.yoy)}</td><td class="${pointColor(finiteNumber(r.margin?.change3m) ? r.margin.change3m <= -10 ? 2 : r.margin.change3m <= -5 ? 1 : 0 : null)}">${fmt(r.margin?.change3m)}</td><td class="${pointColor(r.volume?.pressure)}">${fmt(r.volume?.volume)}</td><td class="${pointColor(r.volume?.pressure)}">${fmt(r.volume?.average)}</td><td class="${(r.ratio ?? 0) >= 2 ? "history-red" : (r.ratio ?? 0) >= 1.5 ? "history-amber" : "history-normal"}">${fmt(r.ratio)}</td><td>${r.candidate ? "Possible" : "\u2014"}</td><td class="${r.low >= 3 ? "history-red" : r.low >= 2 ? "history-amber" : "history-normal"}">${r.low}</td><td class="${r.high >= 3 ? "history-red" : r.high >= 2 ? "history-amber" : "history-normal"}">${r.high}</td><td class="${compositeColor(r.base?.low)}">${r.base ? r.base.low : "\u2014"}</td><td class="${compositeColor(r.base?.high)}">${r.base ? r.base.high : "\u2014"}</td></tr>`).join("")}</tbody></table></div></section>`;
+  const periodControl = requiredValue(document.querySelector("#forcedPeriod"));
   periodControl.value = selected;
   periodControl.onchange = () => renderForcedSelling();
   function plot(id, data, getValue, label, volume = false) {
@@ -5948,7 +6030,7 @@ function renderForcedSelling() {
     }
   });
   plot("marginDebtPlot", [...debtSeries.values()].filter((m) => m.date >= start && m.date <= end).sort((a, b) => a.date.localeCompare(b.date)), (m) => m.debt / 1e3, "Monthly debt (USD billion)");
-  plot("volumeExhaustionPlot", rows.filter((r) => finiteNumber(r.ratio)), (r) => r.ratio, "Volume ratio", true);
+  plot("volumeExhaustionPlot", rows.filter((r) => finiteNumber(r.ratio)), (r) => requiredValue(r.ratio), "Volume ratio", true);
   makeSubsectionsExpandable(host);
 }
 document.addEventListener("DOMContentLoaded", renderForcedSelling);
@@ -5956,7 +6038,7 @@ function forcedInputsForDate(day) {
   if (!day) return {};
   const f = forcedSignal(day), v = f.volume;
   const ix = v ? sp500Daily.findIndex((r) => r[0] === v.date) : -1;
-  return { ...sessionRangeForDate(day), jpy3d: momentumForDate(day)?.jpy3d ?? null, margin_month: f.margin ? Number(f.margin.month.replace("-", "")) : null, margin_debt: f.margin?.debt ?? null, margin_yoy: f.margin?.yoy ?? null, margin_3m: f.margin?.change3m ?? null, volume: v?.volume ?? null, volume_avg: v?.average ?? null, sp500_chg: ix > 0 ? (sp500Daily[ix][1] / sp500Daily[ix - 1][1] - 1) * 100 : null };
+  return { ...sessionRangeForDate(day), jpy3d: momentumForDate(day)?.jpy3d ?? null, margin_month: f.margin ? Number(f.margin.month.replace("-", "")) : null, margin_debt: f.margin?.debt ?? null, margin_yoy: f.margin?.yoy ?? null, margin_3m: f.margin?.change3m ?? null, volume: v?.volume ?? null, volume_avg: v?.average ?? null, sp500_chg: ix > 0 ? (requiredValue(sp500Daily[ix])[1] / requiredValue(sp500Daily[ix - 1])[1] - 1) * 100 : null };
 }
 function validateForcedInputs(values) {
   const liquidityError = validateLiquidityInputs(values);
@@ -6022,7 +6104,7 @@ function metricPoints(key, values, day) {
     return finiteNumber(n) ? yenMomentumPoints(n) : 0;
   }
   if (key === "vix_term" || key === "wti_20d" || key === "breadth_20d") return DashboardCore.contextualPoints(key, values);
-  return metricConfig[key].calc(v);
+  return metricConfig[key].calc(Number(v));
 }
 let model50Cache = null;
 function model50Sources() {
@@ -6048,22 +6130,22 @@ function cpStaleNote(values, day) {
   return (cp.mixedDates ? "Mixed-date CP spreads: financial " + dates[0] + ", nonfinancial " + dates[1] + ", Treasury " + dates[2] + ". These are not same-session spreads. " : "") + (cp.stale ? "CP data is stale: oldest observation " + dates.slice().sort()[0] + " (" + cp.ageDays + " calendar days old). " : "") + (cp.mixedDates || cp.stale ? "Score uses these rates; CP contributes " + cpStressPoints(cp.sector, cp.financialBill) + " / 3 points." : "");
 }
 function cpStressPoints(sector, bill) {
-  return DashboardCore.cpStressPoints(sector, bill);
+  return DashboardCore.cpStressPoints(Number(sector), Number(bill));
 }
 function leadershipPoints(momentum) {
-  return DashboardCore.leadershipPoints(momentum);
+  return DashboardCore.leadershipPoints(Number(momentum));
 }
 function model50Inputs(values, day = localCalendarDate(/* @__PURE__ */ new Date())) {
   const src = model50Sources(), explicit = finiteNumber(values.cp_date);
   let manual = null;
   if (explicit && !validateLiquidityInputs(values)) {
-    const dates = cpObservationDates(values);
-    manual = { date: dates.slice().sort().at(-1), dates, mixedDates: mixedCpDates(values), sector: Math.round((values.cp_financial - values.cp_nonfinancial) * 1e8) / 1e6, financialBill: Math.round((values.cp_financial - values.cp_treasury) * 1e8) / 1e6 };
+    const dates = cpObservationDates(values).map(requiredValue);
+    manual = { date: requiredValue(dates.slice().sort().at(-1)), dates, mixedDates: mixedCpDates(values), sector: Math.round((requiredValue(values.cp_financial) - requiredValue(values.cp_nonfinancial)) * 1e8) / 1e6, financialBill: Math.round((requiredValue(values.cp_financial) - requiredValue(values.cp_treasury)) * 1e8) / 1e6 };
   }
   let left = 0, right = src.cp.length;
   while (left < right) {
     const mid = left + right >> 1;
-    if (src.cp[mid].date <= day) left = mid + 1;
+    if (requiredValue(src.cp[mid]).date <= day) left = mid + 1;
     else right = mid;
   }
   let cp = explicit ? manual : src.cp[left - 1];
@@ -6087,11 +6169,9 @@ function model50Inputs(values, day = localCalendarDate(/* @__PURE__ */ new Date(
   if (!(finiteNumber(close) && close > 0 && finiteNumber(ndx) && ndx > 0)) return { cp, momentum: null, session, momentumReason: "Supply same-session S&P 500 and Nasdaq 100 closes." };
   const prior = src.momentum.filter((r) => r.date < session), base = prior.at(-20);
   if (!base) return { cp, momentum: null, session, momentumReason: "Need 20 earlier matched index observations; " + prior.length + " available." };
-  const momentum = DashboardCore.relativeMomentum({ nasdaq100: ndx, sp500: close }, { nasdaq100: src.nd.get(base.date), sp500: src.sp.get(base.date) });
+  const momentum = DashboardCore.relativeMomentum({ nasdaq100: ndx, sp500: close }, { nasdaq100: requiredValue(src.nd.get(base.date)), sp500: requiredValue(src.sp.get(base.date)) });
   return { cp, momentum, session, baseDate: base.date };
 }
-metricConfig.cp_stress = { name: "Commercial-paper funding stress", maxPoints: 3, format: (n) => n.toFixed(0) + " points" };
-metricConfig.leadership = { name: "Nasdaq 100 / S&P 500 20-matched-observation momentum", maxPoints: 3, format: (n) => n.toFixed(2) + "%" };
 function metricPointRange(key, values, day) {
   if (key === "cp_stress" || key === "leadership") {
     const input = model50Inputs(values, day);
@@ -6107,7 +6187,7 @@ function metricPointRange(key, values, day) {
   if (deps.length === 1) return finiteNumber(values[key]) ? { low: metricPoints(key, values), high: metricPoints(key, values) } : { low: 0, high: metricConfig[key].maxPoints };
   let states = [{ ...values }];
   deps.forEach((k) => {
-    if (!finiteNumber(values[k])) states = states.flatMap((state) => candidates[k].map((n) => ({ ...state, [k]: n })));
+    if (!finiteNumber(values[k])) states = states.flatMap((state) => requiredValue(candidates[k]).map((n) => ({ ...state, [k]: n })));
   });
   const scores = states.map((state) => metricPoints(key, state));
   return { low: Math.min(...scores), high: Math.max(...scores) };
@@ -6124,40 +6204,43 @@ function momentumClass(value, kind, distance) {
   return pointColor(level);
 }
 function providerObject(value) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) throw Error("Provide a JSON object.");
+  if (!value || typeof value !== "object" || unknownArray(value)) throw Error("Provide a JSON object.");
   return value;
 }
 function convertProviderData(payload) {
-  const data = providerObject(payload), asOf = data.asOf;
+  const data = providerObject(payload), asOf = data["asOf"];
   if (typeof asOf !== "string") throw Error("asOf must be a valid completed-session date, not a future date.");
-  const m = providerObject(data.marketData), o = providerObject(data.optionsData), c = providerObject(data.creditData), f = providerObject(data.finraData);
+  const m = providerObject(data["marketData"]), o = providerObject(data["optionsData"]), c = providerObject(data["creditData"]), f = providerObject(data["finraData"]);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(asOf) || !Number.isFinite(Date.parse(asOf)) || (/* @__PURE__ */ new Date(asOf + "T00:00:00Z")).toISOString().slice(0, 10) !== asOf || asOf > localCalendarDate(/* @__PURE__ */ new Date())) throw Error("asOf must be a valid completed-session date, not a future date.");
   if (!m || !o || !c || !f) throw Error("Provide marketData, optionsData, creditData and finraData objects.");
-  if ([m, o, c].some((x) => x.asOf !== asOf)) throw Error("Market, options and credit observations must share the declared asOf date.");
-  if (c.spreadUnit !== "bp" || m.yieldUnit !== "percent" || m.yieldChangeUnit !== "bp" || m.volumeUnit !== "shares") throw Error("Required units: spreadUnit bp; yieldUnit percent; yieldChangeUnit bp; volumeUnit shares.");
-  const rawObservations = m.trailing_20d_volumes_list;
-  if (!Array.isArray(rawObservations) || rawObservations.length !== 20) throw Error("Provide exactly 20 preceding sessions as {date,volume} objects.");
+  if ([m, o, c].some((x) => x["asOf"] !== asOf)) throw Error("Market, options and credit observations must share the declared asOf date.");
+  if (c["spreadUnit"] !== "bp" || m["yieldUnit"] !== "percent" || m["yieldChangeUnit"] !== "bp" || m["volumeUnit"] !== "shares") throw Error("Required units: spreadUnit bp; yieldUnit percent; yieldChangeUnit bp; volumeUnit shares.");
+  const rawObservations = m["trailing_20d_volumes_list"];
+  if (!unknownArray(rawObservations) || rawObservations.length !== 20) throw Error("Provide exactly 20 preceding sessions as {date,volume} objects.");
   const observations = [];
   const seen = /* @__PURE__ */ new Set();
   let previous = "";
   for (const item of rawObservations) {
     const r = providerObject(item);
-    if (typeof r.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.date) || !Number.isFinite(Date.parse(r.date)) || r.date >= asOf || r.date <= previous || seen.has(r.date) || !finiteNumber(r.volume) || r.volume <= 0) throw Error("Volume history must contain 20 distinct, ascending prior-session dates and positive volumes.");
-    previous = r.date;
-    seen.add(r.date);
-    observations.push({ date: r.date, volume: r.volume });
+    if (typeof r["date"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r["date"]) || !Number.isFinite(Date.parse(r["date"])) || r["date"] >= asOf || r["date"] <= previous || seen.has(r["date"]) || !finiteNumber(r["volume"]) || r["volume"] <= 0) throw Error("Volume history must contain 20 distinct, ascending prior-session dates and positive volumes.");
+    previous = r["date"];
+    seen.add(r["date"]);
+    observations.push({ date: r["date"], volume: r["volume"] });
   }
-  if (Date.parse(asOf) - Date.parse(observations[0].date) > 45 * 864e5) throw Error("Volume history is too old to represent the preceding 20 sessions.");
-  const debt = f.total_debt_balance_usd;
-  if (f.debtUnit !== "USD" && f.debtUnit !== "USD million") throw Error("Declare finraData.debtUnit as USD or USD million.");
+  if (Date.parse(asOf) - Date.parse(requiredValue(observations[0]).date) > 45 * 864e5) throw Error("Volume history is too old to represent the preceding 20 sessions.");
+  const debt = f["total_debt_balance_usd"];
+  if (f["debtUnit"] !== "USD" && f["debtUnit"] !== "USD million") throw Error("Declare finraData.debtUnit as USD or USD million.");
   if (debt != null && !finiteNumber(debt)) throw Error("Debt must be a number or null.");
-  if (debt != null && (typeof f.publishedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(f.publishedAt) || !Number.isFinite(Date.parse(f.publishedAt)) || f.publishedAt > asOf)) throw Error("Debt requires a publication date no later than asOf.");
-  const raw = [o.current_vix, o.vix_daily_change, o.vix_5d_change, c.high_yield_oas, c.hy_oas_5d_delta, c.hy_oas_20d_delta, c.bbb_oas, m.us_10y_yield, m.yield_20d_delta, m.sp500_dist_50dma, m.sp500_dist_200dma, m.wti_crude_price, m.wti_20d_change, m.ice_move_index, m.forex_usd_jpy, m.sp500_breadth, m.breadth_20d_delta, o.vix3m_vix_spread, m.sp500_close, f.published_month, debt == null ? null : debt / (f.debtUnit === "USD" ? 1e6 : 1), f.debt_yoy_percentage, f.debt_3m_percentage, m.current_session_volume, observations.reduce((n, r) => n + r.volume, 0) / 20, m.sp500_1d_pct, m.forex_usd_jpy_3d_pct ?? null, m.sp500_high ?? null, m.sp500_low ?? null, m.nasdaq_close ?? null, m.nasdaq100_close ?? null, m.cp_date ?? null, m.cp_financial ?? null, m.cp_nonfinancial ?? null, m.cp_treasury ?? null];
+  if (debt != null && (typeof f["publishedAt"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(f["publishedAt"]) || !Number.isFinite(Date.parse(f["publishedAt"])) || f["publishedAt"] > asOf)) throw Error("Debt requires a publication date no later than asOf.");
+  const raw = [o["current_vix"], o["vix_daily_change"], o["vix_5d_change"], c["high_yield_oas"], c["hy_oas_5d_delta"], c["hy_oas_20d_delta"], c["bbb_oas"], m["us_10y_yield"], m["yield_20d_delta"], m["sp500_dist_50dma"], m["sp500_dist_200dma"], m["wti_crude_price"], m["wti_20d_change"], m["ice_move_index"], m["forex_usd_jpy"], m["sp500_breadth"], m["breadth_20d_delta"], o["vix3m_vix_spread"], m["sp500_close"], f["published_month"], debt == null ? null : debt / (f["debtUnit"] === "USD" ? 1e6 : 1), f["debt_yoy_percentage"], f["debt_3m_percentage"], m["current_session_volume"], observations.reduce((n, r) => n + r.volume, 0) / 20, m["sp500_1d_pct"], m["forex_usd_jpy_3d_pct"] ?? null, m["sp500_high"] ?? null, m["sp500_low"] ?? null, m["nasdaq_close"] ?? null, m["nasdaq100_close"] ?? null, m["cp_date"] ?? null, m["cp_financial"] ?? null, m["cp_nonfinancial"] ?? null, m["cp_treasury"] ?? null];
   raw.forEach((v, i) => {
     if (v === null) return;
-    if (!Number.isFinite(v)) throw Error("Missing or nonnumeric field: " + inputColumns[i][1]);
+    if (!Number.isFinite(v)) throw Error("Missing or nonnumeric field: " + requiredValue(inputColumns[i])[1]);
   });
-  const values = Object.fromEntries(inputColumns.map(([key], i) => [key, raw[i]]));
+  const values = {};
+  inputColumns.forEach(([key], i) => {
+    values[key] = nullableNumber(raw[i]);
+  });
   const error = validateForcedInputs(values);
   if (error) throw Error(error);
   if (finiteNumber(values.sp500) && values.sp500 <= 0 || finiteNumber(values.vix) && values.vix < 0 || finiteNumber(values.jpy) && values.jpy <= 0 || finiteNumber(values.breadth) && (values.breadth < 0 || values.breadth > 100)) throw Error("Price, VIX, USDJPY or breadth is outside its valid range.");
@@ -6228,16 +6311,16 @@ function fredMessage(text) {
 }
 function validateFredData(value) {
   const data = providerObject(value);
-  if (!data || data.version !== 1 || data.source !== "FRED" || JSON.stringify(data.series) !== '["DCPF3M","DCPN3M","DTB3"]' || !Array.isArray(data.rows) || !data.rows.length || data.rows.length > 1e4 || typeof data.fetchedAt !== "string" || !finiteNumber(Date.parse(data.fetchedAt))) throw Error("Invalid FRED response.");
+  if (!data || data["version"] !== 1 || data["source"] !== "FRED" || JSON.stringify(data["series"]) !== '["DCPF3M","DCPN3M","DTB3"]' || !unknownArray(data["rows"]) || !data["rows"].length || data["rows"].length > 1e4 || typeof data["fetchedAt"] !== "string" || !finiteNumber(Date.parse(data["fetchedAt"]))) throw Error("Invalid FRED response.");
   const clean = [];
   let previous = "";
-  for (const row of data.rows) {
-    if (!Array.isArray(row) || row.length !== 4 || typeof row[0] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row[0]) || !finiteNumber(Date.parse(row[0])) || new Date(row[0]).toISOString().slice(0, 10) !== row[0] || row[0] <= previous || row[0] > (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) || row.slice(1).some((n) => n !== null && (!finiteNumber(n) || n < -10 || n > 100))) throw Error("Invalid FRED observations.");
-    clean.push([...row]);
+  for (const row of data["rows"]) {
+    if (!unknownArray(row) || row.length !== 4 || typeof row[0] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row[0]) || !finiteNumber(Date.parse(row[0])) || new Date(row[0]).toISOString().slice(0, 10) !== row[0] || row[0] <= previous || row[0] > (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) || row.slice(1).some((n) => n !== null && (!finiteNumber(n) || n < -10 || n > 100))) throw Error("Invalid FRED observations.");
+    clean.push([row[0], nullableNumber(row[1]), nullableNumber(row[2]), nullableNumber(row[3])]);
     previous = row[0];
   }
   if (![1, 2, 3].every((i) => clean.some((row) => finiteNumber(row[i])))) throw Error("Incomplete FRED response.");
-  return { version: 1, source: "FRED", series: ["DCPF3M", "DCPN3M", "DTB3"], fetchedAt: new Date(data.fetchedAt).toISOString(), rows: clean };
+  return { version: 1, source: "FRED", series: ["DCPF3M", "DCPN3M", "DTB3"], fetchedAt: new Date(data["fetchedAt"]).toISOString(), rows: clean };
 }
 function loadFredPreferences() {
   fredRequestGeneration++;
@@ -6249,7 +6332,7 @@ function loadFredPreferences() {
     if (historyOwner) {
       input.value = localStorage.getItem(fredKeyStorage()) || "";
       const raw = localStorage.getItem(fredDataStorage());
-      if (raw) fredLiveData = validateFredData(JSON.parse(raw));
+      if (raw) fredLiveData = validateFredData(parseJson(raw));
     }
   } catch {
     fredMessage("Saved FRED data or key could not be loaded. Paste your key to fetch again.");
@@ -6310,7 +6393,7 @@ async function fetchFredLiveData() {
     if (!response.ok) {
       if (response.status === 404) throw Error("CONNECTOR_UNAVAILABLE");
       if (response.status === 401) throw Error("SIGN_IN_REQUIRED");
-      throw Error(["FRED_KEY_REJECTED", "FRED_RATE_LIMIT", "FRED_UNAVAILABLE", "INVALID_DATA", "CONNECTOR_CONFIGURATION"].includes(String(payload.error)) ? String(payload.error) : "CONNECTOR_UNAVAILABLE");
+      throw Error(["FRED_KEY_REJECTED", "FRED_RATE_LIMIT", "FRED_UNAVAILABLE", "INVALID_DATA", "CONNECTOR_CONFIGURATION"].includes(String(payload["error"])) ? String(payload["error"]) : "CONNECTOR_UNAVAILABLE");
     }
     const checked = validateFredData(payload);
     if (owner !== historyOwner || generation !== fredRequestGeneration) return;
@@ -6349,13 +6432,13 @@ function fedWatchKey() {
 }
 function validateFedWatch(value) {
   const r = providerObject(value);
-  if (!r || typeof r !== "object" || Array.isArray(r)) throw Error("Paste one Fed JSON object.");
+  if (!r || typeof r !== "object" || unknownArray(r)) throw Error("Paste one Fed JSON object.");
   const timestamp = (v) => typeof v === "string" && /^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v) && finiteNumber(Date.parse(v));
   for (const k of ["observedAt", "publishedAt"]) if (r[k] != null && (!timestamp(r[k]) || Date.parse(r[k]) > Date.now())) throw Error(k + " must have a valid timezone and be no later than now, or be null if unknown.");
-  if (typeof r.meetingDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.meetingDate) || !finiteNumber(Date.parse(r.meetingDate)) || new Date(r.meetingDate).toISOString().slice(0, 10) !== r.meetingDate) throw Error("A valid decision date is required.");
+  if (typeof r["meetingDate"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r["meetingDate"]) || !finiteNumber(Date.parse(r["meetingDate"])) || new Date(r["meetingDate"]).toISOString().slice(0, 10) !== r["meetingDate"]) throw Error("A valid decision date is required.");
   for (const k of ["targetLower", "targetUpper", "hike", "hold", "cut"]) if (typeof r[k] !== "number" || !finiteNumber(r[k]) || r[k] < 0 || r[k] > 100) throw Error(k + " must be a verified number from 0 to 100.");
-  if (Number(r.targetLower) > Number(r.targetUpper)) throw Error("Target lower must not exceed target upper.");
-  if (Math.abs(Number(r.hike) + Number(r.hold) + Number(r.cut) - 100) > 1e-9) throw Error("Hike, hold and cut must total 100%.");
+  if (Number(r["targetLower"]) > Number(r["targetUpper"])) throw Error("Target lower must not exceed target upper.");
+  if (Math.abs(Number(r["hike"]) + Number(r["hold"]) + Number(r["cut"]) - 100) > 1e-9) throw Error("Hike, hold and cut must total 100%.");
   for (const k of ["source", "calendarSource"]) {
     let u;
     try {
@@ -6367,14 +6450,14 @@ function validateFedWatch(value) {
     if (k === "calendarSource" && !["www.federalreserve.gov", "federalreserve.gov"].includes(u.hostname)) throw Error("Use the official Federal Reserve calendar URL.");
   }
   const changes = ["hikeChange5d", "holdChange5d", "cutChange5d"];
-  if (r.comparisonAt != null) {
-    if (!timestamp(r.observedAt) || !timestamp(r.comparisonAt) || Date.parse(r.comparisonAt) >= Date.parse(r.observedAt)) throw Error("Comparison timestamp must precede this observation.");
+  if (r["comparisonAt"] != null) {
+    if (!timestamp(r["observedAt"]) || !timestamp(r["comparisonAt"]) || Date.parse(r["comparisonAt"]) >= Date.parse(r["observedAt"])) throw Error("Comparison timestamp must precede this observation.");
     for (const k of changes) if (typeof r[k] !== "number" || !finiteNumber(r[k]) || Math.abs(r[k]) > 100) throw Error("All three comparison changes must be verified numbers.");
     if (Math.abs(changes.reduce((a, k) => a + Number(r[k]), 0)) > 1) throw Error("Comparison changes must net to approximately zero.");
-    for (const [i, k] of ["hike", "hold", "cut"].entries()) if (Number(r[k]) - Number(r[changes[i]]) < -0.5 || Number(r[k]) - Number(r[changes[i]]) > 100.5) throw Error("Comparison implies an invalid prior probability.");
+    for (const [i, k] of ["hike", "hold", "cut"].entries()) if (Number(r[k]) - Number(r[requiredValue(changes[i])]) < -0.5 || Number(r[k]) - Number(r[requiredValue(changes[i])]) > 100.5) throw Error("Comparison implies an invalid prior probability.");
   } else if (changes.some((k) => r[k] != null)) throw Error("Comparison changes require a verified comparison timestamp.");
-  if (r.notes != null && typeof r.notes !== "string") throw Error("Notes must be text.");
-  return Object.fromEntries(fedFields.map(([k]) => [k, r[k] ?? (k === "notes" ? "" : null)]));
+  if (r["notes"] != null && typeof r["notes"] !== "string") throw Error("Notes must be text.");
+  return { meetingDate: r["meetingDate"], observedAt: nullableString(r["observedAt"]), publishedAt: nullableString(r["publishedAt"]), targetLower: checkedNumber(r["targetLower"]), targetUpper: checkedNumber(r["targetUpper"]), hike: checkedNumber(r["hike"]), hold: checkedNumber(r["hold"]), cut: checkedNumber(r["cut"]), comparisonAt: nullableString(r["comparisonAt"]), hikeChange5d: nullableNumber(r["hikeChange5d"]), holdChange5d: nullableNumber(r["holdChange5d"]), cutChange5d: nullableNumber(r["cutChange5d"]), source: checkedString(r["source"]), calendarSource: checkedString(r["calendarSource"]), notes: r["notes"] == null ? "" : checkedString(r["notes"]) };
 }
 function loadFedWatch() {
   fedWatchRows = [];
@@ -6384,8 +6467,8 @@ function loadFedWatch() {
   fedDirty.clear();
   for (const id of ["fedPrompt", "fedPaste"]) requiredElement(id).value = "";
   try {
-    const rows = JSON.parse(localStorage.getItem(fedWatchKey()) || "[]");
-    if (!Array.isArray(rows)) throw Error("Invalid history");
+    const rows = parseJson(localStorage.getItem(fedWatchKey()) || "[]");
+    if (!unknownArray(rows)) throw Error("Invalid history");
     fedWatchRows = rows.map(validateFedWatch);
     setAppFeedback("fedStatus", "");
   } catch (e) {
@@ -6493,7 +6576,7 @@ function renderFedWatch() {
     td.appendChild(button("Save", () => {
       try {
         const raw = {};
-        fedFields.forEach(([k, , type]) => raw[k] = type === "number" ? inputs[k].value.trim() === "" ? null : Number(inputs[k].value) : inputs[k].value.trim() || null);
+        fedFields.forEach(([k, , type]) => raw[k] = type === "number" ? requiredValue(inputs[k]).value.trim() === "" ? null : Number(requiredValue(inputs[k]).value) : requiredValue(inputs[k]).value.trim() || null);
         const row = validateFedWatch(raw);
         if (fedWatchRows.some((v, j) => j !== i && fedSameObservation(v, row))) throw Error("An observation for this timestamp and meeting already exists.");
         const next = fedWatchRows.slice();
@@ -6553,7 +6636,7 @@ async function copyFedPrompt() {
 }
 function importFedWatch() {
   try {
-    const row = validateFedWatch(JSON.parse(requiredElement("fedPaste").value.trim()));
+    const row = validateFedWatch(parseJson(requiredElement("fedPaste").value.trim()));
     if (fedWatchRows.some((r) => fedSameObservation(r, row))) throw Error("This observation already exists. Edit its saved row instead.");
     if (!fedLeaveEdits()) return;
     persistFedWatch([...fedWatchRows, row]);
@@ -6574,11 +6657,11 @@ function fundingNumber(n) {
 }
 function validateFunding(value) {
   const r = providerObject(value);
-  if (typeof r.observationDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r.observationDate) || !finiteNumber(Date.parse(r.observationDate)) || new Date(r.observationDate).toISOString().slice(0, 10) !== r.observationDate) throw Error("A valid observation date is required.");
-  if (typeof r.publishedAt !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(r.publishedAt) || !finiteNumber(Date.parse(r.publishedAt))) throw Error("Publication time must include its timezone, e.g. 2026-09-17T20:30:00Z.");
-  if (Date.parse(r.publishedAt) < Date.parse(r.observationDate) || Date.parse(r.publishedAt) > Date.now()) throw Error("Publication must follow the observation and cannot be in the future.");
-  if (!finiteNumber(r.balance) || r.balance < 0) throw Error("Balance must be a nonnegative number in USD millions.");
-  if (r.testBalance !== null && (!finiteNumber(r.testBalance) || r.testBalance < 0 || r.testBalance > r.balance)) throw Error("Tests must be null or between zero and the raw balance.");
+  if (typeof r["observationDate"] !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(r["observationDate"]) || !finiteNumber(Date.parse(r["observationDate"])) || new Date(r["observationDate"]).toISOString().slice(0, 10) !== r["observationDate"]) throw Error("A valid observation date is required.");
+  if (typeof r["publishedAt"] !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(r["publishedAt"]) || !finiteNumber(Date.parse(r["publishedAt"]))) throw Error("Publication time must include its timezone, e.g. 2026-09-17T20:30:00Z.");
+  if (Date.parse(r["publishedAt"]) < Date.parse(r["observationDate"]) || Date.parse(r["publishedAt"]) > Date.now()) throw Error("Publication must follow the observation and cannot be in the future.");
+  if (!finiteNumber(r["balance"]) || r["balance"] < 0) throw Error("Balance must be a nonnegative number in USD millions.");
+  if (r["testBalance"] !== null && (!finiteNumber(r["testBalance"]) || r["testBalance"] < 0 || r["testBalance"] > r["balance"])) throw Error("Tests must be null or between zero and the raw balance.");
   function official(s) {
     if (typeof s !== "string") return false;
     try {
@@ -6588,9 +6671,10 @@ function validateFunding(value) {
       return false;
     }
   }
-  if (!official(r.source)) throw Error("Use an HTTPS Fed, NY Fed, FRED or ALFRED source URL.");
-  if (r.testBalance !== null && !official(r.testEvidence)) throw Error("A test adjustment, including verified zero, requires an official evidence URL.");
-  return { ...r, publishedAt: new Date(r.publishedAt).toISOString() };
+  if (!official(r["source"])) throw Error("Use an HTTPS Fed, NY Fed, FRED or ALFRED source URL.");
+  if (r["testBalance"] !== null && !official(r["testEvidence"])) throw Error("A test adjustment, including verified zero, requires an official evidence URL.");
+  if (!optionalTextFields(r, ["id", "supersedes", "savedAt"]) || r["reference"] !== void 0 && typeof r["reference"] !== "boolean") throw Error("Invalid funding record metadata.");
+  return { ...r, observationDate: r["observationDate"], publishedAt: new Date(r["publishedAt"]).toISOString(), balance: r["balance"], testBalance: r["testBalance"], testEvidence: checkedString(r["testEvidence"]), source: r["source"], ...typeof r["savedAt"] === "string" ? { savedAt: r["savedAt"] } : {}, ...typeof r["id"] === "string" ? { id: r["id"] } : {}, ...typeof r["supersedes"] === "string" ? { supersedes: r["supersedes"] } : {}, ...typeof r["reference"] === "boolean" ? { reference: r["reference"] } : {} };
 }
 function fundingVersionsAt(records, time) {
   const m = /* @__PURE__ */ new Map();
@@ -6607,8 +6691,8 @@ function loadFunding() {
   fundingEdit = null;
   try {
     const raw = localStorage.getItem(fundingKey());
-    const list = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(list)) throw Error("Invalid history");
+    const list = raw ? parseJson(raw) : [];
+    if (!unknownArray(list)) throw Error("Invalid history");
     fundingRecords = list.map(validateFunding);
   } catch (e) {
     const s = requiredElement("fundingStatus");
@@ -6634,7 +6718,7 @@ function resetFundingForm() {
 function editFunding(r) {
   fundingEdit = r.id;
   const raw = Object.fromEntries(fundingFields.map(([k]) => [k, r[k] ?? (k === "testBalance" ? null : "")]));
-  raw.publishedAt = (/* @__PURE__ */ new Date()).toISOString();
+  raw["publishedAt"] = (/* @__PURE__ */ new Date()).toISOString();
   requiredElement("fundingQuickPaste").value = JSON.stringify(raw, null, 2);
   requiredElement("fundingCancelEdit").hidden = false;
   setAppFeedback("fundingQuickStatus", "Editing " + r.observationDate + ". Update the JSON and select Parse and Update. The original release is retained; the correction takes effect when saved.", "warning");
@@ -6653,8 +6737,8 @@ async function deleteFunding(r) {
 }
 function importFunding() {
   try {
-    const data = JSON.parse(requiredElement("fundingImport").value);
-    if (!Array.isArray(data) || data.length > 1e4) throw Error("Provide an array of at most 10,000 releases.");
+    const data = parseJson(requiredElement("fundingImport").value);
+    if (!unknownArray(data) || data.length > 1e4) throw Error("Provide an array of at most 10,000 releases.");
     const next = [...fundingRecords];
     let count = 0;
     data.forEach((raw) => {
@@ -6708,7 +6792,7 @@ function renderFunding() {
   body.replaceChildren();
   [...visible].sort((a, b) => b.observationDate.localeCompare(a.observationDate)).forEach((r) => {
     const tr = document.createElement("tr");
-    tr.dataset.comparisonDate = r.observationDate;
+    tr.dataset["comparisonDate"] = r.observationDate;
     const cell = (text) => {
       const td = document.createElement("td");
       td.textContent = text;
@@ -6727,7 +6811,7 @@ function renderFunding() {
     edit.onclick = () => editFunding(r);
     if (r.reference) cell("Read-only");
     else cell("").appendChild(edit);
-    [r.savedAt, r.observationDate, r.publishedAt || "Unverified \xB7 reference vintage", fundingNumber(r.balance), fundingNumber(fundingChange(r, records, time)), fundingNumber(r.testBalance), fundingNumber(r.testBalance === null ? null : r.balance - r.testBalance), r.testBalance === null ? "Unverified" : "Evidence supplied"].forEach(cell);
+    [r.savedAt ?? "", r.observationDate, r.publishedAt || "Unverified \xB7 reference vintage", fundingNumber(r.balance), fundingNumber(fundingChange(r, records, time)), fundingNumber(r.testBalance), fundingNumber(r.testBalance === null ? null : r.balance - r.testBalance), r.testBalance === null ? "Unverified" : "Evidence supplied"].forEach(cell);
     const sources = cell("");
     [r.source, r.testEvidence].filter(Boolean).forEach((url) => {
       const a = document.createElement("a");
@@ -6752,7 +6836,7 @@ function renderFundingChart(time) {
   const points = visible.map((r) => ({ t: Date.parse(r.observationDate), r, change: fundingChange(r, records, time) })).filter((p) => p.t >= a && p.t <= b);
   const max = Math.max(1, ...points.map((p) => p.r?.balance || 0)), y = (n) => 230 - n / max * 195;
   const changes = points.filter((p) => p.t > a && p.t < b && p.change !== null);
-  const cm = Math.max(1, ...changes.map((p) => Math.abs(p.change)));
+  const cm = Math.max(1, ...changes.map((p) => Math.abs(requiredValue(p.change))));
   const add = (tag, attrs, text) => {
     const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
     Object.entries(attrs).forEach(([k, v]) => el.setAttribute(k, String(v)));
@@ -6784,8 +6868,8 @@ function renderFundingChart(time) {
     dot.appendChild(title);
   });
   changes.forEach((p) => {
-    const h = Math.abs(p.change) / cm * 45;
-    const bar = add("rect", { x: x(p.t) - 3, y: p.change >= 0 ? 335 - h : 335, width: 6, height: Math.max(1, h), fill: "#b58b51", tabindex: 0 });
+    const h = Math.abs(requiredValue(p.change)) / cm * 45;
+    const bar = add("rect", { x: x(p.t) - 3, y: requiredValue(p.change) >= 0 ? 335 - h : 335, width: 6, height: Math.max(1, h), fill: "#b58b51", tabindex: 0 });
     const title = document.createElementNS("http://www.w3.org/2000/svg", "title");
     title.textContent = new Date(p.t).toISOString() + " | weekly change " + p.change + " USD m";
     bar.appendChild(title);
@@ -6820,11 +6904,11 @@ function fillFundingFromAI() {
   try {
     let text = requiredElement("fundingQuickPaste").value.trim();
     if (/^```(?:json)?\s*[\s\S]*\s*```$/i.test(text)) text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
-    const raw = JSON.parse(text);
-    if (!raw || Array.isArray(raw) || typeof raw !== "object") throw Error("Paste one JSON object for the latest release. Use bulk import for a history array.");
+    const raw = providerObject(parseJson(text));
+    if (!raw || unknownArray(raw) || typeof raw !== "object") throw Error("Paste one JSON object for the latest release. Use bulk import for a history array.");
     const keys = fundingFields.map(([k]) => k);
     if (keys.some((k) => !Object.hasOwn(raw, k)) || Object.keys(raw).some((k) => !keys.some((key) => key === k))) throw Error("The response must contain exactly observationDate, publishedAt, balance, testBalance, testEvidence and source.");
-    if (raw.observationDate === null || raw.publishedAt === null || raw.balance === null) throw Error("The AI could not verify the observation date, publication timestamp or balance. Research those missing fields before saving.");
+    if (raw["observationDate"] === null || raw["publishedAt"] === null || raw["balance"] === null) throw Error("The AI could not verify the observation date, publication timestamp or balance. Research those missing fields before saving.");
     const r = validateFunding(raw);
     const now = (/* @__PURE__ */ new Date()).toISOString();
     if (fundingEdit) {
@@ -6884,9 +6968,9 @@ function liquidityHistoryRows(entries = entryHistory) {
   [...entries].sort((a, b) => Date.parse(a.cpCheckedAt || a.updatedAt || a.savedAt) - Date.parse(b.cpCheckedAt || b.updatedAt || b.savedAt)).forEach((r) => {
     const v = r.values;
     if (v.cp_date == null || validateLiquidityInputs(v) || mixedCpDates(v)) return;
-    const date = liquidityDate(v.cp_date), existing = byDate.get(date);
-    if (existing?.live && [existing.financial, existing.nonfinancial, existing.treasury].every(Number.isFinite) && Date.parse(fredLiveData.fetchedAt) > Date.parse(r.cpCheckedAt || r.updatedAt || r.savedAt)) return;
-    byDate.set(date, { ...cpSpreads([date, v.cp_financial, v.cp_nonfinancial, v.cp_treasury]), manual: true });
+    const date = requiredValue(liquidityDate(v.cp_date)), existing = byDate.get(date);
+    if (existing?.live && [existing.financial, existing.nonfinancial, existing.treasury].every(Number.isFinite) && Date.parse(requiredValue(fredLiveData).fetchedAt) > Date.parse(r.cpCheckedAt || r.updatedAt || r.savedAt)) return;
+    byDate.set(date, { ...cpSpreads([date, requiredValue(v.cp_financial), requiredValue(v.cp_nonfinancial), requiredValue(v.cp_treasury)]), manual: true });
   });
   return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -6918,7 +7002,7 @@ function diagnosticWatch(rows, key, day, direction) {
     const index = rows.indexOf(latest);
     if (index < 1 || rows[index - 1] !== previous) exceptions.push("Previous session momentum unavailable; direction uses the last valid observation on " + previous.date);
   }
-  const sorted = prior.map((r) => r[key]).sort((a, b) => a - b), threshold = sorted[Math.ceil(sorted.length * (direction === "high" ? 0.9 : 0.1)) - 1], value = latest[key];
+  const sorted = prior.map((r) => r[key]).sort((a, b) => a - b), threshold = requiredValue(sorted[Math.ceil(sorted.length * (direction === "high" ? 0.9 : 0.1)) - 1]), value = latest[key];
   const flagged = direction === "high" ? value > 0 && value >= threshold && value > previous[key] : value < 0 && value <= threshold && value < previous[key];
   return { key, state: flagged ? "watch" : "not-triggered", date: latest.date, value, threshold, previous: previous[key], previousDate: previous.date, count: prior.length, baselineDays, exceptions };
 }
@@ -6943,8 +7027,8 @@ function renderDiagnosticAlerts(cp, rotation, end, historical) {
 function renderLiquidityDiagnostics() {
   const sourceStatus = document.getElementById("cpDownloadStatus");
   if (sourceStatus) {
-    if (!sourceStatus.dataset.embedded) sourceStatus.dataset.embedded = sourceStatus.textContent || "Embedded source downloaded September 25, 2026.";
-    sourceStatus.textContent = fredLiveData ? "FRED data fetched " + displayUpdateTime(fredLiveData.fetchedAt) + "." : sourceStatus.dataset.embedded;
+    if (!sourceStatus.dataset["embedded"]) sourceStatus.dataset["embedded"] = sourceStatus.textContent || "Embedded source downloaded September 25, 2026.";
+    sourceStatus.textContent = fredLiveData ? "FRED data fetched " + displayUpdateTime(fredLiveData.fetchedAt) + "." : sourceStatus.dataset["embedded"];
   }
   const host = requiredElement("liquidityDiagnosticRows");
   if (!host) return;
@@ -7026,161 +7110,161 @@ const dashboardActions = {
   "restoreAccount": (_event, element) => {
     if (element instanceof HTMLInputElement) void restoreAccount(element);
   },
-  "handleLogin-1": (event, element) => {
+  "handleLogin-1": (event) => {
     if (event instanceof SubmitEvent) handleLogin(event);
   },
-  "showAuthStep-2": (event, element) => {
+  "showAuthStep-2": () => {
     showAuthStep("registerStep");
   },
-  "handleRegister-3": (event, element) => {
+  "handleRegister-3": (event) => {
     if (event instanceof SubmitEvent) handleRegister(event);
   },
-  "showAuthStep-4": (event, element) => {
+  "showAuthStep-4": () => {
     showAuthStep("loginStep");
   },
-  "setPlatformLayout-5": (event, element) => {
+  "setPlatformLayout-5": () => {
     setPlatformLayout("desktop");
   },
-  "setPlatformLayout-6": (event, element) => {
+  "setPlatformLayout-6": () => {
     setPlatformLayout("mobile");
   },
-  "syncNow-7": (event, element) => {
+  "syncNow-7": () => {
     syncNow();
   },
-  "openTroubleshootSync-8": (event, element) => {
+  "openTroubleshootSync-8": () => {
     openTroubleshootSync();
   },
-  "logoutUser-9": (event, element) => {
+  "logoutUser-9": () => {
     logoutUser();
   },
-  "preventDefault-10": (event, element) => {
+  "preventDefault-10": (event) => {
     event.preventDefault();
     finishSyncChoice("later");
   },
-  "finishSyncChoice-11": (event, element) => {
+  "finishSyncChoice-11": () => {
     finishSyncChoice("local");
   },
-  "finishSyncChoice-12": (event, element) => {
+  "finishSyncChoice-12": () => {
     finishSyncChoice("cloud");
   },
-  "finishSyncChoice-13": (event, element) => {
+  "finishSyncChoice-13": () => {
     finishSyncChoice("later");
   },
-  "preventDefault-14": (event, element) => {
+  "preventDefault-14": (event) => {
     event.preventDefault();
     hideCloudOverwrite();
   },
-  "overwriteCloudWithLocal-15": (event, element) => {
+  "overwriteCloudWithLocal-15": (event) => {
     overwriteCloudWithLocal(event);
   },
-  "hideCloudOverwrite-16": (event, element) => {
+  "hideCloudOverwrite-16": () => {
     hideCloudOverwrite();
   },
-  "preventDefault-17": (event, element) => {
+  "preventDefault-17": (event) => {
     event.preventDefault();
     event.stopPropagation();
     downloadLatestAnalysis();
   },
-  "generateAnalysisPrompt-18": (event, element) => {
+  "generateAnalysisPrompt-18": () => {
     generateAnalysisPrompt();
   },
-  "copyAnalysisPrompt-19": (event, element) => {
+  "copyAnalysisPrompt-19": () => {
     copyAnalysisPrompt();
   },
-  "exportAnalysisWord-20": (event, element) => {
+  "exportAnalysisWord-20": () => {
     exportAnalysisWord();
   },
-  "getElementById-21": (event, element) => {
+  "getElementById-21": () => {
     requiredElement("analysisWordFile").click();
   },
-  "importAnalysisWord-22": (event, element) => {
+  "importAnalysisWord-22": (_event, element) => {
     if (element instanceof HTMLInputElement) void importAnalysisWord(element.files?.[0]);
   },
-  "refreshAnalysisPreview-23": (event, element) => {
+  "refreshAnalysisPreview-23": () => {
     refreshAnalysisPreview();
   },
-  "saveAnalysisResponse-24": (event, element) => {
+  "saveAnalysisResponse-24": () => {
     saveAnalysisResponse();
   },
-  "copyQuickPastePrompt-25": (event, element) => {
+  "copyQuickPastePrompt-25": () => {
     copyQuickPastePrompt();
   },
-  "parseQuickPaste-26": (event, element) => {
+  "parseQuickPaste-26": () => {
     parseQuickPaste();
   },
-  "setAllChartRanges-27": (event, element) => {
+  "setAllChartRanges-27": (_event, element) => {
     if (element instanceof HTMLSelectElement) setAllChartRanges(element.value);
   },
-  "generateFedPrompt-28": (event, element) => {
+  "generateFedPrompt-28": () => {
     generateFedPrompt();
   },
-  "copyFedPrompt-29": (event, element) => {
+  "copyFedPrompt-29": () => {
     copyFedPrompt();
   },
-  "importFedWatch-30": (event, element) => {
+  "importFedWatch-30": () => {
     importFedWatch();
   },
-  "getElementById-31": (event, element) => {
+  "getElementById-31": () => {
     requiredElement("fedPaste").value = "";
   },
-  "generateFundingQuickPrompt-32": (event, element) => {
+  "generateFundingQuickPrompt-32": () => {
     generateFundingQuickPrompt();
   },
-  "copyFundingQuickPrompt-33": (event, element) => {
+  "copyFundingQuickPrompt-33": () => {
     copyFundingQuickPrompt();
   },
-  "fillFundingFromAI-34": (event, element) => {
+  "fillFundingFromAI-34": () => {
     fillFundingFromAI();
   },
-  "resetFundingForm-35": (event, element) => {
+  "resetFundingForm-35": () => {
     resetFundingForm();
   },
-  "fundingPrompt-36": (event, element) => {
+  "fundingPrompt-36": () => {
     fundingPrompt();
   },
-  "copyFundingPrompt-37": (event, element) => {
+  "copyFundingPrompt-37": () => {
     copyFundingPrompt();
   },
-  "importFunding-38": (event, element) => {
+  "importFunding-38": () => {
     importFunding();
   },
-  "exportFunding-39": (event, element) => {
+  "exportFunding-39": () => {
     exportFunding();
   },
-  "copyCpPrompt-40": (event, element) => {
+  "copyCpPrompt-40": () => {
     copyCpPrompt();
   },
-  "applyCpResponse-41": (event, element) => {
+  "applyCpResponse-41": () => {
     applyCpResponse();
   },
-  "saveFredKey-42": (event, element) => {
+  "saveFredKey-42": () => {
     saveFredKey();
   },
-  "forgetFredKey-43": (event, element) => {
+  "forgetFredKey-43": () => {
     forgetFredKey();
   },
-  "fetchFredLiveData-44": (event, element) => {
+  "fetchFredLiveData-44": () => {
     fetchFredLiveData();
   },
-  "renderLiquidityDiagnostics-45": (event, element) => {
+  "renderLiquidityDiagnostics-45": () => {
     renderLiquidityDiagnostics();
   },
-  "exportCloudComparison-46": (event, element) => {
+  "exportCloudComparison-46": () => {
     exportCloudComparison();
   },
-  "showCloudOverwrite-47": (event, element) => {
+  "showCloudOverwrite-47": () => {
     showCloudOverwrite();
   },
-  "getElementById-48": (event, element) => {
+  "getElementById-48": () => {
     requiredElement("restoreCloudFile").click();
   },
-  "importCloudRestore-49": (event, element) => {
+  "importCloudRestore-49": (_event, element) => {
     if (element instanceof HTMLInputElement) void importCloudRestore(element);
   },
-  "if-50": (event, element) => {
+  "if-50": (_event, element) => {
     if (element instanceof HTMLDetailsElement && element.open) renderRestoreTables();
   },
-  "renderRestoreTables-51": (event, element) => {
+  "renderRestoreTables-51": () => {
     renderRestoreTables();
   }
 };
