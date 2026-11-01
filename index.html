@@ -521,8 +521,7 @@ var DashboardCore = (() => {
     commands.push({ label: "Sync now", hint: "Account", run: () => document.getElementById("syncNowBtn")?.click() }, { label: "Keyboard shortcuts", hint: "?", run: () => help.showModal() });
     for (const [label, target] of [["VIX \xB7 Volatility indicators", "riskFactorsScreen"], ["MOVE \xB7 Bond volatility", "riskFactorsScreen"], ["USDJPY \xB7 Carry-unwind momentum", "riskFactorsScreen"], ["SPX / S&P 500 \xB7 Risk charts", "dashboardRiskCharts"], ["NDX / Nasdaq 100 \xB7 Leadership", "cpUpdate"], ["COMP / Nasdaq Composite \xB7 Leadership", "cpUpdate"]]) {
       commands.push({ label, hint: "Market indicator", run: () => {
-        navigate(target);
-        if (target === "riskFactorsScreen") requestAnimationFrame(() => {
+        const focusIndicator = () => requestAnimationFrame(() => {
           const ticker = label.split(" ")[0] ?? "";
           const row = [...document.querySelectorAll("#metricTableBody tr")].find((item) => item.cells[0]?.textContent?.includes(ticker));
           if (row) {
@@ -531,6 +530,15 @@ var DashboardCore = (() => {
             row.scrollIntoView({ block: "center" });
           }
         });
+        if (target === "riskFactorsScreen") {
+          if (location.hash === "#" + target) {
+            navigate(target);
+            focusIndicator();
+            return;
+          }
+          window.addEventListener("hashchange", focusIndicator, { once: true });
+        }
+        navigate(target);
       } });
     }
     let matches = [], selected = 0;
@@ -541,7 +549,10 @@ var DashboardCore = (() => {
       else input.removeAttribute("aria-activedescendant");
     }
     function run(command) {
+      const origin = returnFocus;
+      returnFocus = null;
       dialog.close();
+      origin?.focus();
       command.run();
     }
     function render() {
@@ -713,7 +724,7 @@ var DashboardCore = (() => {
       link.append(icon, element("span", "", screen.title));
       navigation.append(link);
     }
-    sidebar.append(brand, brandNote, navigation, element("p", "workspace-sidebar-note", "Version 1.0.0"));
+    sidebar.append(brand, brandNote, navigation, element("p", "workspace-sidebar-note", "Version 1.1.0"));
     const content = element("div", "workspace-content"), main = element("main", "workspace-main");
     main.id = "workspaceMain";
     for (const screen of screens) {
@@ -2170,7 +2181,7 @@ table td.column-is-collapsed::after {display:none;}
         <div class="last-checked" id="lastCheckDate"></div>
     </div>
     <div class="header-actions">
-        <div class="build-label">Build 2026.10.27 · Dedicated workspaces for every task.</div>
+        <div class="build-label">Dedicated workspaces for every task.</div>
         <div class="user-menu">
             <span class="user-email" id="loggedInEmail"></span>
             <button class="secondary" id="desktopLayoutBtn" aria-pressed="false" data-onclick="setPlatformLayout-5">Desktop</button>
@@ -2688,7 +2699,7 @@ placeholder="Paste 39 comma-separated values: 35 market fields + 4 dates…" ari
 
 
 <section class="control-panel" id="scoring50Methodology">
-<h3>50-point scoring model · v7.0</h3>
+<h3>50-point scoring model</h3>
 <p>Volatility 10 + Credit 14 + Macro 8 + Equity Structure 12 + Forced Selling 6 = 50. Current entries, saved history and all historical studies recalculate from their underlying inputs using the same model. The first 35 Quick Paste fields retain their order; fields 36–39 supply the four observation dates.</p>
 <h3>1. Commercial-paper funding stress: 0, 2 or 3 Credit points</h3>
 <p>Financial CP minus nonfinancial CP measures financial firms’ borrowing premium relative to other corporations. Financial CP minus Treasury bills measures their premium relative to the government benchmark.</p>
