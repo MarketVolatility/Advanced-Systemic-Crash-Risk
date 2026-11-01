@@ -51,6 +51,7 @@ var DashboardCore = (() => {
     initializePlatform: () => initializePlatform,
     initializeSubsectionFolds: () => initializeSubsectionFolds,
     initializeTableControls: () => initializeTableControls,
+    initializeTheme: () => initializeTheme,
     initializeWorkspace: () => initializeWorkspace,
     leadershipPoints: () => leadershipPoints,
     makeSubsectionsExpandable: () => makeSubsectionsExpandable,
@@ -365,6 +366,277 @@ var DashboardCore = (() => {
     document.addEventListener("DOMContentLoaded", () => setPlatformLayout(document.documentElement.dataset["platform"] ?? mode, false));
   }
 
+  // src/ui/theme.ts
+  var choice = "auto";
+  var device;
+  function applyTheme() {
+    document.documentElement.dataset["theme"] = choice === "auto" ? device?.matches ? "light" : "dark" : choice;
+    for (const control of document.querySelectorAll("[data-theme-choice]")) control.setAttribute("aria-pressed", String(control.getAttribute("data-theme-choice") === choice));
+  }
+  function setThemeChoice(value) {
+    choice = value;
+    try {
+      localStorage.setItem("crash-risk-theme", value);
+    } catch {
+    }
+    applyTheme();
+  }
+  function initializeTheme() {
+    device = window.matchMedia("(prefers-color-scheme: light)");
+    try {
+      const saved = localStorage.getItem("crash-risk-theme");
+      if (saved === "light" || saved === "dark") choice = saved;
+    } catch {
+    }
+    applyTheme();
+    device.addEventListener("change", applyTheme);
+    document.addEventListener("DOMContentLoaded", applyTheme);
+  }
+  function themeControls() {
+    const group = document.createElement("fieldset"), legend = document.createElement("legend");
+    legend.textContent = "Theme";
+    group.append(legend);
+    for (const value of ["auto", "light", "dark"]) {
+      const control = document.createElement("button");
+      control.type = "button";
+      control.textContent = value.charAt(0).toUpperCase() + value.slice(1);
+      control.dataset["themeChoice"] = value;
+      control.setAttribute("aria-pressed", String(value === choice));
+      control.addEventListener("click", () => setThemeChoice(value));
+      group.append(control);
+    }
+    return group;
+  }
+
+  // src/ui/account-menu.ts
+  function initializeAccountMenu(topbar) {
+    const actions = topbar.querySelector(".header-actions"), user = actions?.querySelector(".user-menu");
+    if (!actions || !user) return;
+    const account = document.createElement("div");
+    account.className = "account-control";
+    const panel = document.createElement("div");
+    panel.id = "accountMenu";
+    panel.className = "account-panel";
+    panel.hidden = true;
+    panel.setAttribute("role", "group");
+    panel.setAttribute("aria-label", "Account controls");
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.textContent = "Account";
+    toggle.id = "accountMenuButton";
+    toggle.setAttribute("aria-controls", panel.id);
+    toggle.setAttribute("aria-expanded", "false");
+    function setOpen(open) {
+      panel.hidden = !open;
+      toggle.setAttribute("aria-expanded", String(open));
+    }
+    toggle.addEventListener("click", () => setOpen(panel.hidden));
+    for (const child of [...user.children]) if (child.id !== "syncNowBtn") panel.append(child);
+    panel.append(themeControls());
+    account.append(toggle, panel);
+    const sync = document.getElementById("syncNowBtn"), status = document.getElementById("syncStatus");
+    if (status) topbar.append(status);
+    if (sync) topbar.append(sync);
+    topbar.append(account);
+    actions.hidden = true;
+    document.addEventListener("click", (event) => {
+      if (event.target instanceof Node && !account.contains(event.target)) setOpen(false);
+    });
+    document.addEventListener("focusin", (event) => {
+      if (event.target instanceof Node && !account.contains(event.target)) setOpen(false);
+    });
+    account.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !panel.hidden) {
+        event.stopPropagation();
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+    panel.addEventListener("click", (event) => {
+      if (event.target instanceof Element && event.target.closest("button") && !event.target.closest("#desktopLayoutBtn,#mobileLayoutBtn,[data-theme-choice]")) setOpen(false);
+    });
+  }
+
+  // src/ui/quick-jump.ts
+  var shortcuts = { d: "overview", u: "update", h: "history", c: "charts", r: "factors", f: "fed", b: "funding", p: "cp", a: "analysis", s: "studies", m: "methodology", e: "restore", y: "sync" };
+  function button(label, run) {
+    const el = document.createElement("button");
+    el.type = "button";
+    el.textContent = label;
+    el.addEventListener("click", run);
+    return el;
+  }
+  function initializeQuickJump(topbar, screens2, navigate) {
+    const shell = document.getElementById("appShell");
+    if (!shell) return;
+    const dialog = document.createElement("dialog");
+    dialog.id = "quickJumpDialog";
+    dialog.className = "quick-jump";
+    dialog.setAttribute("aria-label", "Quick jump");
+    const input = document.createElement("input");
+    input.type = "search";
+    input.placeholder = "Screen, action or market ticker";
+    input.setAttribute("aria-label", "Search screens, actions or market tickers");
+    input.autocomplete = "off";
+    input.setAttribute("role", "combobox");
+    input.setAttribute("aria-expanded", "true");
+    input.setAttribute("aria-controls", "quickJumpResults");
+    input.setAttribute("aria-autocomplete", "list");
+    const results = document.createElement("div");
+    results.id = "quickJumpResults";
+    results.className = "quick-jump-results";
+    results.setAttribute("role", "listbox");
+    results.setAttribute("aria-label", "Search results");
+    const count = document.createElement("p");
+    count.setAttribute("aria-live", "polite");
+    dialog.append(input, count, results, button("Close", () => dialog.close()));
+    shell.append(dialog);
+    const help = document.createElement("dialog");
+    help.id = "shortcutHelp";
+    help.setAttribute("aria-label", "Keyboard shortcuts");
+    const heading = document.createElement("h2");
+    heading.textContent = "Keyboard shortcuts";
+    help.append(heading);
+    for (const text of ["Ctrl+K / \u2318K / / \u2014 Quick jump", "? \u2014 Show shortcuts", "Escape \u2014 Close menu or dialog", "Shortcuts are disabled while typing in a field.", ...Object.entries(shortcuts).map(([key, id]) => "G then " + key.toUpperCase() + " \u2014 " + (screens2.find((screen) => screen.id === id)?.title ?? id))]) {
+      const row = document.createElement("p");
+      row.textContent = text;
+      help.append(row);
+    }
+    help.append(button("Close", () => help.close()));
+    shell.append(help);
+    let returnFocus = null;
+    for (const modal of [dialog, help]) {
+      modal.addEventListener("close", () => {
+        if (returnFocus?.isConnected) returnFocus.focus();
+      });
+      modal.addEventListener("click", (event) => {
+        if (event.target === modal) {
+          const rect = modal.getBoundingClientRect();
+          if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) modal.close();
+        }
+      });
+    }
+    const commands = screens2.map((screen) => ({ label: screen.id === "overview" ? "Dashboard \xB7 " + screen.title : screen.title, hint: "Screen", run: () => navigate(screen.target) }));
+    for (const value of ["auto", "light", "dark"]) commands.push({ label: "Theme: " + value, hint: "Appearance", run: () => setThemeChoice(value) });
+    commands.push({ label: "Sync now", hint: "Account", run: () => document.getElementById("syncNowBtn")?.click() }, { label: "Keyboard shortcuts", hint: "?", run: () => help.showModal() });
+    for (const [label, target] of [["VIX \xB7 Volatility indicators", "riskFactorsScreen"], ["MOVE \xB7 Bond volatility", "riskFactorsScreen"], ["USDJPY \xB7 Carry-unwind momentum", "riskFactorsScreen"], ["SPX / S&P 500 \xB7 Risk charts", "dashboardRiskCharts"], ["NDX / Nasdaq 100 \xB7 Leadership", "cpUpdate"], ["COMP / Nasdaq Composite \xB7 Leadership", "cpUpdate"]]) {
+      commands.push({ label, hint: "Market indicator", run: () => {
+        navigate(target);
+        if (target === "riskFactorsScreen") requestAnimationFrame(() => {
+          const ticker = label.split(" ")[0] ?? "";
+          const row = [...document.querySelectorAll("#metricTableBody tr")].find((item) => item.cells[0]?.textContent?.includes(ticker));
+          if (row) {
+            row.tabIndex = -1;
+            row.focus({ preventScroll: true });
+            row.scrollIntoView({ block: "center" });
+          }
+        });
+      } });
+    }
+    let matches = [], selected = 0;
+    function highlight() {
+      for (const [index, item] of [...results.children].entries()) item.setAttribute("aria-selected", String(index === selected));
+      const active = results.children[selected];
+      if (active) input.setAttribute("aria-activedescendant", active.id);
+      else input.removeAttribute("aria-activedescendant");
+    }
+    function run(command) {
+      dialog.close();
+      command.run();
+    }
+    function render() {
+      const query = input.value.trim().toLowerCase();
+      matches = commands.filter((command) => (command.label + " " + command.hint).toLowerCase().includes(query));
+      selected = 0;
+      results.replaceChildren();
+      count.textContent = matches.length ? matches.length + " results" : "No matching screens, actions or market tickers.";
+      for (const [index, command] of matches.entries()) {
+        const item = document.createElement("div");
+        item.id = "quickJumpResult" + index;
+        item.setAttribute("role", "option");
+        item.textContent = command.label + " \u2014 " + command.hint;
+        item.addEventListener("click", () => run(command));
+        results.append(item);
+      }
+      highlight();
+    }
+    function canOpen() {
+      return !!shell && !document.querySelector("dialog[open]") && getComputedStyle(shell).display !== "none";
+    }
+    function rememberFocus() {
+      returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    }
+    function openSearch() {
+      if (!canOpen()) return;
+      rememberFocus();
+      input.value = "";
+      render();
+      dialog.showModal();
+      input.focus();
+    }
+    const search = button("Search", openSearch);
+    search.id = "quickJumpButton";
+    search.title = "Quick jump (Ctrl+K / \u2318K)";
+    search.setAttribute("aria-keyshortcuts", "Control+k Meta+k /");
+    topbar.insertBefore(search, topbar.querySelector(".account-control"));
+    input.addEventListener("input", render);
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        selected = matches.length ? (selected + (event.key === "ArrowDown" ? 1 : -1) + matches.length) % matches.length : 0;
+        highlight();
+        results.children[selected]?.scrollIntoView({ block: "nearest" });
+      } else if (event.key === "Enter") {
+        event.preventDefault();
+        const command = matches[selected];
+        if (command) run(command);
+      }
+    });
+    let prefixUntil = 0;
+    document.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (event.isComposing || event.repeat || target instanceof Element && target.closest('input,textarea,select,[contenteditable]:not([contenteditable="false"]),[role="textbox"]')) {
+        prefixUntil = 0;
+        return;
+      }
+      if (!canOpen()) {
+        prefixUntil = 0;
+        return;
+      }
+      const key = event.key.toLowerCase();
+      if ((event.ctrlKey || event.metaKey) && key === "k") {
+        event.preventDefault();
+        prefixUntil = 0;
+        openSearch();
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey) {
+        prefixUntil = 0;
+        return;
+      }
+      if (key === "/" || key === "?") {
+        event.preventDefault();
+        prefixUntil = 0;
+        if (key === "/") openSearch();
+        else {
+          rememberFocus();
+          help.showModal();
+        }
+        return;
+      }
+      if (Date.now() < prefixUntil) {
+        prefixUntil = 0;
+        const screen = screens2.find((item) => item.id === shortcuts[key]);
+        if (screen) {
+          event.preventDefault();
+          navigate(screen.target);
+        }
+        return;
+      }
+      if (key === "g") prefixUntil = Date.now() + 1200;
+    });
+  }
+
   // src/ui/workspace.ts
   var screens = [
     { id: "overview", title: "Market overview", eyebrow: "MONITOR", description: "A coordinated view of volatility, credit, macro conditions, equity structure and selling pressure.", icon: "\u25EB", target: "dashboardOverview" },
@@ -553,6 +825,8 @@ var DashboardCore = (() => {
     shell.addEventListener("click", (event) => {
       if (event.target instanceof Element && event.target.closest('a[href^="#"]')) queueMicrotask(() => navigateWorkspace());
     });
+    initializeAccountMenu(topbar);
+    initializeQuickJump(topbar, screens, showWorkspace);
     navigateWorkspace(false);
   }
   function navigateWorkspace(focus = true) {
@@ -674,14 +948,14 @@ var DashboardCore = (() => {
     for (const cell of top.cells) {
       const start = offset, span = cell.colSpan || 1;
       offset += span;
-      let button = cell.querySelector(".column-visibility-toggle");
-      if (!button) {
+      let button2 = cell.querySelector(".column-visibility-toggle");
+      if (!button2) {
         const label = (cell.textContent || "").trim() || "Column " + (start + 1);
-        button = document.createElement("button");
-        button.type = "button";
-        button.className = "column-visibility-toggle";
-        button.dataset["columnLabel"] = label;
-        button.addEventListener("click", (event) => {
+        button2 = document.createElement("button");
+        button2.type = "button";
+        button2.className = "column-visibility-toggle";
+        button2.dataset["columnLabel"] = label;
+        button2.addEventListener("click", (event) => {
           event.preventDefault();
           event.stopPropagation();
           const collapse = !hidden.has(start);
@@ -690,13 +964,13 @@ var DashboardCore = (() => {
         });
         if (getComputedStyle(cell).position === "static") cell.style.position = "relative";
         cell.classList.add("column-toggle-header");
-        cell.appendChild(button);
+        cell.appendChild(button2);
       }
       const collapsed = hidden.has(start);
-      button.textContent = collapsed ? "+" : "\u2212";
-      button.title = (collapsed ? "Show " : "Hide ") + button.dataset["columnLabel"];
-      button.setAttribute("aria-label", button.title);
-      button.setAttribute("aria-expanded", String(!collapsed));
+      button2.textContent = collapsed ? "+" : "\u2212";
+      button2.title = (collapsed ? "Show " : "Hide ") + button2.dataset["columnLabel"];
+      button2.setAttribute("aria-label", button2.title);
+      button2.setAttribute("aria-expanded", String(!collapsed));
     }
     const occupied = [];
     for (const row of table.rows) {
@@ -788,6 +1062,7 @@ var DashboardCore = (() => {
 function setPlatformLayout(mode, persist = true) {
   DashboardCore.setPlatformLayout(mode, persist);
 }
+DashboardCore.initializeTheme();
 DashboardCore.initializePlatform();
 document.addEventListener("DOMContentLoaded", () => DashboardCore.initializeWorkspace());
 
@@ -1753,6 +2028,67 @@ table td.column-is-collapsed::after {display:none;}
 
 .cp-paste-dates {border:1px solid #33494a;border-radius:8px;margin:16px 0;padding:16px;}
 .cp-paste-dates legend {color:#c7dfd2;padding:0 8px;}
+
+/* Layout only: existing dark palette, actions and all five risk cards remain. */
+.workspace-topbar {justify-content:flex-end;gap:10px;min-height:58px;padding:10px 24px;box-sizing:border-box;}
+.workspace-topbar-title {margin-right:auto;}
+.workspace-topbar #syncStatus {font-size:11px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin:0!important;}
+.workspace-topbar>button,.account-control>button {white-space:nowrap;}
+.account-control {position:relative;flex-shrink:0;}
+.account-panel {position:absolute;right:0;top:calc(100% + 8px);z-index:200;width:280px;max-width:calc(100vw - 32px);padding:16px;box-sizing:border-box;background:var(--card-bg);border:1px solid var(--border);border-radius:10px;box-shadow:0 12px 36px #0004;display:flex;flex-wrap:wrap;gap:8px;}
+.workspace-topbar .account-panel .user-email {flex-basis:100%;max-width:100%;overflow-wrap:anywhere;white-space:normal;text-align:left;font-size:12px;color:var(--text-main);margin:0 0 8px;}
+.workspace-screen .overview-hero {grid-template-columns:1fr;}
+.workspace-screen .signal-grid {grid-template-columns:repeat(4,minmax(0,1fr))!important;}
+.workspace-screen .signal-card {min-width:0;overflow-wrap:anywhere;}
+@media(max-width:1200px){.workspace-screen .signal-grid {grid-template-columns:repeat(2,minmax(0,1fr))!important;}}
+@media(max-width:800px){
+ .workspace-topbar {flex-wrap:nowrap;align-items:center;gap:6px;padding:8px;min-height:50px;}
+ .workspace-menu-button {font-size:0!important;padding:6px 10px!important;line-height:1;}
+ .workspace-menu-button::before {content:'☰';font-size:16px;}
+ .workspace-topbar #syncStatus {flex:1;min-width:0;font-size:10px;max-width:none;}
+ .workspace-topbar>button,.account-control>button {padding:6px 8px;min-height:40px;}
+ .workspace-screen .signal-card {padding:14px;}
+}
+
+/* The typed head bootstrap selects the theme before the stylesheet is parsed. */
+:root[data-theme="light"] {color-scheme:light;--page-bg:#f2f5f6;--bg-color:#f2f5f6;--card-bg:#fff;--card-alt:#eaf0f1;--border:#bccbd0;--text-main:#172d35;--text-muted:#4b626d;--accent:#126548;--green:#126548;--amber:#875500;--red:#ad233c;}
+:root[data-theme="light"] body {background:var(--page-bg);color:var(--text-main);}
+:root[data-theme="light"] :is(.workspace-topbar,.workspace-screen .control-panel,.workspace-screen .signal-card,.workspace-screen details:not(.workspace-panel),.workspace-action-link,.workspace-screen .analysis-document,.workspace-screen .history-repair,.workspace-screen .fred-live-panel,dialog,.account-panel,.auth-form input) {background:var(--card-bg);color:var(--text-main);border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-title,.workspace-description,.workspace-eyebrow,.workspace-screen .panel-title,.workspace-screen h3,.workspace-screen label,.workspace-screen .table-note,.workspace-screen .signal-title,.workspace-screen .signal-value,.workspace-screen .signal-description,.workspace-screen details:not(.workspace-panel)>summary,.workspace-screen .subsection-fold>summary h2,.workspace-screen .subsection-fold>summary h3,.workspace-screen .subsection-fold>summary h4,.auth-card h2,.auth-card p,.auth-form label,.auth-brand,.workspace-content footer,.workspace-topbar-title) {color:var(--text-main);}
+:root[data-theme="light"] :is(.workspace-screen input,.workspace-screen textarea,.workspace-screen select,dialog input) {background:#fff;color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen .paste-box,.workspace-screen .info-box,.workspace-screen .freshness-strip,.workspace-screen .dashboard-disclaimer,.workspace-panel-actions) {background:#e4efeb;color:#254d40;border-color:var(--border);}
+:root[data-theme="light"] :is(#freshnessTitle,#overviewFreshness,.workspace-screen .dashboard-disclaimer>summary,.workspace-screen .disclosure-notice>summary span,.cp-paste-dates legend,.workspace-screen .history-repair>p:first-child,.workspace-screen .fred-live-panel .free-key) {color:#254d40;}
+:root[data-theme="light"] .workspace-screen a {color:#126548;}
+:root[data-theme="light"] .workspace-screen .workspace-action-link:first-child {color:#fff;background:#1c6d51;border-color:#1c6d51;}
+:root[data-theme="light"] .workspace-screen .score-card {--green:#79dfb5;--amber:#f5c265;--red:#ff889a;}
+:root[data-theme="light"] :is(.workspace-topbar button,.workspace-screen button.secondary) {color:#254d40;border-color:var(--border);background:#e7efec;}
+:root[data-theme="light"] .workspace-topbar button[aria-pressed="true"] {background:#185c44!important;color:#fff!important;border-color:#185c44;}
+:root[data-theme="light"] :is(.workspace-screen table,.workspace-screen .history-scroll,.workspace-screen .history-table input) {background:#fff;color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen th,.workspace-screen .history-table th) {background:#e2ebed;color:#264550;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen td,.workspace-screen .history-table td) {color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] .workspace-screen tr:hover>td {background-color:#edf3f4;}
+:root[data-theme="light"] .workspace-screen .history-normal {color:#172d35!important;}
+:root[data-theme="light"] .workspace-screen .history-amber {color:#875500!important;--risk-tint:#b47a11;}
+:root[data-theme="light"] .workspace-screen .history-red {color:#ad233c!important;--risk-tint:#c93650;}
+:root[data-theme="light"] .workspace-screen .history-table small {color:#4b626d;}
+:root[data-theme="light"] .workspace-screen table td:is(.history-amber,.history-red):not(:has(input)) {background-image:linear-gradient(color-mix(in srgb,var(--risk-tint) 14%,white),color-mix(in srgb,var(--risk-tint) 14%,white));}
+:root[data-theme="light"] .workspace-screen table td input:is(.history-amber,.history-red) {background:color-mix(in srgb,currentColor 14%,white);}
+:root[data-theme="light"] .workspace-screen .signal-card {--green:#126548;--amber:#875500;--red:#ad233c;}
+:root[data-theme="light"] .workspace-screen .signal-value span {color:#4b626d!important;}
+:root[data-theme="light"] .auth-overlay {background:#f2f5f6;}
+:root[data-theme="light"] .auth-links button {color:#126548;}
+:root[data-theme="light"] .auth-message.error {color:#ad233c;}
+/* Brand, composite score and chart surfaces retain their contrasting dark treatment. */
+.account-panel fieldset {width:100%;margin:4px 0;padding:8px;border:1px solid var(--border);border-radius:6px;}
+.account-panel legend {font-size:12px;color:var(--text-main);}
+.account-panel fieldset button {margin-right:4px;}
+.quick-jump {width:560px;box-sizing:border-box;max-height:80dvh;padding:20px;}
+.quick-jump input {width:100%;box-sizing:border-box;padding:12px;font:inherit;background:var(--page-bg);color:var(--text-main);border:1px solid var(--border);border-radius:6px;}
+.quick-jump-results {max-height:48dvh;overflow:auto;display:grid;gap:4px;}
+.quick-jump-results [role="option"] {cursor:pointer;text-align:left;padding:12px;background:var(--card-bg);color:var(--text-main);border:1px solid transparent;border-radius:6px;font-size:13px;}
+.quick-jump-results [aria-selected="true"] {border-color:var(--accent);background:var(--card-alt);}
+#shortcutHelp {max-height:80dvh;overflow:auto;}
+#metricTableBody tr:focus {outline:2px solid var(--accent);outline-offset:-2px;}
 
 </style>
 </head>
