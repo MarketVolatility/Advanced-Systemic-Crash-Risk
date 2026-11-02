@@ -1,0 +1,21 @@
+node_modules/
+.test-build/
+test-results/
+playwright-report/
+.DS_Store
+.claude/
+.codex/
+.agents/
+*.zip
+.env
+.env.*
+publish.command
+GitHub uploads/
+handoffs/
+historical-data/
+migration/
+output/
+outputs/
+index.before-*.html
+index.original.html
+CODEX_HANDOFF.md

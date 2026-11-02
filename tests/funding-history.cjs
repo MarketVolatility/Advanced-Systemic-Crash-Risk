@@ -1,0 +1,52 @@
+const fs=require('fs'),vm=require('vm'),assert=require('node:assert/strict');
+class El{constructor(){this.children=[];this.value='';this.style={};}appendChild(x){this.children.push(x)}setAttribute(){}replaceChildren(){this.children=[]}}
+const els={},store=new Map();const get=id=>els[id]??(els[id]=new El());
+const c={displayUpdateTime:v=>v,renderFreshness:()=>{},sp500ForDate:()=>null,marketForDate:()=>null,marketColumns:[["nasdaq"],["nasdaq100"]],drawSp500Overlay:()=>{},sp500ChartPoints:()=>[],URL,Intl,console,confirm:()=>true,document:{getElementById:get,createElement:()=>new El(),createElementNS:()=>new El(),addEventListener(){}},localStorage:{getItem:k=>store.get(k),setItem:(k,v)=>store.set(k,v)}};
+vm.createContext(c);vm.runInContext(`let historyOwner='alice';function chartWindow(range,now){return {start:new Date(+now-90*86400000),end:now}}`,c);
+const html=fs.readFileSync('index.html','utf8');vm.runInContext(html.slice(html.indexOf('function setAppFeedback('),html.indexOf('function analysisMessage(')),c);vm.runInContext(html.slice(html.indexOf('const fundingReference ='),html.indexOf('</script>',html.indexOf('const fundingReference ='))),c);
+const r={observationDate:'2020-03-11',publishedAt:'2020-03-12T20:30:00Z',balance:100,testBalance:null,testEvidence:'',source:'https://fred.stlouisfed.org/series/SWPT'};
+assert.equal(c.validateFunding(r).balance,100);
+for(const bad of [{balance:null},{balance:-1},{testBalance:101,testEvidence:r.source},{testBalance:0},{publishedAt:'2020-03-12'},{observationDate:'2020-02-30'},{source:'javascript:alert(1)'},{source:'https://fred.stlouisfed.org.evil.org/'}])assert.throws(()=>c.validateFunding({...r,...bad}));
+const prev={...r,observationDate:'2020-03-04',publishedAt:'2020-03-05T21:30:00Z',balance:80};
+const revised={...r,publishedAt:'2020-03-13T20:00:00Z',balance:110};
+assert.equal(c.fundingVersionsAt([prev,r,revised],Date.parse('2020-03-12T20:29:59Z')).length,1);
+assert.equal(c.fundingVersionsAt([prev,r,revised],Date.parse('2020-03-12T20:30:00Z')).at(-1).balance,100);
+assert.equal(c.fundingVersionsAt([prev,r,revised],Date.parse('2020-03-14')).at(-1).balance,110);
+assert.equal(c.fundingChange(r,[prev,r],Date.parse(r.publishedAt)),20);
+assert.equal(c.fundingChange(r,[r],Date.parse(r.publishedAt)),null);
+get('fundingImport').value=JSON.stringify([prev,r,revised]);c.importFunding();assert.equal(vm.runInContext('fundingRecords.length',c),3);
+c.importFunding();assert.equal(vm.runInContext('fundingRecords.length',c),3);
+get('fundingImport').value=JSON.stringify([{...r,balance:999}]);c.importFunding();assert.equal(vm.runInContext('fundingRecords.length',c),3);
+get('fundingImport').value=JSON.stringify([{...r,observationDate:'2020-03-18',publishedAt:'2020-03-19T20:00:00Z'},{...r,balance:-1}]);c.importFunding();assert.equal(vm.runInContext('fundingRecords.length',c),3);
+c.renderFunding();assert.ok(get('fundingSummary').textContent.includes('72 USD m'));
+c.editFunding(vm.runInContext('fundingRecords[1]',c));get('funding_balance').value='120';c.saveFundingForm();assert.equal(vm.runInContext('fundingRecords.length',c),4);assert.equal(c.fundingVersionsAt(vm.runInContext('fundingRecords',c),Date.parse('2020-03-12T21:00:00Z')).at(-1).balance,100);
+c.confirm=()=>false;c.deleteFunding(r);assert.equal(vm.runInContext('fundingRecords.length',c),4);
+c.confirm=()=>true;c.deleteFunding(r);assert.equal(vm.runInContext('fundingRecords.length',c),1);
+vm.runInContext("historyOwner='bob'",c);c.loadFunding();assert.equal(vm.runInContext('fundingRecords.length',c),0);vm.runInContext("historyOwner='alice'",c);c.loadFunding();assert.equal(vm.runInContext('fundingRecords.length',c),1);
+console.log('PASS: validation, publication cutoffs, revisions, weekly deltas, atomic import, duplicates/conflicts, edit audit, confirmed deletion, per-account storage and SVG rendering.');
+c.generateFundingQuickPrompt();assert.ok(get('fundingQuickPrompt').value.includes('USD MILLIONS'));assert.ok(get('fundingQuickPrompt').value.includes('exactly these six keys'));
+const count=vm.runInContext('fundingRecords.length',c);
+get('fundingQuickPaste').value=JSON.stringify(r);c.fillFundingFromAI();assert.equal(get('funding_balance').value,100);assert.equal(get('funding_testBalance').value,'');assert.equal(vm.runInContext('fundingRecords.length',c),count);
+get('fundingQuickPaste').value='```json\n'+JSON.stringify({...r,balance:105})+'\n```';c.fillFundingFromAI();assert.equal(get('funding_balance').value,105);
+for(const raw of [[r],{...r,balance:null},{...r,balance:'100'},{...r,testBalance:0},{...r,extra:1},{...r,source:'javascript:alert(1)'}]){get('fundingQuickPaste').value=JSON.stringify(raw);c.fillFundingFromAI();assert.equal(get('funding_balance').value,105);assert.ok(get('fundingQuickStatus').textContent.includes('unchanged'));}
+assert.equal(vm.runInContext('fundingRecords.length',c),count);
+console.log('PASS: latest-data prompt, valid and fenced JSON fills, null test handling, no implicit save, invalid/incomplete responses preserve form.');
+
+c.generateFundingQuickPrompt();assert.ok(get("fundingQuickPrompt").value.includes("illustrative example only"));assert.ok(get("fundingQuickPrompt").value.includes("The first character must be { and the last character must be }"));console.log("PASS: explicit JSON example and no-surrounding-text instructions.");
+
+const references=vm.runInContext('fundingReference',c);
+assert.equal(references.length,40);
+assert.equal(references[0].observationDate,'2025-12-24');
+assert.equal(references.at(-1).observationDate,'2026-09-23');
+assert.ok(references.every(r=>r.publishedAt===null&&r.testBalance===null));
+assert.equal(c.fundingChange(references.at(-1),references,Date.now()),-22);
+vm.runInContext("historyOwner='empty-account';fundingRecords=[]",c);c.renderFunding();
+assert.equal(get('fundingRows').children.length,40);
+assert.equal(get('fundingRows').children[0].children[3].textContent,'2026-09-23');
+assert.equal(get('fundingRows').children[39].children[3].textContent,'2025-12-24');
+assert.equal(get('fundingRows').children[0].children[0].textContent,'Reference');
+const manual={...references.at(-1),id:'manual',reference:false,publishedAt:'2026-09-24T20:31:00Z',balance:73};
+assert.equal(c.fundingVersionsAt([...references,manual],Date.now()).at(-1).balance,73);
+assert.equal(vm.runInContext('fundingRecords.length',c),0);
+assert.ok(get('fundingChart').children.length>20);
+console.log('PASS: 40 embedded observations, latest-first rows, -22 weekly change, read-only reference history, user precedence and no account mutation.');

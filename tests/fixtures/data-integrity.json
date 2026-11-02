@@ -1,0 +1,11 @@
+{
+  "marketHistoryReference": "c3691e1453bdfc3b521b1877a7a2c60664df5365a4074f488ebaab144eeaf4e6",
+  "sp500Daily": "6307a7febe16373da8fb483061e7d5feeaea21b9a9c403511af0474dacaa4caf",
+  "nasdaqDaily": "543df24d7f764bd896506cdf50da20511dd2e4ae7910f4e3adfb0e1eadd1932a",
+  "historicalMonths": "c4d7f25b40dd4fae74e3718d2f9cb401b786d19cd74a780b678110d83b46f61d",
+  "forcedData": "4502ec54de39f6542530d04976bf291e9035ef9b70e225ad7ea32d21a4ff7144",
+  "momentumDiagnostics": "48edb8b532373bf331f8d4e2c9de80d6dfbf4be29c7342885b61637c863fdca6",
+  "sp500Ranges": "ab5586813a02b6c02d5b71ec8be5b401f1fb91d8431dbf8a369192ab31ee47ed",
+  "fundingReference": "23f23e1b08ca61a77be91721cb9473a3d9c40c719550866f2fbb697c200cea29",
+  "commercialPaperDaily": "cddfb34f324e0fbc71169459a5e8f10e16dea785f29c1c748172e95a5cba4f13"
+}

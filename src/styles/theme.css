@@ -1,0 +1,39 @@
+/* The typed head bootstrap selects the theme before the stylesheet is parsed. */
+:root[data-theme="light"] {color-scheme:light;--page-bg:#f2f5f6;--bg-color:#f2f5f6;--card-bg:#fff;--card-alt:#eaf0f1;--border:#bccbd0;--text-main:#172d35;--text-muted:#4b626d;--accent:#126548;--green:#126548;--amber:#875500;--red:#ad233c;}
+:root[data-theme="light"] body {background:var(--page-bg);color:var(--text-main);}
+:root[data-theme="light"] :is(.workspace-topbar,.workspace-screen .control-panel,.workspace-screen .signal-card,.workspace-screen details:not(.workspace-panel),.workspace-action-link,.workspace-screen .analysis-document,.workspace-screen .history-repair,.workspace-screen .fred-live-panel,dialog,.account-panel,.auth-form input) {background:var(--card-bg);color:var(--text-main);border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-title,.workspace-description,.workspace-eyebrow,.workspace-screen .panel-title,.workspace-screen h3,.workspace-screen label,.workspace-screen .table-note,.workspace-screen .signal-title,.workspace-screen .signal-value,.workspace-screen .signal-description,.workspace-screen details:not(.workspace-panel)>summary,.workspace-screen .subsection-fold>summary h2,.workspace-screen .subsection-fold>summary h3,.workspace-screen .subsection-fold>summary h4,.auth-card h2,.auth-card p,.auth-form label,.auth-brand,.workspace-content footer,.workspace-topbar-title) {color:var(--text-main);}
+:root[data-theme="light"] :is(.workspace-screen input,.workspace-screen textarea,.workspace-screen select,dialog input) {background:#fff;color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen .paste-box,.workspace-screen .info-box,.workspace-screen .freshness-strip,.workspace-screen .dashboard-disclaimer,.workspace-panel-actions) {background:#e4efeb;color:#254d40;border-color:var(--border);}
+:root[data-theme="light"] :is(#freshnessTitle,#overviewFreshness,.workspace-screen .dashboard-disclaimer>summary,.workspace-screen .disclosure-notice>summary span,.cp-paste-dates legend,.workspace-screen .history-repair>p:first-child,.workspace-screen .fred-live-panel .free-key) {color:#254d40;}
+:root[data-theme="light"] .workspace-screen a {color:#126548;}
+:root[data-theme="light"] .workspace-screen .workspace-action-link:first-child {color:#fff;background:#1c6d51;border-color:#1c6d51;}
+:root[data-theme="light"] .workspace-screen .score-card {--green:#79dfb5;--amber:#f5c265;--red:#ff889a;}
+:root[data-theme="light"] :is(.workspace-topbar button,.workspace-screen button.secondary) {color:#254d40;border-color:var(--border);background:#e7efec;}
+:root[data-theme="light"] .workspace-topbar button[aria-pressed="true"] {background:#185c44!important;color:#fff!important;border-color:#185c44;}
+:root[data-theme="light"] :is(.workspace-screen table,.workspace-screen .history-scroll,.workspace-screen .history-table input) {background:#fff;color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen th,.workspace-screen .history-table th) {background:#e2ebed;color:#264550;border-color:var(--border);}
+:root[data-theme="light"] :is(.workspace-screen td,.workspace-screen .history-table td) {color:#172d35;border-color:var(--border);}
+:root[data-theme="light"] .workspace-screen tr:hover>td {background-color:#edf3f4;}
+:root[data-theme="light"] .workspace-screen .history-normal {color:#172d35!important;}
+:root[data-theme="light"] .workspace-screen .history-amber {color:#875500!important;--risk-tint:#b47a11;}
+:root[data-theme="light"] .workspace-screen .history-red {color:#ad233c!important;--risk-tint:#c93650;}
+:root[data-theme="light"] .workspace-screen .history-table small {color:#4b626d;}
+:root[data-theme="light"] .workspace-screen table td:is(.history-amber,.history-red):not(:has(input)) {background-image:linear-gradient(color-mix(in srgb,var(--risk-tint) 14%,white),color-mix(in srgb,var(--risk-tint) 14%,white));}
+:root[data-theme="light"] .workspace-screen table td input:is(.history-amber,.history-red) {background:color-mix(in srgb,currentColor 14%,white);}
+:root[data-theme="light"] .workspace-screen .signal-card {--green:#126548;--amber:#875500;--red:#ad233c;}
+:root[data-theme="light"] .workspace-screen .signal-value span {color:#4b626d!important;}
+:root[data-theme="light"] .auth-overlay {background:#f2f5f6;}
+:root[data-theme="light"] .auth-links button {color:#126548;}
+:root[data-theme="light"] .auth-message.error {color:#ad233c;}
+/* Brand, composite score and chart surfaces retain their contrasting dark treatment. */
+.account-panel fieldset {width:100%;margin:4px 0;padding:8px;border:1px solid var(--border);border-radius:6px;}
+.account-panel legend {font-size:12px;color:var(--text-main);}
+.account-panel fieldset button {margin-right:4px;}
+.quick-jump {width:560px;box-sizing:border-box;max-height:80dvh;padding:20px;}
+.quick-jump input {width:100%;box-sizing:border-box;padding:12px;font:inherit;background:var(--page-bg);color:var(--text-main);border:1px solid var(--border);border-radius:6px;}
+.quick-jump-results {max-height:48dvh;overflow:auto;display:grid;gap:4px;}
+.quick-jump-results [role="option"] {cursor:pointer;text-align:left;padding:12px;background:var(--card-bg);color:var(--text-main);border:1px solid transparent;border-radius:6px;font-size:13px;}
+.quick-jump-results [aria-selected="true"] {border-color:var(--accent);background:var(--card-alt);}
+#shortcutHelp {max-height:80dvh;overflow:auto;}
+#metricTableBody tr:focus {outline:2px solid var(--accent);outline-offset:-2px;}
